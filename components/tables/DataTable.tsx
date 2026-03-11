@@ -51,14 +51,14 @@ export default function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div>
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <Table>
           <TableHeader>
-            <TableRow className="bg-gray-50">
+            <TableRow className="bg-[#FAFAF8] border-b border-black/[0.06]">
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  className={`text-xs font-semibold text-gray-600 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-gray-100' : ''} ${col.className || ''}`}
+                  className={`text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.className || ''}`}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
                   <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
@@ -66,7 +66,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                     {col.sortable && (
                       sortKey === col.key
                         ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)
-                        : <ChevronsUpDown className="w-3.5 h-3.5 text-gray-400" />
+                        : <ChevronsUpDown className="w-3.5 h-3.5 text-[#C4B8AC]" />
                     )}
                   </div>
                 </TableHead>
@@ -76,21 +76,26 @@ export default function DataTable<T extends Record<string, unknown>>({
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8 text-gray-500">
-                  データがありません
+                <TableCell colSpan={columns.length} className="text-center py-12 text-[#A99D93]">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-10 h-10 rounded-full bg-[#F3F0ED] flex items-center justify-center">
+                      <span className="text-lg">-</span>
+                    </div>
+                    <span className="text-sm">データがありません</span>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               data.map((row, i) => (
                 <TableRow
                   key={i}
-                  className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} ${rowClassName ? rowClassName(row) : ''}`}
+                  className={`border-b border-black/[0.04] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''}`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((col) => (
                     <TableCell
                       key={col.key}
-                      className={`text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
+                      className={`text-[13px] text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
                     >
                       {col.render ? col.render(row) : String(row[col.key] ?? '-')}
                     </TableCell>
@@ -102,23 +107,25 @@ export default function DataTable<T extends Record<string, unknown>>({
         </Table>
       </div>
       {totalPages > 1 && onPageChange && (
-        <div className="flex items-center justify-between mt-4">
-          <span className="text-sm text-gray-500">
+        <div className="flex items-center justify-between mt-4 px-1">
+          <span className="text-[13px] text-[#A99D93]">
             全{total.toLocaleString()}件中 {((currentPage - 1) * pageSize + 1).toLocaleString()}-{Math.min(currentPage * pageSize, total).toLocaleString()}件
           </span>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
+              className="h-8 w-8 p-0 rounded-lg border-black/[0.08]"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <span className="text-sm px-3">{currentPage} / {totalPages}</span>
+            <span className="text-[13px] px-3 text-[#5A524B]">{currentPage} / {totalPages}</span>
             <Button
               variant="outline"
               size="sm"
+              className="h-8 w-8 p-0 rounded-lg border-black/[0.08]"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
