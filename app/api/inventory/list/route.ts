@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockInventoryList } from '@/lib/mock-data'
 
 interface InventoryRow {
   goods_id: string
@@ -43,6 +44,10 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sort_order') || 'desc'
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') || '50', 10)))
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockInventoryList(page, perPage, brand, category, season))
+    }
 
     const cacheKey = buildCacheKey('inventory-list', {
       brand, category, season, status, lifecycle, alertType,

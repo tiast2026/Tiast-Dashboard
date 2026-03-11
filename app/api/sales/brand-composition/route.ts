@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockBrandComposition } from '@/lib/mock-data'
 
 interface BrandCompositionRow {
   brand: string
@@ -14,6 +15,10 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month')
     if (!month) {
       return NextResponse.json({ error: 'month parameter is required' }, { status: 400 })
+    }
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockBrandComposition(month))
     }
 
     const cacheKey = buildCacheKey('sales-brand-composition', { month })

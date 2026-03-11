@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockCategorySummary } from '@/lib/mock-data'
 
 interface CategorySummaryRow {
   category: string
@@ -12,6 +13,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl
     const brand = searchParams.get('brand') || undefined
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockCategorySummary(brand))
+    }
 
     const cacheKey = buildCacheKey('inventory-category-summary', { brand })
 

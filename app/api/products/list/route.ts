@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockProductsList } from '@/lib/mock-data'
 
 interface ProductRow {
   product_code: string
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
 
     if (!VALID_SORT_FIELDS.includes(sort_by)) {
       return NextResponse.json({ error: 'Invalid sort_by field' }, { status: 400 })
+    }
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockProductsList(page, per_page, brand, category, season, search))
     }
 
     const cacheKey = buildCacheKey('products-list', {

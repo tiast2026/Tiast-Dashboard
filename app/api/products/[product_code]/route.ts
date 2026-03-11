@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockProductDetail } from '@/lib/mock-data'
 
 interface SalesRow {
   product_code: string
@@ -65,6 +66,14 @@ export async function GET(
 ) {
   try {
     const { product_code } = await params
+
+    if (!isBigQueryConfigured()) {
+      const mockData = getMockProductDetail(product_code)
+      if (!mockData) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+      }
+      return NextResponse.json(mockData)
+    }
 
     const cacheKey = buildCacheKey('product-detail', { product_code })
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockInventoryAlerts } from '@/lib/mock-data'
 
 interface AlertRow {
   alert_type: string
@@ -10,6 +11,10 @@ interface AlertRow {
 
 export async function GET() {
   try {
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockInventoryAlerts())
+    }
+
     const cacheKey = buildCacheKey('inventory-alerts', {})
 
     const data = await cachedQuery(cacheKey, async () => {

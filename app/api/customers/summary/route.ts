@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockCustomerSummary } from '@/lib/mock-data'
 
 function getPrevMonth(month: string): string {
   const [y, m] = month.split('-').map(Number)
@@ -24,6 +25,11 @@ export async function GET(request: NextRequest) {
     }
 
     const brand = searchParams.get('brand') || undefined
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockCustomerSummary(month, brand))
+    }
+
     const prevMonth = getPrevMonth(month)
 
     const cacheKey = buildCacheKey('customers-summary', { month, brand })

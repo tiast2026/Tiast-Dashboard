@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockSeasonSummary } from '@/lib/mock-data'
 
 interface SeasonSummaryRow {
   season: string
@@ -11,6 +12,10 @@ interface SeasonSummaryRow {
 
 export async function GET() {
   try {
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockSeasonSummary())
+    }
+
     const cacheKey = buildCacheKey('inventory-season-summary', {})
 
     const data = await cachedQuery(cacheKey, async () => {
