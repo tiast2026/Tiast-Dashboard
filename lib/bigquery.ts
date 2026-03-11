@@ -28,10 +28,17 @@ export function tableName(name: string): string {
   return `\`${PROJECT}.${DATASET}.${name}\``
 }
 
+export function isBigQueryConfigured(): boolean {
+  return !!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+}
+
 export async function runQuery<T = Record<string, unknown>>(
   query: string,
   params?: Record<string, unknown>
 ): Promise<T[]> {
+  if (!isBigQueryConfigured()) {
+    return []
+  }
   const bq = getBigQueryClient()
   const [rows] = await bq.query({
     query,
