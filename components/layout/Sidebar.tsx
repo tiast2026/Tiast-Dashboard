@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import {
   BarChart3, Tag, Package, Users, Megaphone, TrendingUp, Wallet, Database,
 } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3, Tag, Package, Users, Megaphone, TrendingUp, Wallet, Database,
@@ -34,16 +33,28 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="w-60 h-screen bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0 z-40">
-      <div className="p-6 pb-4">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">TIAST</h1>
-        <p className="text-xs text-gray-400 mt-0.5">Dashboard</p>
+    <aside className="w-60 h-screen flex flex-col fixed left-0 top-0 z-40 bg-gradient-to-b from-[#2C2420] to-[#1E1A17]">
+      {/* Logo area */}
+      <div className="p-6 pb-5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C4A882] to-[#A8896A] flex items-center justify-center">
+            <span className="text-white text-sm font-bold">T</span>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-white tracking-wide">TIAST</h1>
+            <p className="text-[10px] text-[#8A7D72] tracking-widest uppercase">Dashboard</p>
+          </div>
+        </div>
       </div>
-      <Separator />
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+
+      {/* Divider */}
+      <div className="mx-4 h-px bg-white/10" />
+
+      {/* Navigation */}
+      <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item, i) => {
           if ('type' in item) {
-            return <Separator key={i} className="my-3" />
+            return <div key={i} className="my-3 mx-2 h-px bg-white/8" />
           }
           const Icon = iconMap[item.icon]
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -53,11 +64,11 @@ export default function Sidebar() {
             return (
               <div
                 key={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-gray-400 cursor-not-allowed"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#5A524B] cursor-not-allowed"
               >
-                {Icon && <Icon className="w-5 h-5" />}
-                <span className="text-sm">{item.label}</span>
-                <span className="ml-auto text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">
+                {Icon && <Icon className="w-[18px] h-[18px]" />}
+                <span className="text-[13px]">{item.label}</span>
+                <span className="ml-auto text-[9px] bg-white/5 text-[#5A524B] px-1.5 py-0.5 rounded-md">
                   準備中
                 </span>
               </div>
@@ -68,20 +79,33 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all duration-200 ${
                 isActive
-                  ? 'bg-gray-100 text-gray-900 font-medium border-l-2 border-gray-900'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-white/12 text-white font-medium shadow-sm'
+                  : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
               }`}
             >
-              {Icon && <Icon className="w-5 h-5" />}
+              {Icon && <Icon className="w-[18px] h-[18px]" />}
               <span>{item.label}</span>
+              {isActive && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C4A882]" />
+              )}
             </Link>
           )
         })}
       </nav>
-      <div className="p-3 border-t border-gray-200">
-        <div className="px-3 py-2.5 text-xs text-gray-400">開発モード</div>
+
+      {/* Footer */}
+      <div className="p-4 border-t border-white/8">
+        <div className="flex items-center gap-2 px-2">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#C4A882] to-[#8FAE8B] flex items-center justify-center">
+            <span className="text-[10px] font-bold text-white">TI</span>
+          </div>
+          <div>
+            <p className="text-[11px] text-[#A99D93]">TIAST Inc.</p>
+            <p className="text-[9px] text-[#5A524B]">v1.0 Phase 1</p>
+          </div>
+        </div>
       </div>
     </aside>
   )

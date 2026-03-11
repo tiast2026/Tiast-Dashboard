@@ -1,29 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 9%;
+    --background: 35 20% 97%;
+    --foreground: 20 15% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 20 15% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 15%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 15%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 15%;
+    --popover-foreground: 20 15% 15%;
+    --primary: 25 30% 22%;
+    --primary-foreground: 35 20% 98%;
+    --secondary: 30 15% 95%;
+    --secondary-foreground: 20 15% 15%;
+    --muted: 30 10% 95%;
+    --muted-foreground: 20 5% 45%;
+    --accent: 30 15% 93%;
+    --accent-foreground: 20 15% 15%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 64%;
-    --radius: 0.5rem;
+    --border: 30 10% 90%;
+    --input: 30 10% 88%;
+    --ring: 25 25% 50%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -32,5 +34,23 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(30 10% 82%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(30 10% 70%);
 }
