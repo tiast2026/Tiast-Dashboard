@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import {
-  BarChart3, Tag, Package, Users, Megaphone, TrendingUp, Wallet, LogOut,
+  BarChart3, Tag, Package, Users, Megaphone, TrendingUp, Wallet,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
@@ -81,13 +80,7 @@ export default function Sidebar() {
         })}
       </nav>
       <div className="p-3 border-t border-gray-200">
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full"
-        >
-          <LogOut className="w-5 h-5" />
-          <span>ログアウト</span>
-        </button>
+        <div className="px-3 py-2.5 text-xs text-gray-400">開発モード</div>
       </div>
     </aside>
   )
