@@ -30,6 +30,10 @@ yarn-error.log*
 .env.local
 .env*.local
 
+# data (CSV files for BigQuery import)
+/data/*.csv
+/data/*.json
+
 # vercel
 .vercel
 
