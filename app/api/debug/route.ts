@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { getBigQueryClient, isBigQueryConfigured, runQuery } from '@/lib/bigquery'
+import { isBigQueryConfigured, runQuery } from '@/lib/bigquery'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const results: Record<string, unknown> = {
