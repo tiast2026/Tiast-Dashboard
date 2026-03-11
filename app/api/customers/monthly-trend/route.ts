@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
           order_month,
           customer_type,
           SUM(customer_count) AS customer_count
-        FROM ${tableName('t_customer_segments')}
+        FROM ${tableName('mart_customer_segments')}
         WHERE order_month >= FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL @months MONTH))
           ${brandFilter}
         GROUP BY order_month, customer_type

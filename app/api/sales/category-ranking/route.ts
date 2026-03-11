@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         SELECT
           category,
           SUM(sales_amount) AS sales_amount
-        FROM ${tableName('t_sales_by_brand_month')}
+        FROM ${tableName('mart_sales_by_brand_month')}
         WHERE order_month = @month
           ${brandFilter}
         GROUP BY category

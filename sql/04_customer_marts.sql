@@ -1,9 +1,9 @@
 -- ============================================================
--- 7. t_customer_segments
+-- 7. mart_customer_segments
 --    顧客セグメント（新規/リピート × 店舗 × 月）
 --    使用先: 顧客分析（サマリ, チャネル別, リピート率, 月別推移）
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_customer_segments` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_customer_segments` AS
 
 WITH ne_orders_with_customer AS (
   SELECT

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
             ELSE 'その他'
           END AS channel_group,
           SUM(sales_amount) AS sales_amount
-        FROM ${tableName('t_sales_by_shop_month')}
+        FROM ${tableName('mart_sales_by_shop_month')}
         WHERE order_month >= FORMAT_DATE('%Y-%m', DATE_SUB(CURRENT_DATE(), INTERVAL @months MONTH))
           ${brandFilter}
         GROUP BY order_month, channel_group

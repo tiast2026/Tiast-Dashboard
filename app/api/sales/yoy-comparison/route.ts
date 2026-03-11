@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
             shop_brand,
             shop_name,
             SUM(sales_amount) AS sales_amount
-          FROM ${tableName('t_sales_by_shop_month')}
+          FROM ${tableName('mart_sales_by_shop_month')}
           WHERE order_month = @month
           GROUP BY shop_brand, shop_name
         ) cur
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             shop_brand,
             shop_name,
             SUM(sales_amount) AS sales_amount
-          FROM ${tableName('t_sales_by_shop_month')}
+          FROM ${tableName('mart_sales_by_shop_month')}
           WHERE order_month = @lastYearMonth
           GROUP BY shop_brand, shop_name
         ) prev

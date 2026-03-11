@@ -25,7 +25,7 @@ export async function GET() {
           COALESCE(SUM(CASE WHEN season_remaining_days > 0 THEN stock_retail_value ELSE 0 END), 0) AS in_season_amount,
           COALESCE(SUM(CASE WHEN season_remaining_days <= 0 THEN stock_retail_value ELSE 0 END), 0) AS exceeded_amount,
           COALESCE(SUM(stock_retail_value), 0) AS total_amount
-        FROM ${tableName('t_md_dashboard')}
+        FROM ${tableName('mart_md_dashboard')}
         GROUP BY season
         ORDER BY total_amount DESC
       `

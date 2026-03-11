@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           shop_name,
           SUM(customer_count) AS total_count,
           SUM(CASE WHEN customer_type = 'リピート' THEN customer_count ELSE 0 END) AS repeat_count
-        FROM ${tableName('t_customer_segments')}
+        FROM ${tableName('mart_customer_segments')}
         WHERE order_month IN UNNEST(@targetMonths)
           ${brandFilter}
         GROUP BY shop_name

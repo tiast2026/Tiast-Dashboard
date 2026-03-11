@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
           SUM(customer_count) AS customer_count,
           SUM(sales_amount) AS sales_amount,
           SUM(order_count) AS order_count
-        FROM ${tableName('t_customer_segments')}
+        FROM ${tableName('mart_customer_segments')}
         WHERE order_month IN (@month, @prevMonth)
           ${brandFilter}
         GROUP BY order_month, customer_type
