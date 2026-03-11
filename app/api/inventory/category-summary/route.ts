@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
           category,
           brand,
           COALESCE(SUM(stock_retail_value), 0) AS stock_retail_value
-        FROM ${tableName('t_md_dashboard')}
+        FROM ${tableName('mart_md_dashboard')}
         ${brandFilter}
         GROUP BY category, brand
         ORDER BY stock_retail_value DESC

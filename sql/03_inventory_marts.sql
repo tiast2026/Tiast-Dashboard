@@ -1,9 +1,9 @@
 -- ============================================================
--- 5. t_inventory_health
+-- 5. mart_inventory_health
 --    在庫健全性分析（SKU単位）
 --    使用先: 在庫一覧, 在庫アラート, 商品詳細
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_inventory_health` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_inventory_health` AS
 
 WITH ne_stock AS (
   -- NE在庫（倉庫合算）
@@ -98,11 +98,11 @@ WHERE ns.total_stock > 0
 
 
 -- ============================================================
--- 6. t_md_dashboard
+-- 6. mart_md_dashboard
 --    MD（マーチャンダイジング）ダッシュボード
 --    使用先: 在庫一覧, 在庫アラート, 商品詳細
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_md_dashboard` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_md_dashboard` AS
 
 WITH product_stock AS (
   SELECT

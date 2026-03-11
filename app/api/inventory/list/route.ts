@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
       // Count query
       const countQuery = `
         SELECT COUNT(*) AS total
-        FROM ${tableName('t_md_dashboard')} d
-        LEFT JOIN ${tableName('t_inventory_health')} h ON d.goods_id = h.goods_id
+        FROM ${tableName('mart_md_dashboard')} d
+        LEFT JOIN ${tableName('mart_inventory_health')} h ON d.goods_id = h.goods_id
         ${whereClause}
       `
 
@@ -132,8 +132,8 @@ export async function GET(request: NextRequest) {
           h.recommended_discount,
           d.lifecycle_action,
           h.is_overstock
-        FROM ${tableName('t_md_dashboard')} d
-        LEFT JOIN ${tableName('t_inventory_health')} h ON d.goods_id = h.goods_id
+        FROM ${tableName('mart_md_dashboard')} d
+        LEFT JOIN ${tableName('mart_inventory_health')} h ON d.goods_id = h.goods_id
         ${whereClause}
         ORDER BY ${sortColumn} ${safeSortOrder}
         LIMIT @limit OFFSET @offset

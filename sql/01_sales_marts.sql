@@ -21,11 +21,11 @@
 
 
 -- ============================================================
--- 1. t_sales_by_shop_month
+-- 1. mart_sales_by_shop_month
 --    売上 × 店舗 × 月 の集計
 --    使用先: ダッシュボード（KPI, 月別推移, 前年比）
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_sales_by_shop_month` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_sales_by_shop_month` AS
 
 WITH ne_sales AS (
   SELECT
@@ -87,11 +87,11 @@ SELECT * FROM zozo_sales
 
 
 -- ============================================================
--- 2. t_sales_by_brand_month
+-- 2. mart_sales_by_brand_month
 --    売上 × ブランド × カテゴリ × 月
 --    使用先: ブランド構成比ドーナツ, カテゴリランキング
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_sales_by_brand_month` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_sales_by_brand_month` AS
 
 WITH ne_sales AS (
   SELECT

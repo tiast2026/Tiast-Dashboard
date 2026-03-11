@@ -94,7 +94,7 @@ export async function GET(
           sales_amount,
           gross_profit,
           gross_profit_rate
-        FROM ${tableName('t_sales_by_product')}
+        FROM ${tableName('mart_sales_by_product')}
         WHERE product_code = @product_code
       `
 
@@ -105,7 +105,7 @@ export async function GET(
           MIN(sales_start_date) AS sales_start_date,
           MAX(sales_end_date) AS sales_end_date,
           COUNT(DISTINCT goods_id) AS sku_count
-        FROM ${tableName('t_product_master')}
+        FROM ${tableName('mart_product_master')}
         WHERE goods_representation_id = @product_code
       `
 
@@ -130,7 +130,7 @@ export async function GET(
           recommended_discount,
           selling_price,
           cost_price
-        FROM ${tableName('t_inventory_health')}
+        FROM ${tableName('mart_inventory_health')}
         WHERE product_code = @product_code
       `
 
@@ -147,7 +147,7 @@ export async function GET(
           stagnation_alert,
           lifecycle_action,
           inventory_status
-        FROM ${tableName('t_md_dashboard')}
+        FROM ${tableName('mart_md_dashboard')}
         WHERE product_code = @product_code
       `
 

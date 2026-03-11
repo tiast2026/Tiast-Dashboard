@@ -1,9 +1,9 @@
 -- ============================================================
--- 3. t_sales_by_product
+-- 3. mart_sales_by_product
 --    商品（代表品番）単位の売上集計
 --    使用先: 商品分析一覧, 商品詳細ページ
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_sales_by_product` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_sales_by_product` AS
 
 WITH ne_product_sales AS (
   SELECT
@@ -103,11 +103,11 @@ GROUP BY product_code
 
 
 -- ============================================================
--- 4. t_product_master
+-- 4. mart_product_master
 --    商品マスタ（代表品番単位でSKU集約）
 --    使用先: 商品一覧・詳細の画像/SKU数
 -- ============================================================
-CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.t_product_master` AS
+CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_product_master` AS
 
 SELECT
   goods_representation_id AS product_code,

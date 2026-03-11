@@ -22,7 +22,7 @@ export async function GET() {
         SELECT 'overstock' AS alert_type,
                COUNT(*) AS count,
                COALESCE(SUM(h.stock_retail_value), 0) AS amount
-        FROM ${tableName('t_inventory_health')} h
+        FROM ${tableName('mart_inventory_health')} h
         WHERE h.is_overstock = true
 
         UNION ALL
@@ -30,7 +30,7 @@ export async function GET() {
         SELECT 'season_ending' AS alert_type,
                COUNT(*) AS count,
                COALESCE(SUM(d.stock_retail_value), 0) AS amount
-        FROM ${tableName('t_md_dashboard')} d
+        FROM ${tableName('mart_md_dashboard')} d
         WHERE d.season_remaining_days > 0
           AND d.season_remaining_days < 30
           AND d.total_stock > 0
@@ -40,7 +40,7 @@ export async function GET() {
         SELECT 'season_exceeded' AS alert_type,
                COUNT(*) AS count,
                COALESCE(SUM(d.stock_retail_value), 0) AS amount
-        FROM ${tableName('t_md_dashboard')} d
+        FROM ${tableName('mart_md_dashboard')} d
         WHERE d.season_remaining_days <= 0
           AND d.total_stock > 0
       `

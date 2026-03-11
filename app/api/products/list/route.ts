@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
       const countQuery = `
         SELECT COUNT(*) AS total
-        FROM ${tableName('t_sales_by_product')} s
+        FROM ${tableName('mart_sales_by_product')} s
         ${whereClause}
       `
       const countRows = await runQuery<{ total: number }>(countQuery, params)
@@ -100,14 +100,14 @@ export async function GET(request: NextRequest) {
           pm.image_url,
           pm.sales_start_date,
           pm.sales_end_date
-        FROM ${tableName('t_sales_by_product')} s
+        FROM ${tableName('mart_sales_by_product')} s
         LEFT JOIN (
           SELECT DISTINCT
             goods_representation_id,
             image_url,
             sales_start_date,
             sales_end_date
-          FROM ${tableName('t_product_master')}
+          FROM ${tableName('mart_product_master')}
         ) pm ON s.product_code = pm.goods_representation_id
         ${whereClause}
         ORDER BY s.${sort_by} ${orderDirection}

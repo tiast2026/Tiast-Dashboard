@@ -150,7 +150,7 @@ function writeExecutiveSummary(sheet, row, month) {
       SUM(gross_profit) AS total_gross_profit,
       SUM(order_count) AS total_orders,
       SAFE_DIVIDE(SUM(sales_amount), SUM(order_count)) AS avg_order_value
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_shop_month\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_shop_month\`
     WHERE year_month = '${month.formatted}'
   `;
 
@@ -162,7 +162,7 @@ function writeExecutiveSummary(sheet, row, month) {
       SUM(gross_profit) AS total_gross_profit,
       SUM(order_count) AS total_orders,
       SAFE_DIVIDE(SUM(sales_amount), SUM(order_count)) AS avg_order_value
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_shop_month\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_shop_month\`
     WHERE year_month = '${lastYearFormatted}'
   `;
 
@@ -240,7 +240,7 @@ function writeBrandChannelSales(sheet, row, month) {
   // ブランドとチャネル（ショップ）の一覧を取得
   const distinctSql = `
     SELECT DISTINCT shop_brand, shop_name
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_shop_month\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_shop_month\`
     WHERE year_month = '${month.formatted}'
     ORDER BY shop_brand, shop_name
   `;
@@ -293,7 +293,7 @@ function writeBrandChannelSales(sheet, row, month) {
         ${metricConf.column === 'gross_profit_rate'
           ? 'SAFE_DIVIDE(SUM(gross_profit), SUM(sales_amount))'
           : `SUM(${metricConf.column})`} AS metric_value
-      FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_shop_month\`
+      FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_shop_month\`
       WHERE year_month = '${month.formatted}'
       GROUP BY shop_brand, shop_name
       ORDER BY shop_brand, shop_name
@@ -368,7 +368,7 @@ function writeCategoryRanking(sheet, row, month) {
       SUM(sales_amount) AS total_sales,
       SUM(order_count) AS total_orders,
       SUM(gross_profit) AS total_gross_profit
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_brand_month\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_brand_month\`
     WHERE year_month = '${month.formatted}'
     GROUP BY brand, category
     ORDER BY brand, total_sales DESC
@@ -444,8 +444,8 @@ function writeProductTop20(sheet, row, month) {
       p.gross_profit,
       i.stock_quantity,
       i.stock_days
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_sales_by_product\` AS p
-    LEFT JOIN \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_inventory_health\` AS i
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_sales_by_product\` AS p
+    LEFT JOIN \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_inventory_health\` AS i
       ON p.product_code = i.product_code
     WHERE p.year_month = '${month.formatted}'
     ORDER BY p.sales_amount DESC
@@ -513,7 +513,7 @@ function writeInventoryAlerts(sheet, row) {
       COUNT(*) AS overstock_count,
       SUM(stock_quantity) AS total_stock,
       SUM(stock_amount) AS total_stock_amount
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_inventory_health\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_inventory_health\`
     WHERE overstock_flag = TRUE
   `;
   const overstockSummary = runBigQuery(overstockSummarySql);
@@ -545,7 +545,7 @@ function writeInventoryAlerts(sheet, row) {
       alert_type,
       COUNT(*) AS alert_count,
       SUM(stock_amount) AS total_amount
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_md_dashboard\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_md_dashboard\`
     WHERE season_alert IS NOT NULL
     GROUP BY alert_type
     ORDER BY total_amount DESC
@@ -583,7 +583,7 @@ function writeInventoryAlerts(sheet, row) {
       stock_quantity,
       stock_amount,
       stock_days
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_inventory_health\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_inventory_health\`
     WHERE overstock_flag = TRUE
     ORDER BY stock_amount DESC
     LIMIT 5
@@ -635,7 +635,7 @@ function writeCustomerSummary(sheet, row, month) {
       COUNT(*) AS customer_count,
       SUM(total_sales) AS total_sales,
       AVG(total_sales) AS avg_sales
-    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.t_customer_segments\`
+    FROM \`${CONFIG.PROJECT_ID}.${CONFIG.DATASET}.mart_customer_segments\`
     WHERE year_month = '${month.formatted}'
     GROUP BY brand, segment
     ORDER BY brand, segment

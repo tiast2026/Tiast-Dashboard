@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
           brand,
           SUM(sales_amount) AS sales_amount,
           SAFE_DIVIDE(SUM(sales_amount), SUM(SUM(sales_amount)) OVER ()) AS ratio
-        FROM ${tableName('t_sales_by_brand_month')}
+        FROM ${tableName('mart_sales_by_brand_month')}
         WHERE order_month = @month
         GROUP BY brand
         ORDER BY sales_amount DESC

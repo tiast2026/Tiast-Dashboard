@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           SUM(sales_amount) AS sales_amount,
           SUM(order_count) AS order_count,
           SUM(gross_profit) AS gross_profit
-        FROM ${tableName('t_sales_by_shop_month')}
+        FROM ${tableName('mart_sales_by_shop_month')}
         WHERE order_month IN (@month, @prevMonth, @lastYearMonth)
           ${brandFilter}
         GROUP BY order_month
