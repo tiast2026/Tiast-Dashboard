@@ -83,7 +83,7 @@ export default function ProductsPage() {
       params.set('per_page', String(perPage))
 
       const res = await fetch(`/api/products/list?${params.toString()}`)
-      const data = await res.json()
+      const data = res.ok ? await res.json() : null
       setResult(data)
     } catch (e) {
       console.error('Failed to fetch products:', e)

@@ -36,17 +36,17 @@ export default function DashboardPage() {
         fetch(`/api/sales/yoy-comparison?month=${month}`),
       ])
       const [summaryData, trendData, compData, rankData, yoyData] = await Promise.all([
-        summaryRes.json(),
-        trendRes.json(),
-        compRes.json(),
-        rankRes.json(),
-        yoyRes.json(),
+        summaryRes.ok ? summaryRes.json() : null,
+        trendRes.ok ? trendRes.json() : [],
+        compRes.ok ? compRes.json() : [],
+        rankRes.ok ? rankRes.json() : [],
+        yoyRes.ok ? yoyRes.json() : [],
       ])
       setSummary(summaryData)
-      setTrend(trendData)
-      setComposition(compData)
-      setRanking(rankData)
-      setYoy(yoyData)
+      setTrend(Array.isArray(trendData) ? trendData : [])
+      setComposition(Array.isArray(compData) ? compData : [])
+      setRanking(Array.isArray(rankData) ? rankData : [])
+      setYoy(Array.isArray(yoyData) ? yoyData : [])
     } catch (e) {
       console.error('Failed to fetch dashboard data:', e)
     } finally {

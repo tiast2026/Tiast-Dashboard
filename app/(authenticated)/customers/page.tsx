@@ -84,15 +84,15 @@ export default function CustomersPage() {
         fetch(`/api/customers/channel-detail?month=${month}${brandParam}`),
       ])
       const [summaryData, trendData, repeatData, detailData] = await Promise.all([
-        summaryRes.json(),
-        trendRes.json(),
-        repeatRes.json(),
-        detailRes.json(),
+        summaryRes.ok ? summaryRes.json() : null,
+        trendRes.ok ? trendRes.json() : [],
+        repeatRes.ok ? repeatRes.json() : [],
+        detailRes.ok ? detailRes.json() : [],
       ])
       setSummary(summaryData)
-      setTrend(trendData)
-      setChannelRepeat(repeatData)
-      setChannelDetail(detailData)
+      setTrend(Array.isArray(trendData) ? trendData : [])
+      setChannelRepeat(Array.isArray(repeatData) ? repeatData : [])
+      setChannelDetail(Array.isArray(detailData) ? detailData : [])
     } catch (e) {
       console.error('Failed to fetch customer data:', e)
     } finally {

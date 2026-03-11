@@ -131,13 +131,13 @@ export default function InventoryPage() {
         fetch(`/api/inventory/category-summary${brandParam}`),
       ])
       const [alertsData, seasonData, categoryData] = await Promise.all([
-        alertsRes.json(),
-        seasonRes.json(),
-        categoryRes.json(),
+        alertsRes.ok ? alertsRes.json() : null,
+        seasonRes.ok ? seasonRes.json() : [],
+        categoryRes.ok ? categoryRes.json() : [],
       ])
       setAlerts(alertsData)
-      setSeasonSummary(seasonData)
-      setCategorySummary(categoryData)
+      setSeasonSummary(Array.isArray(seasonData) ? seasonData : [])
+      setCategorySummary(Array.isArray(categoryData) ? categoryData : [])
     } catch (e) {
       console.error('Failed to fetch inventory summary:', e)
     } finally {
@@ -150,7 +150,7 @@ export default function InventoryPage() {
     setListLoading(true)
     try {
       const res = await fetch(`/api/inventory/list?${buildListParams()}`)
-      const data = await res.json()
+      const data = res.ok ? await res.json() : null
       setInventoryList(data)
     } catch (e) {
       console.error('Failed to fetch inventory list:', e)
