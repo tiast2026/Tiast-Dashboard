@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockCustomerMonthlyTrend } from '@/lib/mock-data'
 
 interface TrendRow {
   order_month: string
@@ -20,6 +21,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const months = parseInt(searchParams.get('months') || '24', 10)
     const brand = searchParams.get('brand') || undefined
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockCustomerMonthlyTrend(months, brand))
+    }
 
     const cacheKey = buildCacheKey('customers-monthly-trend', {
       months: String(months),

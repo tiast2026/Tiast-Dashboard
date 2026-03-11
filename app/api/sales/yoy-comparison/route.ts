@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockYoyComparison } from '@/lib/mock-data'
 
 function getLastYearMonth(month: string): string {
   const [y, m] = month.split('-')
@@ -21,6 +22,10 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month')
     if (!month) {
       return NextResponse.json({ error: 'month parameter is required' }, { status: 400 })
+    }
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockYoyComparison(month))
     }
 
     const lastYearMonth = getLastYearMonth(month)

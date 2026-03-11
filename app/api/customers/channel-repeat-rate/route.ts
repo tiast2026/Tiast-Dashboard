@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName } from '@/lib/bigquery'
+import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
+import { getMockChannelRepeatRate } from '@/lib/mock-data'
 
 function getPrevMonths(month: string, count: number): string[] {
   const months: string[] = [month]
@@ -37,6 +38,11 @@ export async function GET(request: NextRequest) {
     }
 
     const brand = searchParams.get('brand') || undefined
+
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json(getMockChannelRepeatRate(month, brand))
+    }
+
     const targetMonths = getPrevMonths(month, 2) // current + 2 preceding = 3 months
 
     const cacheKey = buildCacheKey('customers-channel-repeat-rate', { month, brand })
