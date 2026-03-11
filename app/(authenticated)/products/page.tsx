@@ -259,10 +259,12 @@ export default function ProductsPage() {
       </div>
 
       {/* Detail Panel */}
-      <ProductDetailPanel
-        productCode={selectedProduct}
-        onClose={() => setSelectedProduct(null)}
-      />
+      {selectedProduct && (
+        <ProductDetailPanel
+          productCode={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </>
   )
 }
