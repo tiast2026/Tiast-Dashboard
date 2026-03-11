@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TIAST 社内ダッシュボード
 
-## Getting Started
+株式会社TIASTの社内データダッシュボード。
+3ブランド（NOAHL / MYRTH / BLACKQUEEN）のEC事業データをBigQueryから読み取り、WEBブラウザで可視化するシステム。
 
-First, run the development server:
+## 技術スタック
+
+- **Next.js 14** (App Router)
+- **TypeScript**
+- **Tailwind CSS** + **shadcn/ui**
+- **Recharts** (グラフ描画)
+- **@google-cloud/bigquery** (BigQuery接続)
+- **NextAuth.js** (ログイン認証)
+- デプロイ先: Vercel（予定）
+- PC専用（最低幅1280px想定）
+
+## セットアップ
+
+### 1. 依存パッケージのインストール
+
+```bash
+npm install
+```
+
+### 2. 環境変数の設定
+
+`.env.local.example` をコピーして `.env.local` を作成し、各値を設定:
+
+```bash
+cp .env.local.example .env.local
+```
+
+| 変数名 | 説明 |
+|--------|------|
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | BigQuery サービスアカウントキーのJSON |
+| `NEXTAUTH_SECRET` | NextAuth.js のシークレットキー |
+| `NEXTAUTH_URL` | アプリケーションURL（dev: `http://localhost:3000`） |
+| `NEXTAUTH_USERS` | ログインユーザー（`email:password` をカンマ区切り） |
+
+### 3. BigQuery 実テーブルの作成
+
+`/sql` ディレクトリのSQLを使って、BigQueryにスケジュールクエリを登録:
+
+1. [BigQuery コンソール](https://console.cloud.google.com/bigquery)にアクセス
+2. `sql/refresh_all_mart_tables.sql` の内容を実行し、全テーブルを初期作成
+3. 各 `sql/create_t_*.sql` をスケジュールクエリとして登録（毎時1回）
+
+詳細は `/sql` ディレクトリ内のSQLファイルを参照。
+
+### 4. 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000 にアクセス。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 画面構成
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 画面 | パス | 説明 |
+|------|------|------|
+| ダッシュボード | `/dashboard` | KPI・売上推移・ブランド構成比・前年比 |
+| 商品分析 | `/products` | 商品一覧・詳細・シーズン消化予測・値引き提案 |
+| 在庫管理 | `/inventory` | アラート・シーズン別在庫・カテゴリ別構成 |
+| 顧客分析 | `/customers` | 新規/リピート分析・チャネル別詳細 |
+| 広告効果 | `/ads` | Phase 2（準備中） |
+| アクセス分析 | `/analytics` | Phase 2（準備中） |
+| 予算管理 | `/budget` | Phase 3（準備中） |
 
-## Learn More
+## API エンドポイント
 
-To learn more about Next.js, take a look at the following resources:
+### 売上 (`/api/sales/`)
+- `GET /api/sales/summary` - KPIサマリ
+- `GET /api/sales/monthly-trend` - 月別売上推移
+- `GET /api/sales/brand-composition` - ブランド別構成比
+- `GET /api/sales/category-ranking` - カテゴリ別ランキング
+- `GET /api/sales/yoy-comparison` - 前年同月比
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 商品 (`/api/products/`)
+- `GET /api/products/list` - 商品一覧（検索・フィルタ・ページネーション）
+- `GET /api/products/[product_code]` - 商品詳細
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 在庫 (`/api/inventory/`)
+- `GET /api/inventory/alerts` - アラートサマリ
+- `GET /api/inventory/season-summary` - シーズン別サマリ
+- `GET /api/inventory/category-summary` - カテゴリ別サマリ
+- `GET /api/inventory/list` - 在庫一覧
 
-## Deploy on Vercel
+### 顧客 (`/api/customers/`)
+- `GET /api/customers/summary` - KPIサマリ
+- `GET /api/customers/monthly-trend` - 月別推移
+- `GET /api/customers/channel-repeat-rate` - チャネル別リピート率
+- `GET /api/customers/channel-detail` - チャネル別詳細
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## パフォーマンス最適化
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **BigQuery実テーブル化**: VIEWの結果を実テーブル（`t_` プレフィックス）に定期保存
+2. **APIキャッシュ**: インメモリキャッシュ（有効期間60分）
+
+## 月次レポート（Apps Script）
+
+`/apps-script` ディレクトリに月次レポート自動生成スクリプトを格納。
+詳細は `apps-script/README.md` を参照。
+
+## ブランドカラー
+
+| ブランド | カラー |
+|---------|--------|
+| NOAHL | `#C4A882`（ベージュ/ラテカラー） |
+| BLACKQUEEN | `#1A1A1A`（ブラック） |
+| MYRTH | `#8FAE8B`（セージグリーン） |
