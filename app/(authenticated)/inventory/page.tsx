@@ -69,7 +69,7 @@ interface InventoryListResponse {
 const STATUS_OPTIONS = ['全て', '適正', '過剰', '在庫なし'] as const
 const LIFECYCLE_OPTIONS = ['全て', '助走期', '成長期', '成熟期', '衰退期'] as const
 const ALERT_TYPE_OPTIONS = [
-  { value: '', label: '全て' },
+  { value: 'all', label: '全て' },
   { value: 'overstock', label: '過剰在庫' },
   { value: 'season_ending', label: 'シーズン終了間近' },
   { value: 'season_exceeded', label: 'シーズン超過' },
@@ -88,7 +88,7 @@ export default function InventoryPage() {
   const [season, setSeason] = useState('全て')
   const [status, setStatus] = useState('全て')
   const [lifecycle, setLifecycle] = useState('全て')
-  const [alertType, setAlertType] = useState('')
+  const [alertType, setAlertType] = useState('all')
 
   // Sort and pagination
   const [sortBy, setSortBy] = useState('stock_retail_value')
@@ -112,7 +112,7 @@ export default function InventoryPage() {
     if (season !== '全て') params.set('season', season)
     if (status !== '全て') params.set('status', status)
     if (lifecycle !== '全て') params.set('lifecycle', lifecycle)
-    if (alertType) params.set('alert_type', alertType)
+    if (alertType && alertType !== 'all') params.set('alert_type', alertType)
     params.set('sort_by', sortBy)
     params.set('sort_order', sortOrder)
     params.set('page', String(page))
@@ -174,7 +174,7 @@ export default function InventoryPage() {
 
   // Handle alert card click
   const handleAlertClick = (type: string) => {
-    setAlertType((prev) => (prev === type ? '' : type))
+    setAlertType((prev) => (prev === type ? 'all' : type))
   }
 
   // Handle sort
@@ -370,7 +370,7 @@ export default function InventoryPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={alertType} onValueChange={(v) => setAlertType(v ?? '')}>
+          <Select value={alertType} onValueChange={(v) => setAlertType(v ?? 'all')}>
             <SelectTrigger className="w-40 bg-white">
               <SelectValue placeholder="アラート" />
             </SelectTrigger>
@@ -425,7 +425,7 @@ export default function InventoryPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[250px]" />
-              ) : (
+              ) : seasonSummary.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={seasonSummary} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
@@ -437,6 +437,8 @@ export default function InventoryPage() {
                     <Bar dataKey="exceeded_amount" name="シーズン超過" stackId="a" fill="#EF4444" />
                   </BarChart>
                 </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
@@ -449,7 +451,7 @@ export default function InventoryPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[250px]" />
-              ) : (
+              ) : categoryChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={categoryChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -468,6 +470,8 @@ export default function InventoryPage() {
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>

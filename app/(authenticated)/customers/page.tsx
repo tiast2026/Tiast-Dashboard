@@ -229,7 +229,7 @@ export default function CustomersPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[350px]" />
-              ) : (
+              ) : trendChartData.length > 0 ? (
                 <StackedBarChart
                   data={trendChartData}
                   keys={trendKeys}
@@ -237,6 +237,8 @@ export default function CustomersPage() {
                   lineKey="リピート率"
                   lineColor="#F97316"
                 />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
@@ -247,12 +249,14 @@ export default function CustomersPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[350px]" />
-              ) : (
+              ) : repeatBarData.length > 0 ? (
                 <BarChart
                   data={repeatBarData}
                   color="#1E40AF"
                   formatValue={(v) => formatPercent(v)}
                 />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
