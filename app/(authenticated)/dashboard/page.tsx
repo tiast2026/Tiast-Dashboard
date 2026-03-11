@@ -140,8 +140,10 @@ export default function DashboardPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[350px]" />
-              ) : (
+              ) : trendChartData.length > 0 ? (
                 <SalesLineChart data={trendChartData} keys={trendKeys} colors={CHANNEL_GROUP_COLORS} />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
@@ -152,8 +154,10 @@ export default function DashboardPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[300px]" />
-              ) : (
+              ) : donutData.length > 0 ? (
                 <DonutChart data={donutData} centerLabel={donutCenter} />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
@@ -168,8 +172,10 @@ export default function DashboardPage() {
             <CardContent>
               {loading ? (
                 <Skeleton className="h-[400px]" />
-              ) : (
+              ) : barData.length > 0 ? (
                 <BarChart data={barData} color="#6B7280" />
+              ) : (
+                <div className="h-[400px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
             </CardContent>
           </Card>
