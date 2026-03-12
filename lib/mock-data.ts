@@ -129,6 +129,24 @@ export function getMockYoyComparison(_month?: string) {
 }
 
 // ============================================================
+// 5b. Daily Sales Trend
+// ============================================================
+export function getMockDailySalesTrend(_month?: string, _brand?: string) {
+  const rand = seededRandom(88)
+  const daysInMonth = 31
+  const result = []
+  for (let day = 1; day <= daysInMonth; day++) {
+    result.push({
+      day,
+      current: Math.round(800000 + rand() * 1200000),
+      prev_month: Math.round(700000 + rand() * 1100000),
+      prev_year: Math.round(600000 + rand() * 1000000),
+    })
+  }
+  return result
+}
+
+// ============================================================
 // 6. Inventory Alerts
 // ============================================================
 export function getMockInventoryAlerts() {

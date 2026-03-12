@@ -35,3 +35,10 @@ export interface YoYComparisonItem {
   previous_year_sales: number
   yoy_ratio: number | null
 }
+
+export interface DailySalesItem {
+  day: number
+  current: number
+  prev_month: number
+  prev_year: number
+}
