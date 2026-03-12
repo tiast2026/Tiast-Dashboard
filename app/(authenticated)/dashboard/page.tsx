@@ -5,13 +5,14 @@ import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
 import SalesLineChart from '@/components/charts/SalesLineChart'
+import DailySalesChart from '@/components/charts/DailySalesChart'
 import DonutChart from '@/components/charts/DonutChart'
 import BarChart from '@/components/charts/BarChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth } from '@/lib/format'
+import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth, getPreviousMonth, getLastYearMonth, formatMonth } from '@/lib/format'
 import { BRAND_COLORS, CHANNEL_GROUP_COLORS } from '@/lib/constants'
-import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, CategoryRankingItem, YoYComparisonItem } from '@/types/sales'
+import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth())
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [composition, setComposition] = useState<BrandCompositionItem[]>([])
   const [ranking, setRanking] = useState<CategoryRankingItem[]>([])
   const [yoy, setYoy] = useState<YoYComparisonItem[]>([])
+  const [dailyTrend, setDailyTrend] = useState<DailySalesItem[]>([])
   const [loading, setLoading] = useState(true)
 
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
@@ -28,25 +30,28 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [summaryRes, trendRes, compRes, rankRes, yoyRes] = await Promise.all([
+      const [summaryRes, trendRes, compRes, rankRes, yoyRes, dailyRes] = await Promise.all([
         fetch(`/api/sales/summary?month=${month}${brandParam}`),
         fetch(`/api/sales/monthly-trend?months=24${brandParam}`),
         fetch(`/api/sales/brand-composition?month=${month}`),
         fetch(`/api/sales/category-ranking?month=${month}${brandParam}`),
         fetch(`/api/sales/yoy-comparison?month=${month}`),
+        fetch(`/api/sales/daily-trend?month=${month}${brandParam}`),
       ])
-      const [summaryData, trendData, compData, rankData, yoyData] = await Promise.all([
+      const [summaryData, trendData, compData, rankData, yoyData, dailyData] = await Promise.all([
         summaryRes.ok ? summaryRes.json() : null,
         trendRes.ok ? trendRes.json() : [],
         compRes.ok ? compRes.json() : [],
         rankRes.ok ? rankRes.json() : [],
         yoyRes.ok ? yoyRes.json() : [],
+        dailyRes.ok ? dailyRes.json() : [],
       ])
       setSummary(summaryData)
       setTrend(Array.isArray(trendData) ? trendData : [])
       setComposition(Array.isArray(compData) ? compData : [])
       setRanking(Array.isArray(rankData) ? rankData : [])
       setYoy(Array.isArray(yoyData) ? yoyData : [])
+      setDailyTrend(Array.isArray(dailyData) ? dailyData : [])
     } catch (e) {
       console.error('Failed to fetch dashboard data:', e)
     } finally {
@@ -130,6 +135,27 @@ export default function DashboardPage() {
             />
           </div>
         ) : null}
+
+        {/* Daily Sales Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">日別売上推移</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[350px]" />
+            ) : dailyTrend.length > 0 ? (
+              <DailySalesChart
+                data={dailyTrend}
+                currentLabel={formatMonth(month)}
+                prevMonthLabel={formatMonth(getPreviousMonth(month))}
+                prevYearLabel={formatMonth(getLastYearMonth(month))}
+              />
+            ) : (
+              <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Main Charts */}
         <div className="grid grid-cols-5 gap-6">
