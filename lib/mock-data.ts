@@ -500,6 +500,11 @@ function generateProductItems() {
     else if (sellingPrice < 10000) priceTier = priceTiers[3]
     else priceTier = priceTiers[4]
 
+    const totalStock = Math.floor(rand() * 200) + 5
+    const dailySales = Math.round((rand() * 5 + 0.2) * 10) / 10
+    const stockDays = dailySales > 0 ? Math.round(totalStock / dailySales) : 0
+    const inventoryStatus = totalStock === 0 ? '在庫なし' : stockDays > 90 ? '過剰' : '適正'
+
     items.push({
       product_code: `${brand.substring(0, 2).toUpperCase()}${String(2000 + i).padStart(5, '0')}`,
       product_name: productNames[i % productNames.length],
@@ -515,6 +520,10 @@ function generateProductItems() {
       image_url: null as string | null,
       sales_start_date: '2024-09-01',
       sales_end_date: null as string | null,
+      total_stock: totalStock,
+      daily_sales: dailySales,
+      stock_days: stockDays,
+      inventory_status: inventoryStatus,
     })
   }
 

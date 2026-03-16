@@ -5,6 +5,7 @@ import { getMockProductsList } from '@/lib/mock-data'
 import { fetchSheetData, isSheetsConfigured } from '@/lib/google-sheets'
 
 interface ProductRow {
+  [key: string]: unknown
   product_code: string
   product_name: string
   brand: string
@@ -18,9 +19,13 @@ interface ProductRow {
   image_url: string | null
   sales_start_date: string | null
   sales_end_date: string | null
+  total_stock: number
+  daily_sales: number
+  stock_days: number
+  inventory_status: string
 }
 
-const VALID_SORT_FIELDS = ['sales_amount', 'gross_profit_rate', 'total_quantity']
+const VALID_SORT_FIELDS = ['sales_amount', 'gross_profit_rate', 'total_quantity', 'total_stock', 'stock_days']
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,6 +91,7 @@ export async function GET(request: NextRequest) {
       const countRows = await runQuery<{ total: number }>(countQuery, params)
       const total = countRows[0]?.total || 0
 
+      const sortTable = ['total_stock', 'stock_days'].includes(sort_by) ? 'inv' : 's'
       const dataQuery = `
         SELECT
           s.product_code,
@@ -100,7 +106,11 @@ export async function GET(request: NextRequest) {
           s.gross_profit_rate,
           pm.image_url,
           pm.sales_start_date,
-          pm.sales_end_date
+          pm.sales_end_date,
+          COALESCE(inv.total_stock, 0) AS total_stock,
+          COALESCE(inv.daily_sales, 0) AS daily_sales,
+          COALESCE(inv.stock_days, 0) AS stock_days,
+          COALESCE(inv.inventory_status, '') AS inventory_status
         FROM ${tableName('mart_sales_by_product')} s
         LEFT JOIN (
           SELECT DISTINCT
@@ -110,8 +120,25 @@ export async function GET(request: NextRequest) {
             sales_end_date
           FROM ${tableName('mart_product_master')}
         ) pm ON s.product_code = pm.goods_representation_id
+        LEFT JOIN (
+          SELECT
+            product_code,
+            SUM(total_stock) AS total_stock,
+            SUM(daily_sales) AS daily_sales,
+            CASE
+              WHEN SUM(daily_sales) > 0 THEN SAFE_DIVIDE(SUM(total_stock), SUM(daily_sales))
+              ELSE 0
+            END AS stock_days,
+            CASE
+              WHEN SUM(total_stock) = 0 THEN '在庫なし'
+              WHEN SUM(daily_sales) > 0 AND SAFE_DIVIDE(SUM(total_stock), SUM(daily_sales)) > 90 THEN '過剰'
+              ELSE '適正'
+            END AS inventory_status
+          FROM ${tableName('mart_md_dashboard')}
+          GROUP BY product_code
+        ) inv ON s.product_code = inv.product_code
         ${whereClause}
-        ORDER BY s.${sort_by} ${orderDirection}
+        ORDER BY ${sortTable}.${sort_by} ${orderDirection}
         LIMIT @limit OFFSET @offset
       `
       params.limit = per_page
