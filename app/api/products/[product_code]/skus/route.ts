@@ -3,9 +3,15 @@ import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
 import { getSkuImagesForProduct, isSheetsConfigured } from '@/lib/google-sheets'
 
-interface SkuSalesRow {
+interface SkuBaseRow {
   goods_id: string
   goods_name: string
+  selling_price: number
+  cost_price: number
+}
+
+interface SkuSalesRow {
+  goods_id: string
   total_quantity: number
   sales_amount: number
   gross_profit_rate: number
@@ -25,7 +31,7 @@ interface SkuInventoryRow {
   turnover_days: number
   last_io_date: string | null
   days_since_last_io: number
-  stagnation_alert: string | null
+  stagnation_alert: boolean
   lifecycle_action: string | null
 }
 
@@ -63,64 +69,47 @@ export async function GET(
     }
 
     const dateRange = getDateRange(period, month)
-    const cacheKey = buildCacheKey('product-skus', { product_code, period, month: month || '' })
+    const cacheKey = buildCacheKey('product-skus-v2', { product_code, period, month: month || '' })
 
     const data = await cachedQuery(cacheKey, async () => {
+      // 1. Base SKU list from products table (always available)
+      const baseQuery = `
+        SELECT
+          p.goods_id,
+          p.goods_name,
+          COALESCE(p.goods_selling_price, 0) AS selling_price,
+          COALESCE(p.goods_cost_price, 0) AS cost_price
+        FROM \`tiast-data-platform.raw_nextengine.products\` p
+        WHERE p.goods_representation_id = @product_code
+        ORDER BY p.goods_id
+      `
+
+      // 2. SKU-level sales (NE only first, simpler and more reliable)
       const neDateCond = dateRange
         ? `AND LEFT(o.receive_order_date, 10) >= '${dateRange.start}' AND LEFT(o.receive_order_date, 10) <= '${dateRange.end}'`
         : ''
-      const zozoDateCond = dateRange
-        ? `AND LEFT(z.order_date, 10) >= '${dateRange.start}' AND LEFT(z.order_date, 10) <= '${dateRange.end}'`
-        : ''
 
-      // SKU-level sales from NE + ZOZO
       const salesQuery = `
-        WITH ne_sku_sales AS (
-          SELECT
-            o.goods_id,
-            MAX(p.goods_name) AS goods_name,
-            SUM(o.quantity) AS total_quantity,
-            SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount,
-            SAFE_DIVIDE(
-              SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
-                - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity),
-              NULLIF(SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)), 0)
-            ) AS gross_profit_rate
-          FROM \`tiast-data-platform.raw_nextengine.orders\` o
-          LEFT JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
-          WHERE COALESCE(p.goods_representation_id, o.goods_id) = @product_code
-            AND CAST(o.cancel_type_id AS STRING) = '0'
-            AND CAST(o.row_cancel_flag AS STRING) = '0'
-            AND o.receive_order_date IS NOT NULL
-            ${neDateCond}
-          GROUP BY o.goods_id
-        ),
-        zozo_sku_sales AS (
-          SELECT
-            z.ne_goods_id AS goods_id,
-            MAX(z.product_name) AS goods_name,
-            SUM(z.order_quantity) AS total_quantity,
-            SUM(z.selling_price * z.order_quantity) AS sales_amount,
-            0 AS gross_profit_rate
-          FROM \`tiast-data-platform.raw_zozo.zozo_orders\` z
-          WHERE z.ne_goods_representation_id = @product_code
-            AND (z.cancel_flag = '' OR z.cancel_flag IS NULL)
-            AND z.order_date IS NOT NULL
-            ${zozoDateCond}
-          GROUP BY z.ne_goods_id
-        )
         SELECT
-          COALESCE(n.goods_id, z.goods_id) AS goods_id,
-          COALESCE(n.goods_name, z.goods_name) AS goods_name,
-          COALESCE(n.total_quantity, 0) + COALESCE(z.total_quantity, 0) AS total_quantity,
-          COALESCE(n.sales_amount, 0) + COALESCE(z.sales_amount, 0) AS sales_amount,
-          COALESCE(n.gross_profit_rate, 0) AS gross_profit_rate
-        FROM ne_sku_sales n
-        FULL OUTER JOIN zozo_sku_sales z ON n.goods_id = z.goods_id
-        ORDER BY sales_amount DESC
+          o.goods_id,
+          SUM(o.quantity) AS total_quantity,
+          SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount,
+          SAFE_DIVIDE(
+            SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
+              - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity),
+            NULLIF(SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)), 0)
+          ) AS gross_profit_rate
+        FROM \`tiast-data-platform.raw_nextengine.orders\` o
+        JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+        WHERE p.goods_representation_id = @product_code
+          AND CAST(o.cancel_type_id AS STRING) = '0'
+          AND CAST(o.row_cancel_flag AS STRING) = '0'
+          AND o.receive_order_date IS NOT NULL
+          ${neDateCond}
+        GROUP BY o.goods_id
       `
 
-      // SKU-level inventory + MD analysis
+      // 3. SKU-level inventory from mart_md_dashboard
       const inventoryQuery = `
         SELECT
           md.goods_id,
@@ -129,80 +118,64 @@ export async function GET(
           COALESCE(md.zozo_stock, 0) AS zozo_stock,
           COALESCE(md.own_stock, 0) AS own_stock,
           COALESCE(md.daily_sales, 0) AS daily_sales,
-          CASE WHEN md.daily_sales > 0 THEN SAFE_DIVIDE(md.total_stock, md.daily_sales) ELSE 0 END AS stock_days,
+          COALESCE(md.stock_days, 0) AS stock_days,
           COALESCE(md.inventory_status, '') AS inventory_status,
           COALESCE(md.lifecycle_stance, '') AS lifecycle_stance,
           COALESCE(md.turnover_rate_annual, 0) AS turnover_rate_annual,
           COALESCE(md.turnover_days, 0) AS turnover_days,
           md.last_io_date,
           COALESCE(md.days_since_last_io, 0) AS days_since_last_io,
-          md.stagnation_alert,
+          COALESCE(md.stagnation_alert, false) AS stagnation_alert,
           md.lifecycle_action
         FROM ${tableName('mart_md_dashboard')} md
         WHERE md.product_code = @product_code
       `
 
-      const [salesRows, inventoryRows] = await Promise.all([
-        runQuery<SkuSalesRow>(salesQuery, { product_code }),
-        runQuery<SkuInventoryRow>(inventoryQuery, { product_code }),
+      // Run all three in parallel
+      const [baseRows, salesRows, inventoryRows] = await Promise.all([
+        runQuery<SkuBaseRow>(baseQuery, { product_code }),
+        runQuery<SkuSalesRow>(salesQuery, { product_code }).catch(e => {
+          console.error('SKU sales query error:', e)
+          return [] as SkuSalesRow[]
+        }),
+        runQuery<SkuInventoryRow>(inventoryQuery, { product_code }).catch(e => {
+          console.error('SKU inventory query error:', e)
+          return [] as SkuInventoryRow[]
+        }),
       ])
 
-      // Merge sales + inventory by goods_id
+      // Build maps for merging
+      const salesMap = new Map(salesRows.map(r => [r.goods_id, r]))
       const invMap = new Map(inventoryRows.map(r => [r.goods_id, r]))
 
-      // Also include SKUs that only exist in inventory (no sales in period)
-      const salesGoodsIds = new Set(salesRows.map(r => r.goods_id))
-      const inventoryOnly = inventoryRows.filter(r => !salesGoodsIds.has(r.goods_id))
-
-      const merged = [
-        ...salesRows.map(s => {
-          const inv = invMap.get(s.goods_id)
-          return {
-            goods_id: s.goods_id,
-            goods_name: s.goods_name,
-            total_quantity: s.total_quantity,
-            sales_amount: s.sales_amount,
-            gross_profit_rate: s.gross_profit_rate,
-            total_stock: inv?.total_stock ?? 0,
-            free_stock: inv?.free_stock ?? 0,
-            zozo_stock: inv?.zozo_stock ?? 0,
-            own_stock: inv?.own_stock ?? 0,
-            daily_sales: inv?.daily_sales ?? 0,
-            stock_days: inv?.stock_days ?? 0,
-            inventory_status: inv?.inventory_status ?? '',
-            lifecycle_stance: inv?.lifecycle_stance ?? '',
-            turnover_rate_annual: inv?.turnover_rate_annual ?? 0,
-            turnover_days: inv?.turnover_days ?? 0,
-            last_io_date: inv?.last_io_date ?? null,
-            days_since_last_io: inv?.days_since_last_io ?? 0,
-            stagnation_alert: inv?.stagnation_alert ?? null,
-            lifecycle_action: inv?.lifecycle_action ?? null,
-          }
-        }),
-        ...inventoryOnly.map(inv => ({
-          goods_id: inv.goods_id,
-          goods_name: '',
-          total_quantity: 0,
-          sales_amount: 0,
-          gross_profit_rate: 0,
-          total_stock: inv.total_stock,
-          free_stock: inv.free_stock,
-          zozo_stock: inv.zozo_stock,
-          own_stock: inv.own_stock,
-          daily_sales: inv.daily_sales,
-          stock_days: inv.stock_days,
-          inventory_status: inv.inventory_status,
-          lifecycle_stance: inv.lifecycle_stance,
-          turnover_rate_annual: inv.turnover_rate_annual,
-          turnover_days: inv.turnover_days,
-          last_io_date: inv.last_io_date,
-          days_since_last_io: inv.days_since_last_io,
-          stagnation_alert: inv.stagnation_alert,
-          lifecycle_action: inv.lifecycle_action,
-        })),
-      ]
-
-      return merged
+      // Merge: base products + sales + inventory
+      return baseRows.map(base => {
+        const sales = salesMap.get(base.goods_id)
+        const inv = invMap.get(base.goods_id)
+        return {
+          goods_id: base.goods_id,
+          goods_name: base.goods_name,
+          selling_price: base.selling_price,
+          cost_price: base.cost_price,
+          total_quantity: sales?.total_quantity ?? 0,
+          sales_amount: sales?.sales_amount ?? 0,
+          gross_profit_rate: sales?.gross_profit_rate ?? 0,
+          total_stock: inv?.total_stock ?? 0,
+          free_stock: inv?.free_stock ?? 0,
+          zozo_stock: inv?.zozo_stock ?? 0,
+          own_stock: inv?.own_stock ?? 0,
+          daily_sales: inv?.daily_sales ?? 0,
+          stock_days: inv?.stock_days ?? 0,
+          inventory_status: inv?.inventory_status ?? '',
+          lifecycle_stance: inv?.lifecycle_stance ?? '',
+          turnover_rate_annual: inv?.turnover_rate_annual ?? 0,
+          turnover_days: inv?.turnover_days ?? 0,
+          last_io_date: inv?.last_io_date ?? null,
+          days_since_last_io: inv?.days_since_last_io ?? 0,
+          stagnation_alert: inv?.stagnation_alert ?? false,
+          lifecycle_action: inv?.lifecycle_action ?? null,
+        }
+      })
     })
 
     // Overlay SKU images from Google Sheets
