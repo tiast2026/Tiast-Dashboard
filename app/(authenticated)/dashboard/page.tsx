@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
@@ -9,21 +9,37 @@ import BarChart from '@/components/charts/BarChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth, getPreviousMonth, getLastYearMonth, formatMonth } from '@/lib/format'
+import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import type { SalesSummaryResponse, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
+
+interface DashboardData {
+  summary: SalesSummaryResponse | null
+  ranking: CategoryRankingItem[]
+  yoy: YoYComparisonItem[]
+  dailyTrend: DailySalesItem[]
+}
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth())
   const [brand, setBrand] = useState('全て')
-  const [summary, setSummary] = useState<SalesSummaryResponse | null>(null)
-  const [ranking, setRanking] = useState<CategoryRankingItem[]>([])
-  const [yoy, setYoy] = useState<YoYComparisonItem[]>([])
-  const [dailyTrend, setDailyTrend] = useState<DailySalesItem[]>([])
-  const [loading, setLoading] = useState(true)
-
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
+  const cacheKey = `dashboard:${month}:${brandParam}`
+
+  const cached = getCached<DashboardData>(cacheKey)
+  const [summary, setSummary] = useState<SalesSummaryResponse | null>(cached?.summary ?? null)
+  const [ranking, setRanking] = useState<CategoryRankingItem[]>(cached?.ranking ?? [])
+  const [yoy, setYoy] = useState<YoYComparisonItem[]>(cached?.yoy ?? [])
+  const [dailyTrend, setDailyTrend] = useState<DailySalesItem[]>(cached?.dailyTrend ?? [])
+  const [loading, setLoading] = useState(!cached)
+  const mountedRef = useRef(true)
 
   const fetchData = useCallback(async () => {
-    setLoading(true)
+    // Skip fetch if cache is fresh (< 5 min)
+    if (isFresh(cacheKey)) return
+
+    // Only show loading if no cached data
+    if (!getCached(cacheKey)) setLoading(true)
+
     try {
       const [summaryRes, rankRes, yoyRes, dailyRes] = await Promise.all([
         fetch(`/api/sales/summary?month=${month}${brandParam}`),
@@ -37,20 +53,39 @@ export default function DashboardPage() {
         yoyRes.ok ? yoyRes.json() : [],
         dailyRes.ok ? dailyRes.json() : [],
       ])
-      setSummary(summaryData)
-      setRanking(Array.isArray(rankData) ? rankData : [])
-      setYoy(Array.isArray(yoyData) ? yoyData : [])
-      setDailyTrend(Array.isArray(dailyData) ? dailyData : [])
+      if (!mountedRef.current) return
+      const data: DashboardData = {
+        summary: summaryData,
+        ranking: Array.isArray(rankData) ? rankData : [],
+        yoy: Array.isArray(yoyData) ? yoyData : [],
+        dailyTrend: Array.isArray(dailyData) ? dailyData : [],
+      }
+      setSummary(data.summary)
+      setRanking(data.ranking)
+      setYoy(data.yoy)
+      setDailyTrend(data.dailyTrend)
+      setCache(cacheKey, data)
     } catch (e) {
       console.error('Failed to fetch dashboard data:', e)
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
-  }, [month, brandParam])
+  }, [month, brandParam, cacheKey])
 
   useEffect(() => {
+    mountedRef.current = true
+    // Restore from cache immediately
+    const c = getCached<DashboardData>(cacheKey)
+    if (c) {
+      setSummary(c.summary)
+      setRanking(c.ranking)
+      setYoy(c.yoy)
+      setDailyTrend(c.dailyTrend)
+      setLoading(false)
+    }
     fetchData()
-  }, [fetchData])
+    return () => { mountedRef.current = false }
+  }, [fetchData, cacheKey])
 
   // Build brand×channel matrix from YoY data
   const { channels, brands, matrix, channelTotals, grandTotal } = (() => {
