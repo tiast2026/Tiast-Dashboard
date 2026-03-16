@@ -3,7 +3,7 @@ import { sheets, sheets_v4, auth as gauth } from '@googleapis/sheets'
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1m_slCKW-k_pcEDW7goMDc7Mt3-gTQBL75mchKU-GOv8'
 const SHEET_NAME = process.env.GOOGLE_SHEET_NAME || 'ダッシュボード用'
 
-// Column mapping: spreadsheet header → internal key
+// Column mapping: spreadsheet header → internal key (known columns)
 const HEADER_MAP: Record<string, string> = {
   '代表品番': 'product_code',
   'ZOZO専用商品番号': 'zozo_product_code',
@@ -23,13 +23,6 @@ const HEADER_MAP: Record<string, string> = {
   '発注ロット': 'order_lot',
 }
 
-// Headers in spreadsheet order
-const HEADERS_ORDER = [
-  '代表品番', 'ZOZO専用商品番号', 'サムネURL', '注力', 'ブランド', 'シーズン抽出',
-  'シーズン', '販売日', '終了日', '再入荷', 'カテゴリ',
-  'コラボ', 'サイズ', '上代', '下代', '発注ロット',
-]
-
 export interface SheetProductMaster {
   product_code: string
   zozo_product_code: string
@@ -47,11 +40,21 @@ export interface SheetProductMaster {
   selling_price: number
   cost_price: number
   order_lot: number | null
+  extra_fields: Record<string, string>  // dynamic columns not in HEADER_MAP
   _row_index?: number  // 1-based row number in sheet (for updates)
+}
+
+// Header info for the table UI
+export interface SheetHeaderInfo {
+  key: string       // internal key or original header name
+  label: string     // original spreadsheet header name
+  isExtra: boolean  // true if not in HEADER_MAP
 }
 
 // In-memory cache
 let cachedData: SheetProductMaster[] | null = null
+let cachedHeaders: SheetHeaderInfo[] | null = null
+let cachedRawHeaders: string[] | null = null
 let cacheTimestamp = 0
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -70,10 +73,21 @@ function getSheetsClient(): sheets_v4.Sheets {
   return sheets({ version: 'v4', auth: authClient })
 }
 
-function parseRow(row: string[], headerKeys: string[], rowIndex: number): SheetProductMaster {
+function parseRow(row: string[], headerKeys: string[], rawHeaders: string[], rowIndex: number): SheetProductMaster {
   const obj: Record<string, string> = {}
+  const extra: Record<string, string> = {}
+
   for (let i = 0; i < headerKeys.length; i++) {
-    obj[headerKeys[i]] = (row[i] || '').trim()
+    const val = (row[i] || '').trim()
+    const key = headerKeys[i]
+    const rawHeader = rawHeaders[i]
+
+    // If the key equals the raw header, it's an unknown/extra column
+    if (!HEADER_MAP[rawHeader]) {
+      extra[rawHeader] = val
+    } else {
+      obj[key] = val
+    }
   }
 
   return {
@@ -93,6 +107,7 @@ function parseRow(row: string[], headerKeys: string[], rowIndex: number): SheetP
     selling_price: Number(obj.selling_price) || 0,
     cost_price: Number(obj.cost_price) || 0,
     order_lot: obj.order_lot ? Number(obj.order_lot) : null,
+    extra_fields: extra,
     _row_index: rowIndex,
   }
 }
@@ -114,24 +129,44 @@ export async function fetchSheetData(forceRefresh = false): Promise<SheetProduct
   const rows = res.data.values
   if (!rows || rows.length < 2) {
     cachedData = []
+    cachedHeaders = []
+    cachedRawHeaders = []
     cacheTimestamp = Date.now()
     return []
   }
 
   // First row = headers
-  const headers = rows[0] as string[]
-  const headerKeys = headers.map(h => HEADER_MAP[h.trim()] || h.trim())
+  const rawHeaders = (rows[0] as string[]).map(h => h.trim())
+  const headerKeys = rawHeaders.map(h => HEADER_MAP[h] || h)
+
+  // Build header info for the UI
+  cachedHeaders = rawHeaders.map((h, i) => ({
+    key: headerKeys[i],
+    label: h,
+    isExtra: !HEADER_MAP[h],
+  }))
+  cachedRawHeaders = rawHeaders
 
   const items: SheetProductMaster[] = []
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as string[]
     if (!row[0] || !row[0].trim()) continue // skip empty rows
-    items.push(parseRow(row, headerKeys, i + 1)) // i+1 = 1-based row number
+    items.push(parseRow(row, headerKeys, rawHeaders, i + 1)) // i+1 = 1-based row number
   }
 
   cachedData = items
   cacheTimestamp = Date.now()
   return items
+}
+
+/**
+ * Get the spreadsheet headers (call after fetchSheetData)
+ */
+export async function getSheetHeaders(): Promise<SheetHeaderInfo[]> {
+  if (!cachedHeaders) {
+    await fetchSheetData()
+  }
+  return cachedHeaders || []
 }
 
 /**
@@ -163,15 +198,20 @@ export async function getSheetProductsByCode(codes: string[]): Promise<Map<strin
 export async function updateSheetRow(product: SheetProductMaster): Promise<void> {
   const client = getSheetsClient()
 
-  // Find the row to update
+  // Ensure we have fresh data and headers
   const data = await fetchSheetData(true)
   const existing = data.find(d => d.product_code === product.product_code)
 
-  const rowValues = HEADERS_ORDER.map(header => {
+  const headers = cachedRawHeaders || []
+  const rowValues = headers.map(header => {
     const key = HEADER_MAP[header]
-    const val = product[key as keyof SheetProductMaster]
-    if (val === undefined || val === null) return ''
-    return String(val)
+    if (key) {
+      const val = product[key as keyof SheetProductMaster]
+      if (val === undefined || val === null) return ''
+      return String(val)
+    }
+    // Extra field
+    return product.extra_fields?.[header] || ''
   })
 
   if (existing && existing._row_index) {
@@ -186,7 +226,7 @@ export async function updateSheetRow(product: SheetProductMaster): Promise<void>
     // Append new row
     await client.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A:N`,
+      range: `${SHEET_NAME}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [rowValues] },
     })
@@ -204,15 +244,78 @@ export async function deleteSheetRow(productCode: string): Promise<boolean> {
   const existing = data.find(d => d.product_code === productCode)
   if (!existing || !existing._row_index) return false
 
+  const colCount = cachedRawHeaders?.length || 16
+  const lastCol = String.fromCharCode(64 + colCount) // A=65
+
   const client = getSheetsClient()
   await client.spreadsheets.values.clear({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A${existing._row_index}:N${existing._row_index}`,
+    range: `${SHEET_NAME}!A${existing._row_index}:${lastCol}${existing._row_index}`,
   })
 
   // Invalidate cache
   cachedData = null
   return true
+}
+
+// ============================================================
+// SKU画像シート
+// ============================================================
+
+const SKU_SHEET_NAME = 'SKU画像'
+
+export interface SkuImageRow {
+  product_code: string   // B列: 商品管理番号（代表品番と紐付け）
+  sku_code: string       // C列: SKU番号
+  sku_image_url: string  // D列: SKU画像URL
+}
+
+let cachedSkuData: SkuImageRow[] | null = null
+let skuCacheTimestamp = 0
+
+/**
+ * Fetch SKU image data from the SKU画像 sheet
+ */
+export async function fetchSkuImageData(forceRefresh = false): Promise<SkuImageRow[]> {
+  if (!forceRefresh && cachedSkuData && Date.now() - skuCacheTimestamp < CACHE_TTL_MS) {
+    return cachedSkuData
+  }
+
+  const client = getSheetsClient()
+  const res = await client.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${SKU_SHEET_NAME}`,
+  })
+
+  const rows = res.data.values
+  if (!rows || rows.length < 2) {
+    cachedSkuData = []
+    skuCacheTimestamp = Date.now()
+    return []
+  }
+
+  // Skip header row (row 0), parse B/C/D columns (index 1, 2, 3)
+  const items: SkuImageRow[] = []
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i] as string[]
+    const productCode = (row[1] || '').trim()  // B列
+    const skuCode = (row[2] || '').trim()      // C列
+    const skuImageUrl = (row[3] || '').trim()  // D列
+    if (!productCode) continue
+    items.push({ product_code: productCode, sku_code: skuCode, sku_image_url: skuImageUrl })
+  }
+
+  cachedSkuData = items
+  skuCacheTimestamp = Date.now()
+  return items
+}
+
+/**
+ * Get SKU images for a specific product code
+ */
+export async function getSkuImagesForProduct(productCode: string): Promise<SkuImageRow[]> {
+  const data = await fetchSkuImageData()
+  return data.filter(d => d.product_code === productCode)
 }
 
 /**
@@ -227,5 +330,7 @@ export function isSheetsConfigured(): boolean {
  */
 export function invalidateSheetCache(): void {
   cachedData = null
+  cachedHeaders = null
+  cachedRawHeaders = null
   cacheTimestamp = 0
 }

@@ -22,6 +22,7 @@ export interface ProductMaster {
   operation_note: string       // 運用のポイント
   image_url: string | null     // サムネURL
   sku_images: SkuImage[]       // SKU別画像
+  extra_fields: Record<string, string>  // スプレッドシートの動的カラム
   created_at: string
   updated_at: string
 }

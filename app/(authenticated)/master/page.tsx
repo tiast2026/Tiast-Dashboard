@@ -1,6 +1,7 @@
+/* eslint-disable react/display-name */
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Header from '@/components/layout/Header'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import { Button } from '@/components/ui/button'
@@ -8,12 +9,21 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS } from '@/lib/constants'
-import { ExternalLink, Image, RefreshCw, AlertCircle } from 'lucide-react'
+import { ExternalLink, Image as ImageIcon, RefreshCw, AlertCircle, Loader2 } from 'lucide-react'
 import type { ProductMaster } from '@/types/master'
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1m_slCKW-k_pcEDW7goMDc7Mt3-gTQBL75mchKU-GOv8/edit?gid=1735499737#gid=1735499737'
+
+const PAGE_SIZE_OPTIONS = [30, 50, 100, 200]
+
+interface HeaderInfo {
+  key: string
+  label: string
+  isExtra: boolean
+}
 
 interface MasterRow extends ProductMaster {
   [key: string]: unknown
@@ -25,7 +35,63 @@ interface ListResponse {
   page: number
   per_page: number
   total_pages: number
+  headers?: HeaderInfo[]
 }
+
+interface SkuImageItem {
+  product_code: string
+  sku_code: string
+  sku_image_url: string
+}
+
+// Known column renderers (special formatting)
+function getKnownColumnRenderer(key: string): ((row: MasterRow) => React.ReactNode) | null {
+  switch (key) {
+    case 'image_url':
+      return (row) =>
+        row.image_url ? (
+          <img src={row.image_url} alt="" className="w-11 h-11 object-cover rounded" />
+        ) : (
+          <div className="w-11 h-11 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+            <ImageIcon className="w-4 h-4" />
+          </div>
+        )
+    case 'product_code':
+      return (row) => <span className="font-mono font-medium">{row.product_code}</span>
+    case 'zozo_product_code':
+      return (row) => <span className="font-mono text-gray-500">{row.zozo_product_code || '-'}</span>
+    case 'is_focus':
+      return (row) => row.is_focus ? (
+        <Badge className="bg-orange-100 text-orange-700 px-1.5">{row.is_focus}</Badge>
+      ) : <span className="text-gray-300">-</span>
+    case 'selling_price':
+      return (row) => <span>{row.selling_price ? formatCurrency(row.selling_price) : '-'}</span>
+    case 'cost_price':
+      return (row) => <span>{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>
+    case 'order_lot':
+      return (row) => <span>{row.order_lot ?? '-'}</span>
+    case 'sales_start_date':
+      return (row) => <span className="text-gray-500">{formatDate(row.sales_start_date)}</span>
+    case 'sales_end_date':
+      return (row) => <span className="text-gray-500">{formatDate(row.sales_end_date)}</span>
+    case 'restock':
+      return (row) => <span className="text-gray-500">{row.restock || '-'}</span>
+    case 'collaborator':
+      return (row) => <span>{row.collaborator || '-'}</span>
+    case 'size':
+      return (row) => <span className="text-gray-500">{row.size || '-'}</span>
+    case 'season_extraction':
+      return (row) => <span>{row.season_extraction || '-'}</span>
+    default:
+      return null
+  }
+}
+
+// Right-aligned columns
+const RIGHT_ALIGN_KEYS = new Set(['selling_price', 'cost_price', 'order_lot'])
+
+// Columns to hide from table (rendered separately or internal)
+const HIDDEN_KEYS = new Set(['image_url'])
 
 export default function MasterPage() {
   const [search, setSearch] = useState('')
@@ -33,9 +99,16 @@ export default function MasterPage() {
   const [category, setCategory] = useState('全て')
   const [season, setSeason] = useState('全て')
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(50)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ListResponse | null>(null)
+
+  // SKU dialog state
+  const [skuDialogOpen, setSkuDialogOpen] = useState(false)
+  const [skuDialogProduct, setSkuDialogProduct] = useState<MasterRow | null>(null)
+  const [skuImages, setSkuImages] = useState<SkuImageItem[]>([])
+  const [skuLoading, setSkuLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -47,7 +120,7 @@ export default function MasterPage() {
       if (category !== '全て') params.set('category', category)
       if (season !== '全て') params.set('season', season)
       params.set('page', String(page))
-      params.set('per_page', '50')
+      params.set('per_page', String(perPage))
 
       const res = await fetch(`/api/master?${params}`)
       if (res.ok) {
@@ -62,102 +135,75 @@ export default function MasterPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, brand, category, season, page])
+  }, [search, brand, category, season, page, perPage])
 
   useEffect(() => { fetchList() }, [fetchList])
-  useEffect(() => { setPage(1) }, [search, brand, category, season])
+  useEffect(() => { setPage(1) }, [search, brand, category, season, perPage])
 
-  const columns: Column<MasterRow>[] = [
-    {
-      key: 'image_url',
-      label: '',
-      className: 'w-[48px]',
-      render: (row) =>
-        row.image_url ? (
-          <img src={row.image_url} alt="" className="w-10 h-10 object-cover rounded aspect-square" />
-        ) : (
-          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-300 aspect-square">
-            <Image className="w-4 h-4" />
-          </div>
-        ),
-    },
-    {
-      key: 'product_code',
-      label: '代表品番',
-      className: 'min-w-[130px]',
-      render: (row) => (
-        <div className="font-mono text-xs font-medium">{row.product_code}</div>
-      ),
-    },
-    {
-      key: 'zozo_product_code',
-      label: 'ZOZO品番',
-      render: (row) => <span className="font-mono text-xs text-gray-500">{row.zozo_product_code || '-'}</span>,
-    },
-    {
-      key: 'is_focus',
-      label: '注力',
-      className: 'w-[44px]',
-      render: (row) => row.is_focus ? (
-        <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">{row.is_focus}</Badge>
-      ) : <span className="text-gray-300">-</span>,
-    },
-    { key: 'brand', label: 'ブランド' },
-    {
-      key: 'season_extraction',
-      label: 'シーズン抽出',
-      render: (row) => <span className="text-xs">{row.season_extraction || '-'}</span>,
-    },
-    { key: 'season', label: 'シーズン' },
-    { key: 'category', label: 'カテゴリ' },
-    {
-      key: 'collaborator',
-      label: 'コラボ',
-      render: (row) => <span className="text-xs">{row.collaborator || '-'}</span>,
-    },
-    {
-      key: 'size',
-      label: 'サイズ',
-      render: (row) => <span className="text-xs text-gray-500">{row.size || '-'}</span>,
-    },
-    {
-      key: 'selling_price',
-      label: '上代',
-      align: 'right',
-      render: (row) => <span className="text-xs">{row.selling_price ? formatCurrency(row.selling_price) : '-'}</span>,
-    },
-    {
-      key: 'cost_price',
-      label: '下代',
-      align: 'right',
-      render: (row) => <span className="text-xs">{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>,
-    },
-    {
-      key: 'order_lot',
-      label: '発注ロット',
-      align: 'right',
-      render: (row) => <span className="text-xs">{row.order_lot ?? '-'}</span>,
-    },
-    {
-      key: 'restock',
-      label: '再入荷',
-      render: (row) => <span className="text-xs text-gray-500">{row.restock || '-'}</span>,
-    },
-    {
-      key: 'sales_start_date',
-      label: '販売日',
-      render: (row) => (
-        <span className="text-xs text-gray-500">{formatDate(row.sales_start_date)}</span>
-      ),
-    },
-    {
-      key: 'sales_end_date',
-      label: '終了日',
-      render: (row) => (
-        <span className="text-xs text-gray-500">{formatDate(row.sales_end_date)}</span>
-      ),
-    },
-  ]
+  // Handle row click → fetch SKU images
+  const handleRowClick = useCallback(async (row: MasterRow) => {
+    setSkuDialogProduct(row)
+    setSkuDialogOpen(true)
+    setSkuLoading(true)
+    setSkuImages([])
+
+    try {
+      const res = await fetch(`/api/master/sku-images?product_code=${encodeURIComponent(row.product_code)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSkuImages(data.data || [])
+      }
+    } catch (e) {
+      console.error('Failed to fetch SKU images:', e)
+    } finally {
+      setSkuLoading(false)
+    }
+  }, [])
+
+  // Build columns dynamically from API headers
+  const columns: Column<MasterRow>[] = useMemo(() => {
+    const headers = result?.headers || []
+    if (headers.length === 0) return []
+
+    const cols: Column<MasterRow>[] = []
+
+    // Add image column
+    const hasImage = headers.some(h => h.key === 'image_url')
+    if (hasImage) {
+      cols.push({
+        key: 'image_url',
+        label: '',
+        className: 'w-[52px]',
+        render: getKnownColumnRenderer('image_url')!,
+      })
+    }
+
+    // Add remaining columns in spreadsheet order
+    for (const h of headers) {
+      if (HIDDEN_KEYS.has(h.key)) continue
+
+      const renderer = h.isExtra ? null : getKnownColumnRenderer(h.key)
+      const col: Column<MasterRow> = {
+        key: h.key,
+        label: h.label,
+        className: h.key === 'product_code' ? 'min-w-[140px]' : 'whitespace-nowrap',
+        align: RIGHT_ALIGN_KEYS.has(h.key) ? 'right' : undefined,
+      }
+
+      if (renderer) {
+        col.render = renderer
+      } else if (h.isExtra) {
+        col.render = (row) => {
+          const val = row.extra_fields?.[h.label]
+          return <span>{val || '-'}</span>
+        }
+      }
+
+      cols.push(col)
+    }
+
+    return cols
+  }, [result?.headers])
 
   return (
     <>
@@ -196,7 +242,7 @@ export default function MasterPage() {
             className="w-56 bg-white"
           />
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">ブランド</span>
+            <span className="text-sm text-gray-500">ブランド</span>
             <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -205,7 +251,7 @@ export default function MasterPage() {
             </Select>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">カテゴリ</span>
+            <span className="text-sm text-gray-500">カテゴリ</span>
             <Select value={category} onValueChange={(v) => v && setCategory(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -214,11 +260,20 @@ export default function MasterPage() {
             </Select>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">シーズン</span>
+            <span className="text-sm text-gray-500">シーズン</span>
             <Select value={season} onValueChange={(v) => v && setSeason(v)}>
               <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {SEASON_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-sm text-gray-500">表示</span>
+            <Select value={String(perPage)} onValueChange={(v) => setPerPage(Number(v))}>
+              <SelectTrigger className="w-20 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((n) => <SelectItem key={n} value={String(n)}>{n}件</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -246,13 +301,66 @@ export default function MasterPage() {
           <DataTable<MasterRow>
             columns={columns}
             data={result.data as MasterRow[]}
-            pageSize={50}
+            pageSize={perPage}
             currentPage={result.page}
             totalItems={result.total}
             onPageChange={setPage}
+            onRowClick={handleRowClick}
           />
         ) : null}
       </div>
+
+      {/* SKU Images Dialog */}
+      <Dialog open={skuDialogOpen} onOpenChange={setSkuDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {skuDialogProduct?.image_url && (
+                <img src={skuDialogProduct.image_url} alt="" className="w-12 h-12 object-cover rounded" />
+              )}
+              <div>
+                <div className="font-mono text-base">{skuDialogProduct?.product_code}</div>
+                <div className="text-sm text-gray-500 font-normal">
+                  {skuDialogProduct?.brand} / {skuDialogProduct?.category}
+                </div>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">SKU一覧</h3>
+            {skuLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                <span className="ml-2 text-sm text-gray-500">読み込み中...</span>
+              </div>
+            ) : skuImages.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                SKUデータがありません
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {skuImages.map((sku, i) => (
+                  <div key={i} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
+                    {sku.sku_image_url ? (
+                      <img
+                        src={sku.sku_image_url}
+                        alt={sku.sku_code}
+                        className="w-full aspect-square object-cover rounded mb-2"
+                      />
+                    ) : (
+                      <div className="w-full aspect-square bg-gray-100 rounded mb-2 flex items-center justify-center text-gray-300">
+                        <ImageIcon className="w-8 h-8" />
+                      </div>
+                    )}
+                    <div className="font-mono text-sm text-center text-gray-700">{sku.sku_code || '-'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

@@ -59,7 +59,7 @@ export default function DataTable<T extends Record<string, unknown>>({
               {columns.map((col) => (
                 <TableHead
                   key={col.key}
-                  className={`text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.className || ''}`}
+                  className={`text-xs font-semibold text-[#8A7D72] tracking-wider ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.className || ''}`}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
                   <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
@@ -96,7 +96,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                   {columns.map((col) => (
                     <TableCell
                       key={col.key}
-                      className={`text-[13px] text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
+                      className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
                     >
                       {col.render ? col.render(row) : String(row[col.key] ?? '-')}
                     </TableCell>
