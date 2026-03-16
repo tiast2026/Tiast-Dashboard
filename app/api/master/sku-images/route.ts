@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSkuImagesForProduct, isSheetsConfigured } from '@/lib/google-sheets'
+import { getSkuImagesForProduct, getSkuHeaders, isSheetsConfigured } from '@/lib/google-sheets'
 
 // GET /api/master/sku-images?product_code=xxx
 export async function GET(request: NextRequest) {
@@ -10,11 +10,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (!isSheetsConfigured()) {
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ data: [], headers: [] })
     }
 
     const skuImages = await getSkuImagesForProduct(productCode)
-    return NextResponse.json({ data: skuImages })
+    const headers = await getSkuHeaders()
+    return NextResponse.json({ data: skuImages, headers })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('SKU images error:', msg)

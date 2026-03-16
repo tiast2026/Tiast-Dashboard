@@ -40,8 +40,18 @@ interface ListResponse {
 
 interface SkuImageItem {
   product_code: string
+  shop_name: string
   sku_code: string
+  color: string
+  size: string
   sku_image_url: string
+  extra_fields: Record<string, string>
+}
+
+interface SkuHeaderInfo {
+  key: string
+  label: string
+  isExtra: boolean
 }
 
 // Known column renderers (special formatting)
@@ -50,9 +60,9 @@ function getKnownColumnRenderer(key: string): ((row: MasterRow) => React.ReactNo
     case 'image_url':
       return (row) =>
         row.image_url ? (
-          <img src={row.image_url} alt="" className="w-11 h-11 object-cover rounded" />
+          <img src={row.image_url} alt="" className="w-11 h-11 aspect-square object-cover rounded" />
         ) : (
-          <div className="w-11 h-11 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+          <div className="w-11 h-11 aspect-square bg-gray-100 rounded flex items-center justify-center text-gray-300">
             <ImageIcon className="w-4 h-4" />
           </div>
         )
@@ -108,6 +118,7 @@ export default function MasterPage() {
   const [skuDialogOpen, setSkuDialogOpen] = useState(false)
   const [skuDialogProduct, setSkuDialogProduct] = useState<MasterRow | null>(null)
   const [skuImages, setSkuImages] = useState<SkuImageItem[]>([])
+  const [skuHeaders, setSkuHeaders] = useState<SkuHeaderInfo[]>([])
   const [skuLoading, setSkuLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
@@ -146,12 +157,14 @@ export default function MasterPage() {
     setSkuDialogOpen(true)
     setSkuLoading(true)
     setSkuImages([])
+    setSkuHeaders([])
 
     try {
       const res = await fetch(`/api/master/sku-images?product_code=${encodeURIComponent(row.product_code)}`)
       if (res.ok) {
         const data = await res.json()
         setSkuImages(data.data || [])
+        setSkuHeaders(data.headers || [])
       }
     } catch (e) {
       console.error('Failed to fetch SKU images:', e)
@@ -312,7 +325,7 @@ export default function MasterPage() {
 
       {/* SKU Images Dialog */}
       <Dialog open={skuDialogOpen} onOpenChange={setSkuDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               {skuDialogProduct?.image_url && (
@@ -328,7 +341,7 @@ export default function MasterPage() {
           </DialogHeader>
 
           <div className="mt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">SKU一覧</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">SKU一覧（{skuImages.length}件）</h3>
             {skuLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -339,23 +352,55 @@ export default function MasterPage() {
                 SKUデータがありません
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {skuImages.map((sku, i) => (
-                  <div key={i} className="border rounded-lg p-3 hover:shadow-md transition-shadow">
-                    {sku.sku_image_url ? (
-                      <img
-                        src={sku.sku_image_url}
-                        alt={sku.sku_code}
-                        className="w-full aspect-square object-cover rounded mb-2"
-                      />
-                    ) : (
-                      <div className="w-full aspect-square bg-gray-100 rounded mb-2 flex items-center justify-center text-gray-300">
-                        <ImageIcon className="w-8 h-8" />
-                      </div>
-                    )}
-                    <div className="font-mono text-sm text-center text-gray-700">{sku.sku_code || '-'}</div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">画像</th>
+                      {skuHeaders
+                        .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code')
+                        .map(h => (
+                          <th key={h.key} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
+                            {h.label}
+                          </th>
+                        ))
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skuImages.map((sku, i) => (
+                      <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
+                        <td className="px-3 py-2">
+                          {sku.sku_image_url ? (
+                            <img src={sku.sku_image_url} alt={sku.sku_code} className="w-14 h-14 object-cover rounded" />
+                          ) : (
+                            <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+                              <ImageIcon className="w-5 h-5" />
+                            </div>
+                          )}
+                        </td>
+                        {skuHeaders
+                          .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code')
+                          .map(h => {
+                            let val: string
+                            if (h.isExtra) {
+                              val = sku.extra_fields?.[h.label] || '-'
+                            } else {
+                              val = String((sku as unknown as Record<string, unknown>)[h.key] ?? '-')
+                            }
+                            return (
+                              <td key={h.key} className="px-3 py-2 whitespace-nowrap">
+                                {h.key === 'sku_code' ? (
+                                  <span className="font-mono">{val}</span>
+                                ) : val}
+                              </td>
+                            )
+                          })
+                        }
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

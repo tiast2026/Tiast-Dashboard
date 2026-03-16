@@ -259,22 +259,43 @@ export async function deleteSheetRow(productCode: string): Promise<boolean> {
 }
 
 // ============================================================
-// SKU画像シート
+// SKU画像シート（ヘッダー動的読み取り）
 // ============================================================
 
 const SKU_SHEET_NAME = 'SKU画像'
 
+// SKU画像シートの既知カラム → 内部キー
+const SKU_HEADER_MAP: Record<string, string> = {
+  '店舗名': 'shop_name',
+  '商品管理番号': 'product_code',
+  'システム連携用SKU番号': 'sku_code',
+  'カラー': 'color',
+  'サイズ': 'size',
+  'SKU画像URL': 'sku_image_url',
+}
+
 export interface SkuImageRow {
-  product_code: string   // B列: 商品管理番号（代表品番と紐付け）
-  sku_code: string       // C列: SKU番号
-  sku_image_url: string  // D列: SKU画像URL
+  product_code: string
+  shop_name: string
+  sku_code: string
+  color: string
+  size: string
+  sku_image_url: string
+  extra_fields: Record<string, string>  // 動的カラム
+}
+
+export interface SkuHeaderInfo {
+  key: string
+  label: string
+  isExtra: boolean
 }
 
 let cachedSkuData: SkuImageRow[] | null = null
+let cachedSkuHeaders: SkuHeaderInfo[] | null = null
 let skuCacheTimestamp = 0
 
 /**
- * Fetch SKU image data from the SKU画像 sheet
+ * Fetch SKU image data from the SKU画像 sheet (header-based dynamic parsing)
  */
 export async function fetchSkuImageData(forceRefresh = false): Promise<SkuImageRow[]> {
   if (!forceRefresh && cachedSkuData && Date.now() - skuCacheTimestamp < CACHE_TTL_MS) {
@@ -290,24 +311,65 @@ export async function fetchSkuImageData(forceRefresh = false): Promise<SkuImageR
   const rows = res.data.values
   if (!rows || rows.length < 2) {
     cachedSkuData = []
+    cachedSkuHeaders = []
     skuCacheTimestamp = Date.now()
     return []
   }
 
-  // Skip header row (row 0), parse B/C/D columns (index 1, 2, 3)
+  // First row = headers
+  const rawHeaders = (rows[0] as string[]).map(h => h.trim())
+  const headerKeys = rawHeaders.map(h => SKU_HEADER_MAP[h] || h)
+
+  // Build header info
+  cachedSkuHeaders = rawHeaders.map((h, i) => ({
+    key: headerKeys[i],
+    label: h,
+    isExtra: !SKU_HEADER_MAP[h],
+  }))
+
   const items: SkuImageRow[] = []
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i] as string[]
-    const productCode = (row[1] || '').trim()  // B列
-    const skuCode = (row[2] || '').trim()      // C列
-    const skuImageUrl = (row[3] || '').trim()  // D列
-    if (!productCode) continue
-    items.push({ product_code: productCode, sku_code: skuCode, sku_image_url: skuImageUrl })
+    const obj: Record<string, string> = {}
+    const extra: Record<string, string> = {}
+
+    for (let j = 0; j < headerKeys.length; j++) {
+      const val = (row[j] || '').trim()
+      const key = headerKeys[j]
+      const rawHeader = rawHeaders[j]
+
+      if (!SKU_HEADER_MAP[rawHeader]) {
+        extra[rawHeader] = val
+      } else {
+        obj[key] = val
+      }
+    }
+
+    if (!obj.product_code) continue
+    items.push({
+      product_code: obj.product_code,
+      shop_name: obj.shop_name || '',
+      sku_code: obj.sku_code || '',
+      color: obj.color || '',
+      size: obj.size || '',
+      sku_image_url: obj.sku_image_url || '',
+      extra_fields: extra,
+    })
   }
 
   cachedSkuData = items
   skuCacheTimestamp = Date.now()
   return items
+}
+
+/**
+ * Get SKU sheet headers (call after fetchSkuImageData)
+ */
+export async function getSkuHeaders(): Promise<SkuHeaderInfo[]> {
+  if (!cachedSkuHeaders) {
+    await fetchSkuImageData()
+  }
+  return cachedSkuHeaders || []
 }
 
 /**
