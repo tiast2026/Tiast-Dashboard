@@ -52,6 +52,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   return (
     <div>
       <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-[#FAFAF8] border-b border-black/[0.06]">
@@ -105,6 +106,7 @@ export default function DataTable<T extends Record<string, unknown>>({
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
       {totalPages > 1 && onPageChange && (
         <div className="flex items-center justify-between mt-4 px-1">
