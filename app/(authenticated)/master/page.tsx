@@ -71,12 +71,12 @@ export default function MasterPage() {
     {
       key: 'image_url',
       label: '',
-      className: 'w-[52px]',
+      className: 'w-[48px]',
       render: (row) =>
         row.image_url ? (
-          <img src={row.image_url} alt="" className="w-10 h-10 object-cover rounded" />
+          <img src={row.image_url} alt="" className="w-10 h-10 object-cover rounded aspect-square" />
         ) : (
-          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+          <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-300 aspect-square">
             <Image className="w-4 h-4" />
           </div>
         ),
@@ -84,17 +84,25 @@ export default function MasterPage() {
     {
       key: 'product_code',
       label: '代表品番',
-      className: 'min-w-[140px]',
+      className: 'min-w-[130px]',
       render: (row) => (
-        <div className="font-mono text-sm font-medium">{row.product_code}</div>
+        <div className="font-mono text-xs font-medium">{row.product_code}</div>
+      ),
+    },
+    {
+      key: 'product_name',
+      label: '商品名',
+      className: 'min-w-[100px] max-w-[160px]',
+      render: (row) => (
+        <div className="text-xs truncate" title={String(row.product_name || '')}>{row.product_name || '-'}</div>
       ),
     },
     {
       key: 'is_focus',
       label: '注力',
-      className: 'w-[50px]',
+      className: 'w-[44px]',
       render: (row) => row.is_focus ? (
-        <Badge className="bg-orange-100 text-orange-700 text-[11px]">{row.is_focus}</Badge>
+        <Badge className="bg-orange-100 text-orange-700 text-[10px] px-1.5">{row.is_focus}</Badge>
       ) : <span className="text-gray-300">-</span>,
     },
     { key: 'brand', label: 'ブランド' },
@@ -103,38 +111,47 @@ export default function MasterPage() {
     {
       key: 'collaborator',
       label: 'コラボ',
-      render: (row) => <span className="text-sm">{row.collaborator || '-'}</span>,
+      render: (row) => <span className="text-xs">{row.collaborator || '-'}</span>,
     },
     {
       key: 'size',
       label: 'サイズ',
-      render: (row) => <span className="text-sm text-gray-500">{row.size || '-'}</span>,
+      render: (row) => <span className="text-xs text-gray-500">{row.size || '-'}</span>,
+    },
+    {
+      key: 'lifecycle_stance',
+      label: 'スタンス',
+      render: (row) => <span className="text-xs text-gray-500">{row.lifecycle_stance || '-'}</span>,
     },
     {
       key: 'selling_price',
       label: '上代',
       align: 'right',
-      render: (row) => <span className="text-sm">{row.selling_price ? formatCurrency(row.selling_price) : '-'}</span>,
+      render: (row) => <span className="text-xs">{row.selling_price ? formatCurrency(row.selling_price) : '-'}</span>,
     },
     {
       key: 'cost_price',
       label: '下代',
       align: 'right',
-      render: (row) => <span className="text-sm">{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>,
+      render: (row) => <span className="text-xs">{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>,
     },
     {
       key: 'restock',
       label: '再入荷',
-      render: (row) => <span className="text-sm text-gray-500">{row.restock || '-'}</span>,
+      render: (row) => <span className="text-xs text-gray-500">{row.restock || '-'}</span>,
     },
     {
       key: 'sales_start_date',
-      label: '販売期間',
+      label: '販売日',
       render: (row) => (
-        <span className="text-xs text-gray-500">
-          {formatDate(row.sales_start_date)}
-          {row.sales_end_date ? ` ~ ${formatDate(row.sales_end_date)}` : ' ~'}
-        </span>
+        <span className="text-xs text-gray-500">{formatDate(row.sales_start_date)}</span>
+      ),
+    },
+    {
+      key: 'sales_end_date',
+      label: '終了日',
+      render: (row) => (
+        <span className="text-xs text-gray-500">{formatDate(row.sales_end_date)}</span>
       ),
     },
   ]
