@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS `tiast-data-platform.raw_nextengine.orders` (
   receive_order_row_no         INT64,                -- 明細行番号
   receive_order_date           STRING,               -- 受注日 (YYYY-MM-DD HH:MM:SS)
   receive_order_shop_id        INT64,                -- 店舗ID
-  import_type_name             STRING,               -- 取込種類名（楽天, Yahoo! 等）
+  receive_order_shop_cut_form_id STRING,             -- 受注番号（店舗側）
+  import_type_name             STRING,               -- 取込種類名（CSV等）
 
   -- 商品情報
   goods_id                     STRING,               -- 商品コード（SKU）

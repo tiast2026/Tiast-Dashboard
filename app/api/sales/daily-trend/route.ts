@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
             EXTRACT(DAY FROM PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS day,
             SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount
           FROM \`tiast-data-platform.raw_nextengine.orders\` o
-          WHERE o.cancel_type_id = '0'
-            AND o.row_cancel_flag = '0'
+          WHERE CAST(o.cancel_type_id AS STRING) = '0'
+            AND CAST(o.row_cancel_flag AS STRING) = '0'
             AND o.receive_order_date IS NOT NULL
             AND FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) IN (@month, @prevMonth, @lastYearMonth)
             ${brandFilterNE}

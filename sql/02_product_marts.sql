@@ -47,8 +47,8 @@ WITH ne_product_sales AS (
   FROM `tiast-data-platform.raw_nextengine.orders` o
   LEFT JOIN `tiast-data-platform.raw_nextengine.products` p
     ON o.goods_id = p.goods_id
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND o.receive_order_date IS NOT NULL
   GROUP BY 1, 3
 ),

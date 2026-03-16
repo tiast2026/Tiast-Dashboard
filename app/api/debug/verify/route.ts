@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     }>(`
       SELECT COUNT(*) AS cnt, SUM(CAST(total_amount AS FLOAT64)) AS total_amount
       FROM \`tiast-data-platform.raw_nextengine.orders\`
-      WHERE FORMAT_TIMESTAMP('%Y-%m', order_date) = @month
+      WHERE FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(receive_order_date, 10))) = @month
     `, { month })
 
     results.raw_orders = rawOrders[0] || { cnt: 0, total_amount: 0 }
