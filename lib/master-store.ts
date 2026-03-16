@@ -5,6 +5,7 @@ import { ProductMaster } from '@/types/master'
 import {
   fetchSheetData,
   getSheetProduct,
+  getSheetHeaders,
   updateSheetRow,
   deleteSheetRow,
   isSheetsConfigured,
@@ -59,6 +60,7 @@ function sheetToProductMaster(s: SheetProductMaster): ProductMaster {
     operation_note: '',
     image_url: s.image_url || null,
     sku_images: [],
+    extra_fields: s.extra_fields || {},
     created_at: now,
     updated_at: now,
   }
@@ -83,6 +85,7 @@ function productMasterToSheet(p: ProductMaster): SheetProductMaster {
     selling_price: p.selling_price,
     cost_price: p.cost_price,
     order_lot: p.order_lot,
+    extra_fields: p.extra_fields || {},
   }
 }
 
@@ -106,6 +109,7 @@ export async function getMasterList(params: {
   }
 
   const sheetData = await fetchSheetData()
+  const headers = await getSheetHeaders()
   let items = sheetData.map(sheetToProductMaster)
 
   if (brand) items = items.filter(i => i.brand === brand)
@@ -124,7 +128,7 @@ export async function getMasterList(params: {
   const start = (page - 1) * per_page
   const data = items.slice(start, start + per_page)
 
-  return { data, total, page, per_page, total_pages: Math.ceil(total / per_page) }
+  return { data, total, page, per_page, total_pages: Math.ceil(total / per_page), headers }
 }
 
 export async function getMasterItem(productCode: string): Promise<ProductMaster | undefined> {
@@ -182,6 +186,7 @@ export async function importMasterItems(items: Partial<ProductMaster>[]): Promis
       operation_note: item.operation_note || '',
       image_url: item.image_url || null,
       sku_images: item.sku_images || [],
+      extra_fields: item.extra_fields || {},
       created_at: now,
       updated_at: now,
     }
@@ -213,7 +218,7 @@ function getMockMasterList(params: {
     season: p.season, season_extraction: '', collaborator: p.collaborator, commission_rate: 0,
     selling_price: 0, cost_price: 0, order_lot: null, sales_start_date: null, sales_end_date: null,
     is_focus: '', restock: '', size: '', lifecycle_stance: '', operation_note: '',
-    image_url: null, sku_images: [], created_at: now, updated_at: now,
+    image_url: null, sku_images: [], extra_fields: {}, created_at: now, updated_at: now,
   }))
 
   if (brand) items = items.filter(i => i.brand === brand)
@@ -226,7 +231,7 @@ function getMockMasterList(params: {
 
   const total = items.length
   const start = (page - 1) * per_page
-  return { data: items.slice(start, start + per_page), total, page, per_page, total_pages: Math.ceil(total / per_page) }
+  return { data: items.slice(start, start + per_page), total, page, per_page, total_pages: Math.ceil(total / per_page), headers: [] }
 }
 
 function getMockMasterItem(productCode: string): ProductMaster | undefined {
@@ -238,6 +243,6 @@ function getMockMasterItem(productCode: string): ProductMaster | undefined {
     season: p.season, season_extraction: '', collaborator: p.collaborator, commission_rate: 0,
     selling_price: 0, cost_price: 0, order_lot: null, sales_start_date: null, sales_end_date: null,
     is_focus: '', restock: '', size: '', lifecycle_stance: '', operation_note: '',
-    image_url: null, sku_images: [], created_at: now, updated_at: now,
+    image_url: null, sku_images: [], extra_fields: {}, created_at: now, updated_at: now,
   }
 }
