@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatDate, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
-import { Mail, Truck, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Mail, Truck, HelpCircle, ChevronDown, ChevronRight, X } from 'lucide-react'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PROFIT_RATE_COLORS } from '@/lib/constants'
 
 interface ProductRow {
@@ -43,14 +43,29 @@ interface ProductListResponse {
   total_pages: number
 }
 
-interface SkuItem {
-  product_code: string
-  sku_code: string
+interface SkuRow {
+  goods_id: string
+  goods_name: string
   color: string
   size: string
   sku_image_url: string
-  shop_name: string
-  extra_fields: Record<string, string>
+  total_quantity: number
+  sales_amount: number
+  gross_profit_rate: number
+  total_stock: number
+  free_stock: number
+  zozo_stock: number
+  own_stock: number
+  daily_sales: number
+  stock_days: number
+  inventory_status: string
+  lifecycle_stance: string
+  turnover_rate_annual: number
+  turnover_days: number
+  last_io_date: string | null
+  days_since_last_io: number
+  stagnation_alert: string | null
+  lifecycle_action: string | null
 }
 
 const PERIOD_OPTIONS = [
@@ -98,61 +113,203 @@ function ProfitRateBar({ rate }: { rate: number }) {
 // Column header with help tooltip
 function colHelp(label: string, tooltip: string) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
       {label}
       <span title={tooltip}><HelpCircle className="w-3 h-3 text-gray-400 cursor-help" /></span>
     </span>
   )
 }
 
-// Inline SKU expansion row — fetches from Google Sheets SKU画像 sheet
-function SkuExpansion({ productCode }: { productCode: string }) {
-  const [skus, setSkus] = useState<SkuItem[]>([])
+// SKU detail panel - shown when clicking a SKU row
+function SkuDetailPanel({ sku, onClose }: { sku: SkuRow; onClose: () => void }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 my-1 mx-2">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          {sku.sku_image_url ? (
+            <img src={sku.sku_image_url} alt="" className="w-16 h-16 object-cover rounded" />
+          ) : null}
+          <div>
+            <div className="font-medium text-sm">{sku.goods_id}</div>
+            {sku.color && <span className="text-xs text-gray-500">{sku.color} / {sku.size}</span>}
+          </div>
+        </div>
+        <button onClick={(e) => { e.stopPropagation(); onClose() }} className="p-1 hover:bg-gray-100 rounded">
+          <X className="w-4 h-4 text-gray-400" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        {/* Channel breakdown */}
+        <div className="bg-gray-50 rounded-lg p-2.5">
+          <div className="text-gray-500 mb-1">チャネル別在庫</div>
+          <div className="space-y-1">
+            <div className="flex justify-between"><span>自社(NE)</span><span className="font-medium">{formatNumber(sku.own_stock)}</span></div>
+            <div className="flex justify-between"><span>フリー</span><span className="font-medium">{formatNumber(sku.free_stock)}</span></div>
+            <div className="flex justify-between"><span>ZOZO</span><span className="font-medium">{formatNumber(sku.zozo_stock)}</span></div>
+          </div>
+        </div>
+        {/* Sales velocity */}
+        <div className="bg-gray-50 rounded-lg p-2.5">
+          <div className="text-gray-500 mb-1">販売速度</div>
+          <div className="space-y-1">
+            <div className="flex justify-between"><span>日販</span><span className="font-medium">{sku.daily_sales > 0 ? sku.daily_sales.toFixed(1) : '-'}</span></div>
+            <div className="flex justify-between"><span>在庫日数</span><span className="font-medium">{sku.stock_days > 0 ? `${Math.round(sku.stock_days)}日` : '-'}</span></div>
+            <div className="flex justify-between"><span>回転率(年)</span><span className="font-medium">{sku.turnover_rate_annual > 0 ? sku.turnover_rate_annual.toFixed(1) : '-'}</span></div>
+          </div>
+        </div>
+        {/* Lifecycle */}
+        <div className="bg-gray-50 rounded-lg p-2.5">
+          <div className="text-gray-500 mb-1">ライフサイクル</div>
+          <div className="space-y-1">
+            <div className="flex justify-between"><span>ステージ</span><span className="font-medium">{sku.lifecycle_stance || '-'}</span></div>
+            <div className="flex justify-between"><span>回転日数</span><span className="font-medium">{sku.turnover_days > 0 ? `${Math.round(sku.turnover_days)}日` : '-'}</span></div>
+            <div className="flex justify-between"><span>最終入出庫</span><span className="font-medium">{sku.last_io_date ? formatDate(sku.last_io_date) : '-'}</span></div>
+          </div>
+        </div>
+        {/* Alerts & Actions */}
+        <div className="bg-gray-50 rounded-lg p-2.5">
+          <div className="text-gray-500 mb-1">アラート</div>
+          <div className="space-y-1">
+            {sku.stagnation_alert && (
+              <div className="text-red-600 font-medium">{sku.stagnation_alert}</div>
+            )}
+            {sku.lifecycle_action && (
+              <div className="text-amber-700">{sku.lifecycle_action}</div>
+            )}
+            {sku.days_since_last_io > 0 && (
+              <div className="flex justify-between"><span>入出庫なし</span><span className="font-medium">{sku.days_since_last_io}日</span></div>
+            )}
+            {!sku.stagnation_alert && !sku.lifecycle_action && sku.days_since_last_io === 0 && (
+              <div className="text-green-600">問題なし</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Inline SKU expansion — renders SKU rows aligned with parent columns
+function SkuExpansion({ productCode, period, month, hasUrlBrand }: { productCode: string; period: string; month: string; hasUrlBrand: boolean }) {
+  const [skus, setSkus] = useState<SkuRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedSku, setSelectedSku] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/master/sku-images?product_code=${encodeURIComponent(productCode)}`)
+    const params = new URLSearchParams()
+    params.set('period', period)
+    if (period === 'month') params.set('month', month)
+    fetch(`/api/products/${encodeURIComponent(productCode)}/skus?${params}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         setSkus(data?.data || [])
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [productCode])
+  }, [productCode, period, month])
 
   if (loading) return <div className="py-3 px-4"><Skeleton className="h-16 w-full" /></div>
   if (skus.length === 0) return <div className="py-3 px-4 text-xs text-gray-400">SKUデータなし</div>
 
+  // Build a table that mirrors the parent columns
+  // Columns: expand(32) | image(60) | name(180+) | [brand] | category | season | collab | shipping | price | cost | qty | amount | profit | stock | days | status | start | end
   return (
-    <div className="py-2 px-4">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="text-gray-500 border-b border-gray-100">
-            <th className="text-left py-1.5 font-medium w-[50px]">画像</th>
-            <th className="text-left py-1.5 font-medium">SKUコード</th>
-            <th className="text-left py-1.5 font-medium">カラー</th>
-            <th className="text-left py-1.5 font-medium">サイズ</th>
-            <th className="text-left py-1.5 font-medium">店舗</th>
-          </tr>
-        </thead>
+    <div className="py-1">
+      <table className="w-full text-sm">
         <tbody>
-          {skus.map((sku, i) => (
-            <tr key={sku.sku_code || i} className="border-b border-gray-50 hover:bg-gray-50/50">
-              <td className="py-1.5">
-                {sku.sku_image_url ? (
-                  <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
-                ) : (
-                  <div className="w-[40px] aspect-square bg-gray-100 rounded" />
-                )}
-              </td>
-              <td className="py-1.5 font-mono text-[11px]">{sku.sku_code || '-'}</td>
-              <td className="py-1.5">{sku.color || '-'}</td>
-              <td className="py-1.5">{sku.size || '-'}</td>
-              <td className="py-1.5">{sku.shop_name || '-'}</td>
-            </tr>
-          ))}
+          {skus.map((sku) => {
+            const isSelected = selectedSku === sku.goods_id
+            const stockDays = Math.round(sku.stock_days)
+            const stockDayColor = stockDays > 90 ? 'text-red-600' : stockDays > 60 ? 'text-amber-600' : 'text-gray-700'
+            const statusCls = sku.inventory_status === '過剰' ? 'bg-red-100 text-red-700' : sku.inventory_status === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+
+            return (
+              <tr
+                key={sku.goods_id}
+                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => setSelectedSku(isSelected ? null : sku.goods_id)}
+              >
+                {/* expand placeholder */}
+                <td className="w-[32px] py-1.5 pl-2">
+                  {isSelected
+                    ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                    : <ChevronRight className="w-3.5 h-3.5 text-gray-300" />}
+                </td>
+                {/* image */}
+                <td className="w-[60px] py-1.5">
+                  {sku.sku_image_url ? (
+                    <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
+                  ) : (
+                    <div className="w-[40px] aspect-square bg-gray-100 rounded" />
+                  )}
+                </td>
+                {/* name: show color/size under goods_id */}
+                <td className="min-w-[180px] py-1.5">
+                  <div className="max-w-[220px]">
+                    <div className="truncate text-xs font-mono text-gray-600">{sku.goods_id}</div>
+                    <div className="text-[11px] text-gray-400">
+                      {[sku.color, sku.size].filter(Boolean).join(' / ') || '-'}
+                    </div>
+                  </div>
+                </td>
+                {/* brand (if shown) */}
+                {!hasUrlBrand && <td className="py-1.5" />}
+                {/* category */}
+                <td className="py-1.5" />
+                {/* season */}
+                <td className="py-1.5" />
+                {/* collab */}
+                <td className="py-1.5" />
+                {/* shipping */}
+                <td className="w-[50px] py-1.5" />
+                {/* selling_price */}
+                <td className="text-right py-1.5" />
+                {/* cost_price */}
+                <td className="text-right py-1.5" />
+                {/* total_quantity */}
+                <td className="text-right py-1.5 text-sm text-[#3D352F]">
+                  {sku.total_quantity > 0 ? formatNumber(sku.total_quantity) : '-'}
+                </td>
+                {/* sales_amount */}
+                <td className="text-right py-1.5 text-sm text-[#3D352F]">
+                  {sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}
+                </td>
+                {/* gross_profit_rate */}
+                <td className="text-right py-1.5">
+                  {sku.gross_profit_rate > 0 ? <ProfitRateBar rate={sku.gross_profit_rate} /> : <span className="text-gray-300">-</span>}
+                </td>
+                {/* total_stock */}
+                <td className="text-right py-1.5 text-sm text-[#3D352F]">
+                  {formatNumber(sku.total_stock)}
+                </td>
+                {/* stock_days */}
+                <td className="text-right py-1.5">
+                  <span className={`text-xs font-medium ${stockDayColor}`}>
+                    {stockDays > 0 ? `${stockDays}日` : '-'}
+                  </span>
+                </td>
+                {/* inventory_status */}
+                <td className="py-1.5">
+                  {sku.inventory_status ? (
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${statusCls}`}>{sku.inventory_status}</span>
+                  ) : null}
+                </td>
+                {/* sales_start_date */}
+                <td className="py-1.5" />
+                {/* sales_end_date */}
+                <td className="py-1.5" />
+              </tr>
+            )
+          })}
         </tbody>
       </table>
+      {/* Detail panel for selected SKU */}
+      {selectedSku && skus.find(s => s.goods_id === selectedSku) && (
+        <SkuDetailPanel
+          sku={skus.find(s => s.goods_id === selectedSku)!}
+          onClose={() => setSelectedSku(null)}
+        />
+      )}
     </div>
   )
 }
@@ -353,7 +510,7 @@ function ProductsPageContent() {
       label: '販売数',
       align: 'right',
       sortable: true,
-      headerRender: () => colHelp('販売数', 'BigQuery受注データ\nNE+ZOZO合算の販売個数'),
+      headerRender: () => colHelp('販売数', 'BigQuery受注データ NE+ZOZO合算の販売個数'),
       render: (row) => formatNumber(row.total_quantity),
     },
     {
@@ -361,13 +518,13 @@ function ProductsPageContent() {
       label: '売上金額',
       align: 'right',
       sortable: true,
-      headerRender: () => colHelp('売上金額', 'BigQuery受注データ\nNE+ZOZO合算の売上合計'),
+      headerRender: () => colHelp('売上金額', 'BigQuery受注データ NE+ZOZO合算の売上合計'),
       render: (row) => formatCurrency(row.sales_amount),
     },
     {
       key: 'gross_profit_rate',
       label: '粗利率',
-      headerRender: () => colHelp('粗利率', '(売上 - 仕入原価 - 送料) / 売上\nメール便: ¥330/個, 宅配便: ¥660/個\n仕入原価: BigQuery受注データ\n送料: 商品マスタ「サイズ」列'),
+      headerRender: () => colHelp('粗利率', '(売上 - 仕入原価 - 送料) / 売上'),
       align: 'right',
       sortable: true,
       render: (row: ProductRow) => <ProfitRateBar rate={row.gross_profit_rate} />,
@@ -377,7 +534,7 @@ function ProductsPageContent() {
       label: '在庫数',
       align: 'right',
       sortable: true,
-      headerRender: () => colHelp('在庫数', 'BigQuery在庫データ\nNextEngine在庫+ZOZO在庫の合計'),
+      headerRender: () => colHelp('在庫数', 'NE在庫+ZOZO在庫の合計'),
       render: (row) => formatNumber(row.total_stock),
     },
     {
@@ -385,7 +542,7 @@ function ProductsPageContent() {
       label: '在庫日数',
       align: 'right',
       sortable: true,
-      headerRender: () => colHelp('在庫日数', 'BigQuery在庫データ\n在庫数 ÷ 30日間平均日販\n90日超: 赤, 60日超: 黄'),
+      headerRender: () => colHelp('在庫日数', '在庫数 ÷ 30日間平均日販'),
       render: (row) => {
         const days = Math.round(row.stock_days)
         const color = days > 90 ? 'text-red-600' : days > 60 ? 'text-amber-600' : 'text-gray-700'
@@ -395,7 +552,7 @@ function ProductsPageContent() {
     {
       key: 'inventory_status',
       label: '在庫状態',
-      headerRender: () => colHelp('在庫状態', 'BigQuery在庫データ\n適正 / 過剰（在庫日数>90日）/ 在庫なし'),
+      headerRender: () => colHelp('在庫状態', '適正 / 過剰（>90日）/ 在庫なし'),
       render: (row) => {
         const s = row.inventory_status
         const cls = s === '過剰' ? 'bg-red-100 text-red-700' : s === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
@@ -431,12 +588,14 @@ function ProductsPageContent() {
 
         {/* Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
-            <SelectContent>
-              {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{b}</SelectItem>))}
-            </SelectContent>
-          </Select>
+          {!urlBrand && (
+            <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
+              <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
+              <SelectContent>
+                {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{b}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={category} onValueChange={(v) => v && setCategory(v)}>
             <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="カテゴリ" /></SelectTrigger>
             <SelectContent>
@@ -502,7 +661,14 @@ function ProductsPageContent() {
             sortKey={sortBy}
             sortOrder={sortOrder}
             expandedRowKeys={expandedRows}
-            renderExpandedRow={(row) => <SkuExpansion productCode={row.product_code} />}
+            renderExpandedRow={(row) => (
+              <SkuExpansion
+                productCode={row.product_code}
+                period={period}
+                month={month}
+                hasUrlBrand={!!urlBrand}
+              />
+            )}
             rowKeyField="product_code"
           />
         ) : null}
