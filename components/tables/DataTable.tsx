@@ -13,6 +13,8 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode
   headerRender?: () => React.ReactNode
   className?: string
+  /** Make this column sticky from the left. Value is the left offset in pixels. */
+  stickyLeft?: number
 }
 
 interface DataTableProps<T> {
@@ -67,10 +69,15 @@ export default function DataTable<T extends Record<string, unknown>>({
         <Table>
           <TableHeader className="sticky top-0 z-10">
             <TableRow className="bg-[#FAFAF8] border-b border-black/[0.06]">
-              {columns.map((col) => (
+              {columns.map((col) => {
+                const stickyStyle = col.stickyLeft != null
+                  ? { position: 'sticky' as const, left: col.stickyLeft, zIndex: 20 }
+                  : undefined
+                return (
                 <TableHead
                   key={col.key}
-                  className={`text-xs font-semibold text-[#8A7D72] tracking-wider whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.className || ''}`}
+                  className={`text-xs font-semibold text-[#8A7D72] tracking-wider whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.stickyLeft != null ? 'bg-[#FAFAF8]' : ''} ${col.className || ''}`}
+                  style={stickyStyle}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
                   <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
@@ -82,7 +89,8 @@ export default function DataTable<T extends Record<string, unknown>>({
                     )}
                   </div>
                 </TableHead>
-              ))}
+                )
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -104,17 +112,23 @@ export default function DataTable<T extends Record<string, unknown>>({
                 return (
                   <React.Fragment key={rowKey}>
                     <TableRow
-                      className={`border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''} ${isExpanded ? 'bg-[#FAFAF8]' : ''}`}
+                      className={`group/row border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''} ${isExpanded ? 'bg-[#FAFAF8]' : ''}`}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                     >
-                      {columns.map((col) => (
-                        <TableCell
-                          key={col.key}
-                          className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
-                        >
-                          {col.render ? col.render(row) : String(row[col.key] ?? '-')}
-                        </TableCell>
-                      ))}
+                      {columns.map((col) => {
+                        const stickyStyle = col.stickyLeft != null
+                          ? { position: 'sticky' as const, left: col.stickyLeft, zIndex: 5 }
+                          : undefined
+                        return (
+                          <TableCell
+                            key={col.key}
+                            className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? (isExpanded ? 'bg-[#FAFAF8]' : 'bg-white group-hover/row:bg-[#FDFCFA]') : ''} ${col.className || ''}`}
+                            style={stickyStyle}
+                          >
+                            {col.render ? col.render(row) : String(row[col.key] ?? '-')}
+                          </TableCell>
+                        )
+                      })}
                     </TableRow>
                     {isExpanded && renderExpandedRows && renderExpandedRows(row, columns)}
                     {isExpanded && !renderExpandedRows && renderExpandedRow && (

@@ -277,14 +277,20 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
             className="bg-[#FAFAF8] border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
             onClick={() => setSelectedSku(isSelected ? null : sku.goods_id)}
           >
-            {columns.map((col) => (
-              <TableCell
-                key={col.key}
-                className={`py-1.5 text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
-              >
-                {skuCellContent(sku, col.key, stockDays, stockDayColor, statusCls, isSelected)}
-              </TableCell>
-            ))}
+            {columns.map((col) => {
+              const stickyStyle = col.stickyLeft != null
+                ? { position: 'sticky' as const, left: col.stickyLeft, zIndex: 5 }
+                : undefined
+              return (
+                <TableCell
+                  key={col.key}
+                  className={`py-1.5 text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? 'bg-[#FAFAF8]' : ''} ${col.className || ''}`}
+                  style={stickyStyle}
+                >
+                  {skuCellContent(sku, col.key, stockDays, stockDayColor, statusCls, isSelected)}
+                </TableCell>
+              )
+            })}
           </TableRow>
         )
       })}
@@ -406,7 +412,8 @@ function ProductsPageContent() {
     {
       key: 'expand',
       label: '',
-      className: 'w-[32px]',
+      className: 'w-[40px] !px-1',
+      stickyLeft: 0,
       render: (row) => {
         const isExpanded = expandedRows.has(row.product_code)
         return (
@@ -424,7 +431,8 @@ function ProductsPageContent() {
     {
       key: 'image_url',
       label: '',
-      className: 'w-[60px]',
+      className: 'w-[68px] !px-1',
+      stickyLeft: 40,
       render: (row) =>
         row.image_url ? (
           <img src={row.image_url} alt="" className="w-[50px] aspect-square object-cover rounded" />
@@ -437,7 +445,8 @@ function ProductsPageContent() {
     {
       key: 'product_name',
       label: '商品名',
-      className: 'min-w-[180px]',
+      className: 'min-w-[180px] max-w-[240px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]',
+      stickyLeft: 108,
       render: (row) => (
         <div className="max-w-[220px]">
           <div className="truncate font-medium text-sm" title={row.product_name}>
