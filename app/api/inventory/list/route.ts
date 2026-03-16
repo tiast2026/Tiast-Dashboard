@@ -45,8 +45,13 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') || '50', 10)))
 
+    const search = searchParams.get('search') || undefined
+
     if (!isBigQueryConfigured()) {
-      return NextResponse.json(getMockInventoryList(page, perPage, brand, category, season))
+      return NextResponse.json(getMockInventoryList(
+        page, perPage, brand, category, season,
+        search, status, lifecycle, alertType, sortBy, sortOrder,
+      ))
     }
 
     const cacheKey = buildCacheKey('inventory-list', {
@@ -58,6 +63,10 @@ export async function GET(request: NextRequest) {
       const conditions: string[] = []
       const params: Record<string, unknown> = {}
 
+      if (search) {
+        conditions.push('(LOWER(d.product_code) LIKE CONCAT(\'%\', LOWER(@search), \'%\') OR LOWER(d.goods_name) LIKE CONCAT(\'%\', LOWER(@search), \'%\'))')
+        params.search = search
+      }
       if (brand) {
         conditions.push('d.brand = @brand')
         params.brand = brand

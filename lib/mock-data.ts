@@ -220,6 +220,10 @@ function generateInventoryItems() {
     'ピンタックブラウス', 'クロップドワイドパンツ', 'ジャカードニットワンピース',
   ]
 
+  const focusOptions = ['◎', '○', '']
+  const restockOptions = ['可', '要確認', '']
+  const orderLots = [30, 50, 100, 150, 200, null]
+
   const rand = seededRandom(123)
   const items = []
 
@@ -234,6 +238,7 @@ function generateInventoryItems() {
     const zozoStock = Math.floor(totalStock * rand() * 0.3)
     const ownStock = totalStock - freeStock - zozoStock
     const sellingPrice = (Math.floor(rand() * 15) + 3) * 1000
+    const costPrice = Math.round(sellingPrice * (0.35 + rand() * 0.2))
     const dailySales = Math.round((rand() * 5 + 0.1) * 10) / 10
     const stockDays = dailySales > 0 ? Math.round(totalStock / dailySales) : 999
     const seasonRemDays = Math.floor(rand() * 120) - 20
@@ -241,6 +246,9 @@ function generateInventoryItems() {
     const productName = productNames[i % productNames.length]
     const reorder = reorderJudgments[Math.floor(rand() * reorderJudgments.length)]
     const discount = isOverstock ? Math.floor(rand() * 3 + 1) * 10 : 0
+    const isFocus = focusOptions[Math.floor(rand() * focusOptions.length)]
+    const restock = restockOptions[Math.floor(rand() * restockOptions.length)]
+    const orderLot = orderLots[Math.floor(rand() * orderLots.length)]
 
     items.push({
       goods_id: `GD${String(10000 + i).padStart(6, '0')}`,
@@ -253,6 +261,8 @@ function generateInventoryItems() {
       free_stock: Math.max(0, freeStock),
       zozo_stock: Math.max(0, zozoStock),
       own_stock: Math.max(0, ownStock),
+      selling_price: sellingPrice,
+      cost_price: costPrice,
       stock_retail_value: totalStock * sellingPrice,
       daily_sales: dailySales,
       stock_days: stockDays,
@@ -263,6 +273,10 @@ function generateInventoryItems() {
       recommended_discount: discount,
       lifecycle_action: lifecycle === '衰退期' ? '値引販売検討' : lifecycle === '成長期' ? '追加発注検討' : '現状維持',
       is_overstock: isOverstock,
+      image_url: null as string | null,
+      is_focus: isFocus,
+      restock,
+      order_lot: orderLot,
     })
   }
 
@@ -277,11 +291,47 @@ export function getMockInventoryList(
   _brand?: string,
   _category?: string,
   _season?: string,
+  _search?: string,
+  _status?: string,
+  _lifecycle?: string,
+  _alertType?: string,
+  _sortBy?: string,
+  _sortOrder?: string,
 ) {
   let filtered = _inventoryItems
   if (_brand) filtered = filtered.filter(i => i.brand === _brand)
   if (_category) filtered = filtered.filter(i => i.category === _category)
   if (_season) filtered = filtered.filter(i => i.season === _season)
+  if (_search) {
+    const q = _search.toLowerCase()
+    filtered = filtered.filter(i =>
+      i.product_code.toLowerCase().includes(q) ||
+      i.goods_name.toLowerCase().includes(q)
+    )
+  }
+  if (_status) {
+    if (_status === '適正') filtered = filtered.filter(i => i.inventory_status === '適正在庫')
+    else if (_status === '過剰') filtered = filtered.filter(i => i.inventory_status === '過剰在庫')
+    else if (_status === '在庫なし') filtered = filtered.filter(i => i.inventory_status === '在庫不足')
+  }
+  if (_lifecycle) filtered = filtered.filter(i => i.lifecycle_stance === _lifecycle)
+  if (_alertType === 'overstock') filtered = filtered.filter(i => i.is_overstock)
+  else if (_alertType === 'season_ending') filtered = filtered.filter(i => i.season_remaining_days > 0 && i.season_remaining_days < 30 && i.total_stock > 0)
+  else if (_alertType === 'season_exceeded') filtered = filtered.filter(i => i.season_remaining_days <= 0 && i.total_stock > 0)
+
+  // Sort
+  const sortBy = _sortBy || 'stock_retail_value'
+  const sortOrder = _sortOrder || 'desc'
+  filtered = [...filtered].sort((a, b) => {
+    const aVal = (a as Record<string, unknown>)[sortBy]
+    const bVal = (b as Record<string, unknown>)[sortBy]
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal
+    }
+    return sortOrder === 'asc'
+      ? String(aVal ?? '').localeCompare(String(bVal ?? ''))
+      : String(bVal ?? '').localeCompare(String(aVal ?? ''))
+  })
 
   const total = filtered.length
   const start = (page - 1) * perPage
