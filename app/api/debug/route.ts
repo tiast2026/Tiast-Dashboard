@@ -111,5 +111,48 @@ export async function GET() {
     results.zozo_investigation = { error: e instanceof Error ? e.message : String(e) }
   }
 
+  // Test 5: Directly run ZOZO sales CTE to verify data
+  try {
+    const zozoDirect = await runQuery<{ order_month: string; shop_brand: string; sales_amount: number; order_count: number }>(
+      `SELECT
+        FORMAT_DATE('%Y-%m', PARSE_DATE('%Y/%m/%d', LEFT(z.order_date, 10))) AS order_month,
+        CASE
+          WHEN LEFT(z.brand_code, 1) = 'n' THEN 'NOAHL'
+          WHEN LEFT(z.brand_code, 1) = 'b' THEN 'BLACKQUEEN'
+          ELSE 'OTHER'
+        END AS shop_brand,
+        SUM(z.selling_price * z.order_quantity) AS sales_amount,
+        COUNT(DISTINCT z.order_number) AS order_count
+      FROM \`tiast-data-platform.raw_zozo.zozo_orders\` z
+      WHERE (z.cancel_flag = '' OR z.cancel_flag IS NULL)
+        AND z.order_date IS NOT NULL
+      GROUP BY 1, 2
+      ORDER BY 1 DESC
+      LIMIT 10`
+    )
+    results.zozo_direct_query = zozoDirect
+
+    // Check VIEW definition source
+    const viewDef = await runQuery<{ view_definition: string }>(
+      `SELECT view_definition
+       FROM \`tiast-data-platform.analytics_mart.INFORMATION_SCHEMA.VIEWS\`
+       WHERE table_name = 'mart_sales_by_shop_month'`
+    )
+    results.view_definition_contains_zozo = viewDef.length > 0
+      ? String(viewDef[0].view_definition).includes('zozo')
+      : 'VIEW_DEF_NOT_FOUND'
+
+    // Get all distinct shop_names in VIEW
+    const shopNames = await runQuery<{ shop_name: string; cnt: number }>(
+      `SELECT shop_name, COUNT(*) AS cnt
+       FROM \`tiast-data-platform.analytics_mart.mart_sales_by_shop_month\`
+       GROUP BY shop_name
+       ORDER BY cnt DESC`
+    )
+    results.view_shop_names = shopNames
+  } catch (e) {
+    results.zozo_direct_test = { error: e instanceof Error ? e.message : String(e) }
+  }
+
   return NextResponse.json(results, { status: 200 })
 }
