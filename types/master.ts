@@ -2,6 +2,7 @@
 
 export interface ProductMaster {
   product_code: string         // 代表品番 (e.g., nlmtp001-2510)
+  zozo_product_code: string    // ZOZO専用商品番号
   product_name: string         // 商品名
   brand: string                // ブランド (NOAHL, BLACKQUEEN, MYRTH)
   category: string             // カテゴリ

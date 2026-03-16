@@ -90,12 +90,9 @@ export default function MasterPage() {
       ),
     },
     {
-      key: 'product_name',
-      label: '商品名',
-      className: 'min-w-[100px] max-w-[160px]',
-      render: (row) => (
-        <div className="text-xs truncate" title={String(row.product_name || '')}>{row.product_name || '-'}</div>
-      ),
+      key: 'zozo_product_code',
+      label: 'ZOZO品番',
+      render: (row) => <span className="font-mono text-xs text-gray-500">{row.zozo_product_code || '-'}</span>,
     },
     {
       key: 'is_focus',
@@ -106,8 +103,13 @@ export default function MasterPage() {
       ) : <span className="text-gray-300">-</span>,
     },
     { key: 'brand', label: 'ブランド' },
-    { key: 'category', label: 'カテゴリ' },
+    {
+      key: 'season_extraction',
+      label: 'シーズン抽出',
+      render: (row) => <span className="text-xs">{row.season_extraction || '-'}</span>,
+    },
     { key: 'season', label: 'シーズン' },
+    { key: 'category', label: 'カテゴリ' },
     {
       key: 'collaborator',
       label: 'コラボ',
@@ -117,11 +119,6 @@ export default function MasterPage() {
       key: 'size',
       label: 'サイズ',
       render: (row) => <span className="text-xs text-gray-500">{row.size || '-'}</span>,
-    },
-    {
-      key: 'lifecycle_stance',
-      label: 'スタンス',
-      render: (row) => <span className="text-xs text-gray-500">{row.lifecycle_stance || '-'}</span>,
     },
     {
       key: 'selling_price',
@@ -134,6 +131,12 @@ export default function MasterPage() {
       label: '下代',
       align: 'right',
       render: (row) => <span className="text-xs">{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>,
+    },
+    {
+      key: 'order_lot',
+      label: '発注ロット',
+      align: 'right',
+      render: (row) => <span className="text-xs">{row.order_lot ?? '-'}</span>,
     },
     {
       key: 'restock',

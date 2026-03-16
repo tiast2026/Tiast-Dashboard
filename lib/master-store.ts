@@ -39,6 +39,7 @@ function sheetToProductMaster(s: SheetProductMaster): ProductMaster {
   const now = new Date().toISOString()
   return {
     product_code: s.product_code,
+    zozo_product_code: s.zozo_product_code || '',
     product_name: '',
     brand: s.brand || detectBrand(s.product_code),
     category: s.category || detectCategory(s.product_code),
@@ -48,7 +49,7 @@ function sheetToProductMaster(s: SheetProductMaster): ProductMaster {
     commission_rate: 0,
     selling_price: s.selling_price || 0,
     cost_price: s.cost_price || 0,
-    order_lot: null,
+    order_lot: s.order_lot || null,
     sales_start_date: s.sales_start_date || null,
     sales_end_date: s.sales_end_date || null,
     is_focus: s.is_focus || '',
@@ -67,6 +68,7 @@ function sheetToProductMaster(s: SheetProductMaster): ProductMaster {
 function productMasterToSheet(p: ProductMaster): SheetProductMaster {
   return {
     product_code: p.product_code,
+    zozo_product_code: p.zozo_product_code || '',
     image_url: p.image_url || '',
     is_focus: p.is_focus || '',
     brand: p.brand,
@@ -80,6 +82,7 @@ function productMasterToSheet(p: ProductMaster): SheetProductMaster {
     size: p.size || '',
     selling_price: p.selling_price,
     cost_price: p.cost_price,
+    order_lot: p.order_lot,
   }
 }
 
@@ -159,6 +162,7 @@ export async function importMasterItems(items: Partial<ProductMaster>[]): Promis
     if (!item.product_code) continue
     const full: ProductMaster = {
       product_code: item.product_code,
+      zozo_product_code: item.zozo_product_code || '',
       product_name: item.product_name || '',
       brand: item.brand || detectBrand(item.product_code),
       category: item.category || detectCategory(item.product_code),
@@ -205,7 +209,7 @@ function getMockMasterList(params: {
   const { page = 1, per_page = 30, brand, category, season, search } = params
   const now = new Date().toISOString()
   let items: ProductMaster[] = MOCK_PRODUCTS.map(p => ({
-    product_code: p.code, product_name: '', brand: p.brand, category: p.category,
+    product_code: p.code, zozo_product_code: '', product_name: '', brand: p.brand, category: p.category,
     season: p.season, season_extraction: '', collaborator: p.collaborator, commission_rate: 0,
     selling_price: 0, cost_price: 0, order_lot: null, sales_start_date: null, sales_end_date: null,
     is_focus: '', restock: '', size: '', lifecycle_stance: '', operation_note: '',
@@ -230,7 +234,7 @@ function getMockMasterItem(productCode: string): ProductMaster | undefined {
   const p = MOCK_PRODUCTS.find(m => m.code === productCode)
   if (!p) return undefined
   return {
-    product_code: p.code, product_name: '', brand: p.brand, category: p.category,
+    product_code: p.code, zozo_product_code: '', product_name: '', brand: p.brand, category: p.category,
     season: p.season, season_extraction: '', collaborator: p.collaborator, commission_rate: 0,
     selling_price: 0, cost_price: 0, order_lot: null, sales_start_date: null, sales_end_date: null,
     is_focus: '', restock: '', size: '', lifecycle_stance: '', operation_note: '',

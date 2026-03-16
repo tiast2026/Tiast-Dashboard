@@ -6,6 +6,7 @@ const SHEET_NAME = process.env.GOOGLE_SHEET_NAME || 'ダッシュボード用'
 // Column mapping: spreadsheet header → internal key
 const HEADER_MAP: Record<string, string> = {
   '代表品番': 'product_code',
+  'ZOZO専用商品番号': 'zozo_product_code',
   'サムネURL': 'image_url',
   '注力': 'is_focus',
   'ブランド': 'brand',
@@ -19,17 +20,19 @@ const HEADER_MAP: Record<string, string> = {
   'サイズ': 'size',
   '上代': 'selling_price',
   '下代': 'cost_price',
+  '発注ロット': 'order_lot',
 }
 
 // Headers in spreadsheet order
 const HEADERS_ORDER = [
-  '代表品番', 'サムネURL', '注力', 'ブランド', 'シーズン抽出',
+  '代表品番', 'ZOZO専用商品番号', 'サムネURL', '注力', 'ブランド', 'シーズン抽出',
   'シーズン', '販売日', '終了日', '再入荷', 'カテゴリ',
-  'コラボ', 'サイズ', '上代', '下代',
+  'コラボ', 'サイズ', '上代', '下代', '発注ロット',
 ]
 
 export interface SheetProductMaster {
   product_code: string
+  zozo_product_code: string
   image_url: string
   is_focus: string
   brand: string
@@ -43,6 +46,7 @@ export interface SheetProductMaster {
   size: string
   selling_price: number
   cost_price: number
+  order_lot: number | null
   _row_index?: number  // 1-based row number in sheet (for updates)
 }
 
@@ -74,6 +78,7 @@ function parseRow(row: string[], headerKeys: string[], rowIndex: number): SheetP
 
   return {
     product_code: obj.product_code || '',
+    zozo_product_code: obj.zozo_product_code || '',
     image_url: obj.image_url || '',
     is_focus: obj.is_focus || '',
     brand: obj.brand || '',
@@ -87,6 +92,7 @@ function parseRow(row: string[], headerKeys: string[], rowIndex: number): SheetP
     size: obj.size || '',
     selling_price: Number(obj.selling_price) || 0,
     cost_price: Number(obj.cost_price) || 0,
+    order_lot: obj.order_lot ? Number(obj.order_lot) : null,
     _row_index: rowIndex,
   }
 }
