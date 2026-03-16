@@ -135,7 +135,7 @@ export default function MasterPage() {
 
   return (
     <>
-      <Header title="マスタ管理" />
+      <Header title="商品マスタ" />
       <div className="p-6 space-y-4">
         {/* Info banner */}
         <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">

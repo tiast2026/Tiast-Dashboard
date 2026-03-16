@@ -22,7 +22,7 @@ const navItems: (NavItem | { type: 'separator' })[] = [
   { label: '商品分析', href: '/products', icon: 'Tag', phase: 1 },
   { label: '在庫管理', href: '/inventory', icon: 'Package', phase: 1 },
   { label: '顧客分析', href: '/customers', icon: 'Users', phase: 1 },
-  { label: 'マスタ管理', href: '/master', icon: 'Database', phase: 1 },
+  { label: '商品マスタ', href: '/master', icon: 'Database', phase: 1 },
   { type: 'separator' },
   { label: '広告効果', href: '/ads', icon: 'Megaphone', phase: 2 },
   { label: 'アクセス分析', href: '/analytics', icon: 'TrendingUp', phase: 2 },

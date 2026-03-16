@@ -1,4 +1,4 @@
-import { google, sheets_v4 } from 'googleapis'
+import { sheets, sheets_v4, auth as gauth } from '@googleapis/sheets'
 
 const SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID || '1m_slCKW-k_pcEDW7goMDc7Mt3-gTQBL75mchKU-GOv8'
 const SHEET_NAME = process.env.GOOGLE_SHEET_NAME || 'ダッシュボード用'
@@ -20,11 +20,6 @@ const HEADER_MAP: Record<string, string> = {
   '上代': 'selling_price',
   '下代': 'cost_price',
 }
-
-// Reverse mapping for writing back
-const KEY_TO_HEADER: Record<string, string> = Object.fromEntries(
-  Object.entries(HEADER_MAP).map(([k, v]) => [v, k])
-)
 
 // Headers in spreadsheet order
 const HEADERS_ORDER = [
@@ -63,12 +58,12 @@ function getSheetsClient(): sheets_v4.Sheets {
   }
 
   const credentials = JSON.parse(credJson)
-  const auth = new google.auth.GoogleAuth({
+  const authClient = new gauth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   })
 
-  return google.sheets({ version: 'v4', auth })
+  return sheets({ version: 'v4', auth: authClient })
 }
 
 function parseRow(row: string[], headerKeys: string[], rowIndex: number): SheetProductMaster {
@@ -104,8 +99,8 @@ export async function fetchSheetData(forceRefresh = false): Promise<SheetProduct
     return cachedData
   }
 
-  const sheets = getSheetsClient()
-  const res = await sheets.spreadsheets.values.get({
+  const client = getSheetsClient()
+  const res = await client.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: `${SHEET_NAME}`,
   })
@@ -160,7 +155,7 @@ export async function getSheetProductsByCode(codes: string[]): Promise<Map<strin
  * Update a single row in the spreadsheet
  */
 export async function updateSheetRow(product: SheetProductMaster): Promise<void> {
-  const sheets = getSheetsClient()
+  const client = getSheetsClient()
 
   // Find the row to update
   const data = await fetchSheetData(true)
@@ -175,7 +170,7 @@ export async function updateSheetRow(product: SheetProductMaster): Promise<void>
 
   if (existing && existing._row_index) {
     // Update existing row
-    await sheets.spreadsheets.values.update({
+    await client.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
       range: `${SHEET_NAME}!A${existing._row_index}`,
       valueInputOption: 'USER_ENTERED',
@@ -183,7 +178,7 @@ export async function updateSheetRow(product: SheetProductMaster): Promise<void>
     })
   } else {
     // Append new row
-    await sheets.spreadsheets.values.append({
+    await client.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: `${SHEET_NAME}!A:N`,
       valueInputOption: 'USER_ENTERED',
@@ -203,8 +198,8 @@ export async function deleteSheetRow(productCode: string): Promise<boolean> {
   const existing = data.find(d => d.product_code === productCode)
   if (!existing || !existing._row_index) return false
 
-  const sheets = getSheetsClient()
-  await sheets.spreadsheets.values.clear({
+  const client = getSheetsClient()
+  await client.spreadsheets.values.clear({
     spreadsheetId: SPREADSHEET_ID,
     range: `${SHEET_NAME}!A${existing._row_index}:N${existing._row_index}`,
   })
