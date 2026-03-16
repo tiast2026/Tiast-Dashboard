@@ -1,5 +1,6 @@
 'use client'
 // DataTable component
+import React from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -26,6 +27,9 @@ interface DataTableProps<T> {
   sortOrder?: 'asc' | 'desc'
   rowClassName?: (row: T) => string
   onRowClick?: (row: T) => void
+  expandedRowKeys?: Set<string>
+  renderExpandedRow?: (row: T) => React.ReactNode
+  rowKeyField?: string
 }
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -40,6 +44,9 @@ export default function DataTable<T extends Record<string, unknown>>({
   sortOrder,
   rowClassName,
   onRowClick,
+  expandedRowKeys,
+  renderExpandedRow,
+  rowKeyField,
 }: DataTableProps<T>) {
   const total = totalItems ?? data.length
   const totalPages = Math.ceil(total / pageSize)
@@ -88,22 +95,34 @@ export default function DataTable<T extends Record<string, unknown>>({
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row, i) => (
-                <TableRow
-                  key={i}
-                  className={`border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''}`}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                >
-                  {columns.map((col) => (
-                    <TableCell
-                      key={col.key}
-                      className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
+              data.map((row, i) => {
+                const rowKey = rowKeyField ? String(row[rowKeyField]) : String(i)
+                const isExpanded = expandedRowKeys?.has(rowKey)
+                return (
+                  <React.Fragment key={rowKey}>
+                    <TableRow
+                      className={`border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''} ${isExpanded ? 'bg-[#FAFAF8]' : ''}`}
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
                     >
-                      {col.render ? col.render(row) : String(row[col.key] ?? '-')}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                      {columns.map((col) => (
+                        <TableCell
+                          key={col.key}
+                          className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
+                        >
+                          {col.render ? col.render(row) : String(row[col.key] ?? '-')}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {isExpanded && renderExpandedRow && (
+                      <TableRow className="bg-[#FAFAF8] border-b border-black/[0.08]">
+                        <TableCell colSpan={columns.length} className="p-0">
+                          {renderExpandedRow(row)}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                )
+              })
             )}
           </TableBody>
         </Table>
