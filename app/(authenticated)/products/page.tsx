@@ -6,7 +6,6 @@ import Header from '@/components/layout/Header'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import AlertCard from '@/components/cards/AlertCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatDate, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
@@ -417,12 +416,6 @@ function ProductsPageContent() {
 
         {/* Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Input
-            placeholder="商品名・商品コードで検索"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64 bg-white"
-          />
           <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
             <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
             <SelectContent>
@@ -455,6 +448,24 @@ function ProductsPageContent() {
               </SelectContent>
             </Select>
           )}
+          <div className="ml-auto relative">
+            <textarea
+              placeholder={"商品名・商品コードで検索\n複数: カンマ or 改行で区切り"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              rows={1}
+              onFocus={(e) => { e.currentTarget.rows = 3 }}
+              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.rows = 1 }}
+              className="w-72 min-h-[36px] px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            {search && (
+              <span className="absolute right-2 top-1.5 text-[10px] text-gray-400">
+                {search.split(/[,\n\r]+/).filter(s => s.trim()).length > 1
+                  ? `${search.split(/[,\n\r]+/).filter(s => s.trim()).length}件`
+                  : ''}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Data Table */}
