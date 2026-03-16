@@ -358,7 +358,7 @@ export default function MasterPage() {
                     <tr className="bg-gray-50 border-b">
                       <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">画像</th>
                       {skuHeaders
-                        .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code')
+                        .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code' && h.key !== 'shop_name')
                         .map(h => (
                           <th key={h.key} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
                             {h.label}
@@ -380,7 +380,7 @@ export default function MasterPage() {
                           )}
                         </td>
                         {skuHeaders
-                          .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code')
+                          .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code' && h.key !== 'shop_name')
                           .map(h => {
                             let val: string
                             if (h.isExtra) {
