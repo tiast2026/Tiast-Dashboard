@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import DataTable, { Column } from '@/components/tables/DataTable'
+import { TableRow, TableCell } from '@/components/ui/table'
 import AlertCard from '@/components/cards/AlertCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -189,8 +190,47 @@ function SkuDetailPanel({ sku, onClose }: { sku: SkuRow; onClose: () => void }) 
   )
 }
 
-// Inline SKU expansion — renders SKU rows aligned with parent columns
-function SkuExpansion({ productCode, period, month, hasUrlBrand }: { productCode: string; period: string; month: string; hasUrlBrand: boolean }) {
+// SKU cell renderer — maps a column key to the SKU cell content
+function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDayColor: string, statusCls: string, isSelected: boolean): React.ReactNode {
+  switch (colKey) {
+    case 'expand':
+      return isSelected
+        ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+        : <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
+    case 'image_url':
+      return sku.sku_image_url
+        ? <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
+        : <div className="w-[40px] aspect-square bg-gray-100 rounded" />
+    case 'product_name':
+      return (
+        <div className="max-w-[220px]">
+          <div className="truncate text-xs font-mono text-gray-600">{sku.goods_id}</div>
+          <div className="text-[11px] text-gray-400">
+            {[sku.color, sku.size].filter(Boolean).join(' / ') || '-'}
+          </div>
+        </div>
+      )
+    case 'total_quantity':
+      return <span className="text-sm text-[#3D352F]">{sku.total_quantity > 0 ? formatNumber(sku.total_quantity) : '-'}</span>
+    case 'sales_amount':
+      return <span className="text-sm text-[#3D352F]">{sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}</span>
+    case 'gross_profit_rate':
+      return sku.gross_profit_rate > 0 ? <ProfitRateBar rate={sku.gross_profit_rate} /> : <span className="text-gray-300">-</span>
+    case 'total_stock':
+      return <span className="text-sm text-[#3D352F]">{formatNumber(sku.total_stock)}</span>
+    case 'stock_days':
+      return <span className={`text-xs font-medium ${stockDayColor}`}>{stockDays > 0 ? `${stockDays}日` : '-'}</span>
+    case 'inventory_status':
+      return sku.inventory_status
+        ? <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${statusCls}`}>{sku.inventory_status}</span>
+        : null
+    default:
+      return null // empty cell for columns without SKU-level data
+  }
+}
+
+// Inline SKU expansion — renders SKU rows as actual TableRow elements aligned with parent columns
+function SkuExpansionRows({ productCode, period, month, columns }: { productCode: string; period: string; month: string; columns: Column<ProductRow>[] }) {
   const [skus, setSkus] = useState<SkuRow[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSku, setSelectedSku] = useState<string | null>(null)
@@ -208,109 +248,58 @@ function SkuExpansion({ productCode, period, month, hasUrlBrand }: { productCode
       .catch(() => setLoading(false))
   }, [productCode, period, month])
 
-  if (loading) return <div className="py-3 px-4"><Skeleton className="h-16 w-full" /></div>
-  if (skus.length === 0) return <div className="py-3 px-4 text-xs text-gray-400">SKUデータなし</div>
+  if (loading) return (
+    <TableRow className="bg-[#FAFAF8]">
+      <TableCell colSpan={columns.length} className="py-3 px-4">
+        <Skeleton className="h-16 w-full" />
+      </TableCell>
+    </TableRow>
+  )
+  if (skus.length === 0) return (
+    <TableRow className="bg-[#FAFAF8]">
+      <TableCell colSpan={columns.length} className="py-3 px-4 text-xs text-gray-400">
+        SKUデータなし
+      </TableCell>
+    </TableRow>
+  )
 
-  // Build a table that mirrors the parent columns
-  // Columns: expand(32) | image(60) | name(180+) | [brand] | category | season | collab | shipping | price | cost | qty | amount | profit | stock | days | status | start | end
   return (
-    <div className="py-1">
-      <table className="w-full text-sm">
-        <tbody>
-          {skus.map((sku) => {
-            const isSelected = selectedSku === sku.goods_id
-            const stockDays = Math.round(sku.stock_days)
-            const stockDayColor = stockDays > 90 ? 'text-red-600' : stockDays > 60 ? 'text-amber-600' : 'text-gray-700'
-            const statusCls = sku.inventory_status === '過剰' ? 'bg-red-100 text-red-700' : sku.inventory_status === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+    <>
+      {skus.map((sku) => {
+        const isSelected = selectedSku === sku.goods_id
+        const stockDays = Math.round(sku.stock_days)
+        const stockDayColor = stockDays > 90 ? 'text-red-600' : stockDays > 60 ? 'text-amber-600' : 'text-gray-700'
+        const statusCls = sku.inventory_status === '過剰' ? 'bg-red-100 text-red-700' : sku.inventory_status === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
 
-            return (
-              <tr
-                key={sku.goods_id}
-                className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                onClick={() => setSelectedSku(isSelected ? null : sku.goods_id)}
+        return (
+          <TableRow
+            key={sku.goods_id}
+            className="bg-[#FAFAF8] border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+            onClick={() => setSelectedSku(isSelected ? null : sku.goods_id)}
+          >
+            {columns.map((col) => (
+              <TableCell
+                key={col.key}
+                className={`py-1.5 text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.className || ''}`}
               >
-                {/* expand placeholder */}
-                <td className="w-[32px] py-1.5 pl-2">
-                  {isSelected
-                    ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                    : <ChevronRight className="w-3.5 h-3.5 text-gray-300" />}
-                </td>
-                {/* image */}
-                <td className="w-[60px] py-1.5">
-                  {sku.sku_image_url ? (
-                    <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
-                  ) : (
-                    <div className="w-[40px] aspect-square bg-gray-100 rounded" />
-                  )}
-                </td>
-                {/* name: show color/size under goods_id */}
-                <td className="min-w-[180px] py-1.5">
-                  <div className="max-w-[220px]">
-                    <div className="truncate text-xs font-mono text-gray-600">{sku.goods_id}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {[sku.color, sku.size].filter(Boolean).join(' / ') || '-'}
-                    </div>
-                  </div>
-                </td>
-                {/* brand (if shown) */}
-                {!hasUrlBrand && <td className="py-1.5" />}
-                {/* category */}
-                <td className="py-1.5" />
-                {/* season */}
-                <td className="py-1.5" />
-                {/* collab */}
-                <td className="py-1.5" />
-                {/* shipping */}
-                <td className="w-[50px] py-1.5" />
-                {/* selling_price */}
-                <td className="text-right py-1.5" />
-                {/* cost_price */}
-                <td className="text-right py-1.5" />
-                {/* total_quantity */}
-                <td className="text-right py-1.5 text-sm text-[#3D352F]">
-                  {sku.total_quantity > 0 ? formatNumber(sku.total_quantity) : '-'}
-                </td>
-                {/* sales_amount */}
-                <td className="text-right py-1.5 text-sm text-[#3D352F]">
-                  {sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}
-                </td>
-                {/* gross_profit_rate */}
-                <td className="text-right py-1.5">
-                  {sku.gross_profit_rate > 0 ? <ProfitRateBar rate={sku.gross_profit_rate} /> : <span className="text-gray-300">-</span>}
-                </td>
-                {/* total_stock */}
-                <td className="text-right py-1.5 text-sm text-[#3D352F]">
-                  {formatNumber(sku.total_stock)}
-                </td>
-                {/* stock_days */}
-                <td className="text-right py-1.5">
-                  <span className={`text-xs font-medium ${stockDayColor}`}>
-                    {stockDays > 0 ? `${stockDays}日` : '-'}
-                  </span>
-                </td>
-                {/* inventory_status */}
-                <td className="py-1.5">
-                  {sku.inventory_status ? (
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${statusCls}`}>{sku.inventory_status}</span>
-                  ) : null}
-                </td>
-                {/* sales_start_date */}
-                <td className="py-1.5" />
-                {/* sales_end_date */}
-                <td className="py-1.5" />
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                {skuCellContent(sku, col.key, stockDays, stockDayColor, statusCls, isSelected)}
+              </TableCell>
+            ))}
+          </TableRow>
+        )
+      })}
       {/* Detail panel for selected SKU */}
       {selectedSku && skus.find(s => s.goods_id === selectedSku) && (
-        <SkuDetailPanel
-          sku={skus.find(s => s.goods_id === selectedSku)!}
-          onClose={() => setSelectedSku(null)}
-        />
+        <TableRow className="bg-[#FAFAF8]">
+          <TableCell colSpan={columns.length} className="p-0">
+            <SkuDetailPanel
+              sku={skus.find(s => s.goods_id === selectedSku)!}
+              onClose={() => setSelectedSku(null)}
+            />
+          </TableCell>
+        </TableRow>
       )}
-    </div>
+    </>
   )
 }
 
@@ -661,12 +650,12 @@ function ProductsPageContent() {
             sortKey={sortBy}
             sortOrder={sortOrder}
             expandedRowKeys={expandedRows}
-            renderExpandedRow={(row) => (
-              <SkuExpansion
+            renderExpandedRows={(row, cols) => (
+              <SkuExpansionRows
                 productCode={row.product_code}
                 period={period}
                 month={month}
-                hasUrlBrand={!!urlBrand}
+                columns={cols}
               />
             )}
             rowKeyField="product_code"
