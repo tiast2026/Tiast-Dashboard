@@ -40,18 +40,15 @@ export const PROFIT_RATE_COLORS = {
   low: { threshold: 0, color: '#EF4444' },
 }
 
-// Navigation items
-export const NAV_ITEMS = [
-  { label: 'ダッシュボード', href: '/dashboard', icon: 'BarChart3', phase: 1 },
-  { label: '商品分析', href: '/products', icon: 'Tag', phase: 1 },
-  { label: '在庫管理', href: '/inventory', icon: 'Package', phase: 1 },
-  { label: '顧客分析', href: '/customers', icon: 'Users', phase: 1 },
-  { label: '商品マスタ', href: '/master', icon: 'Database', phase: 1 },
-  { type: 'separator' as const },
-  { label: '広告効果', href: '/ads', icon: 'Megaphone', phase: 2 },
-  { label: 'アクセス分析', href: '/analytics', icon: 'TrendingUp', phase: 2 },
-  { label: '予算管理', href: '/budget', icon: 'Wallet', phase: 3 },
+// Brand sub-menu items (per brand)
+export const BRAND_SUB_ITEMS = [
+  { label: '売上分析', href: '/dashboard', icon: 'TrendingUp' },
+  { label: '商品分析', href: '/products', icon: 'Tag' },
+  { label: '顧客分析', href: '/customers', icon: 'Users' },
 ] as const
+
+// Brands shown in sidebar
+export const SIDEBAR_BRANDS = ['NOAHL', 'BLACKQUEEN'] as const
 
 // Brand options for filters
 export const BRAND_OPTIONS = ['全て', 'NOAHL', 'MYRTH', 'BLACKQUEEN'] as const
