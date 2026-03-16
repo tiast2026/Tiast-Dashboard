@@ -60,9 +60,9 @@ function getKnownColumnRenderer(key: string): ((row: MasterRow) => React.ReactNo
     case 'image_url':
       return (row) =>
         row.image_url ? (
-          <img src={row.image_url} alt="" className="w-11 h-11 aspect-square object-cover rounded" />
+          <img src={row.image_url} alt="" className="w-[44px] min-w-[44px] h-[44px] min-h-[44px] object-cover rounded shrink-0" />
         ) : (
-          <div className="w-11 h-11 aspect-square bg-gray-100 rounded flex items-center justify-center text-gray-300">
+          <div className="w-[44px] min-w-[44px] h-[44px] min-h-[44px] bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
             <ImageIcon className="w-4 h-4" />
           </div>
         )
