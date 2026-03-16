@@ -88,8 +88,17 @@ export async function GET(request: NextRequest) {
       const params: Record<string, unknown> = {}
 
       if (search) {
-        conditions.push('(s.product_name LIKE CONCAT(\'%\', @search, \'%\') OR s.product_code LIKE CONCAT(\'%\', @search, \'%\'))')
-        params.search = search
+        // Support multiple product codes separated by comma or newline
+        const terms = search.split(/[,\n\r]+/).map(s => s.trim()).filter(Boolean)
+        if (terms.length > 1) {
+          // Multiple codes: exact match on product_code
+          const placeholders = terms.map((t, i) => `@search_${i}`)
+          conditions.push(`s.product_code IN (${placeholders.join(', ')})`)
+          terms.forEach((t, i) => { params[`search_${i}`] = t })
+        } else {
+          conditions.push('(s.product_name LIKE CONCAT(\'%\', @search, \'%\') OR s.product_code LIKE CONCAT(\'%\', @search, \'%\'))')
+          params.search = terms[0] || search
+        }
       }
       if (brand) {
         conditions.push('s.brand = @brand')
