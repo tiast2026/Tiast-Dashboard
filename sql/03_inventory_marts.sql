@@ -45,8 +45,8 @@ recent_sales AS (
       o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount), 0
     )) / 30 AS sales_30days
   FROM `tiast-data-platform.raw_nextengine.orders` o
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND o.receive_order_date IS NOT NULL
     AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
   GROUP BY o.goods_id
@@ -129,8 +129,8 @@ daily_sales AS (
     SUM(o.quantity) * 1.0 / 30 AS daily_qty,
     SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) / 30 AS daily_sales_amount
   FROM `tiast-data-platform.raw_nextengine.orders` o
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
   GROUP BY o.goods_id
 ),
@@ -141,8 +141,8 @@ annual_sales AS (
     o.goods_id,
     SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity) AS annual_cogs
   FROM `tiast-data-platform.raw_nextengine.orders` o
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
   GROUP BY o.goods_id
 ),
@@ -153,7 +153,7 @@ last_io AS (
     goods_id,
     MAX(io_date) AS last_io_date
   FROM `tiast-data-platform.raw_nextengine.stock_io_history`
-  WHERE deleted_flag = '0'
+  WHERE CAST(deleted_flag AS STRING) = '0'
   GROUP BY goods_id
 )
 

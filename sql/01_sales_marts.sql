@@ -17,6 +17,8 @@
 --   ZOZO: cancel_flag = '' OR cancel_flag IS NULL
 --
 -- ブランド判別: goods_id先頭1文字 n=NOAHL, b=BLACKQUEEN
+-- 店舗判別: receive_order_shop_cut_form_idのパターンで判定
+--   楽天: 数字6桁-YYYYMMDD-数字 (例: 338335-20230909-0688303402)
 -- ============================================================
 
 
@@ -30,14 +32,15 @@ CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_sales_by_shop_mo
 WITH ne_sales AS (
   SELECT
     FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS order_month,
-    -- 店舗名からshop_name (API側でchannel_groupにマッピング)
+    -- 店舗名: receive_order_shop_cut_form_idのパターンで判別
+    -- (import_type_nameは取込種類='ＣＳＶ'等で店舗判別不可)
     CASE
       WHEN o.receive_order_shop_id = 1 THEN '自社EC'
-      WHEN LOWER(COALESCE(o.import_type_name, '')) LIKE '%楽天%' THEN '楽天市場'
-      WHEN LOWER(COALESCE(o.import_type_name, '')) LIKE '%yahoo%' THEN 'Yahoo!'
-      WHEN LOWER(COALESCE(o.import_type_name, '')) LIKE '%amazon%' THEN 'Amazon'
-      WHEN LOWER(COALESCE(o.import_type_name, '')) LIKE '%qoo10%' THEN 'Qoo10'
-      ELSE COALESCE(o.import_type_name, 'その他')
+      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{5,6}-\d{8}-') THEN '楽天市場'
+      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^[Yy]') THEN 'Yahoo!'
+      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{3}-\d{7}-') THEN 'Amazon'
+      WHEN LOWER(COALESCE(o.receive_order_shop_cut_form_id, '')) LIKE '%qoo10%' THEN 'Qoo10'
+      ELSE CONCAT('EC_', CAST(o.receive_order_shop_id AS STRING))
     END AS shop_name,
     -- ブランド判別
     CASE
@@ -52,8 +55,8 @@ WITH ne_sales AS (
     SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
       - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity) AS gross_profit
   FROM `tiast-data-platform.raw_nextengine.orders` o
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND o.receive_order_date IS NOT NULL
   GROUP BY 1, 2, 3
 ),
@@ -106,8 +109,8 @@ WITH ne_sales AS (
   FROM `tiast-data-platform.raw_nextengine.orders` o
   LEFT JOIN `tiast-data-platform.raw_nextengine.products` p
     ON o.goods_id = p.goods_id
-  WHERE o.cancel_type_id = '0'
-    AND o.row_cancel_flag = '0'
+  WHERE CAST(o.cancel_type_id AS STRING) = '0'
+    AND CAST(o.row_cancel_flag AS STRING) = '0'
     AND o.receive_order_date IS NOT NULL
   GROUP BY 1, 2, 3
 ),
