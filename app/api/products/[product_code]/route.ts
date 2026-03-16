@@ -109,29 +109,32 @@ export async function GET(
         WHERE goods_representation_id = @product_code
       `
 
-      // Fetch inventory data per SKU
+      // Fetch inventory data per SKU (mart_inventory_health has no product_code column,
+      // so we join through products to find SKUs belonging to this product)
       const inventoryQuery = `
         SELECT
-          goods_id,
-          goods_name,
-          total_stock,
-          free_stock,
-          zozo_stock,
-          own_stock,
-          sales_1day,
-          sales_7days,
-          sales_30days,
-          daily_sales,
-          stock_days,
-          season_remaining_days,
-          is_overstock,
-          is_stockout,
-          reorder_judgment,
-          recommended_discount,
-          selling_price,
-          cost_price
-        FROM ${tableName('mart_inventory_health')}
-        WHERE product_code = @product_code
+          ih.goods_id,
+          ih.goods_name,
+          ih.total_stock,
+          ih.free_stock,
+          ih.zozo_stock,
+          ih.own_stock,
+          ih.sales_1day,
+          ih.sales_7days,
+          ih.sales_30days,
+          ih.daily_sales,
+          ih.stock_days,
+          ih.season_remaining_days,
+          ih.is_overstock,
+          ih.is_stockout,
+          ih.reorder_judgment,
+          ih.recommended_discount,
+          ih.selling_price,
+          ih.cost_price
+        FROM ${tableName('mart_inventory_health')} ih
+        INNER JOIN \`tiast-data-platform.raw_nextengine.products\` p
+          ON ih.goods_id = p.goods_id
+        WHERE p.goods_representation_id = @product_code
       `
 
       // Fetch MD analysis per SKU
