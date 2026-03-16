@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatDate } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
+import { Mail, Truck, HelpCircle } from 'lucide-react'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PRICE_TIER_OPTIONS, PROFIT_RATE_COLORS } from '@/lib/constants'
 
 interface ProductRow {
@@ -174,17 +175,39 @@ function ProductsPageContent() {
         </div>
       ),
     },
-    { key: 'brand', label: 'ブランド' },
+    ...(!urlBrand ? [{ key: 'brand' as const, label: 'ブランド' }] : []),
     { key: 'category', label: 'カテゴリ' },
     { key: 'season', label: 'シーズン' },
     {
       key: 'collaborator',
       label: 'コラボ',
-      render: (row) => row.collaborator ? (
+      render: (row: ProductRow) => row.collaborator ? (
         <span className="text-xs text-purple-600">{row.collaborator}</span>
       ) : <span className="text-gray-300">-</span>,
     },
-    { key: 'size', label: 'サイズ', render: (row) => <span className="text-xs">{row.size || '-'}</span> },
+    {
+      key: 'size',
+      label: '配送',
+      className: 'w-[50px]',
+      render: (row: ProductRow) => {
+        const s = (row.size || '').trim()
+        if (s.includes('メール') || s === 'M' || s === 'メール便') {
+          return (
+            <span className="inline-flex items-center gap-1 text-blue-600" title="メール便 ¥330">
+              <Mail className="w-3.5 h-3.5" />
+            </span>
+          )
+        }
+        if (s.includes('宅配') || s === 'L' || s === '宅配便') {
+          return (
+            <span className="inline-flex items-center gap-1 text-amber-600" title="宅配便 ¥660">
+              <Truck className="w-3.5 h-3.5" />
+            </span>
+          )
+        }
+        return s ? <span className="text-xs text-gray-500" title={s}>{s}</span> : <span className="text-gray-300">-</span>
+      },
+    },
     {
       key: 'selling_price',
       label: '販売価格',
@@ -214,9 +237,15 @@ function ProductsPageContent() {
     {
       key: 'gross_profit_rate',
       label: '粗利率',
+      headerRender: () => (
+        <span className="inline-flex items-center gap-1">
+          粗利率
+          <span title={"(売上 - 仕入原価) / 売上\n※送料は含まれていません"}><HelpCircle className="w-3 h-3 text-gray-400 cursor-help" /></span>
+        </span>
+      ),
       align: 'right',
       sortable: true,
-      render: (row) => <ProfitRateBar rate={row.gross_profit_rate} />,
+      render: (row: ProductRow) => <ProfitRateBar rate={row.gross_profit_rate} />,
     },
     {
       key: 'total_stock',

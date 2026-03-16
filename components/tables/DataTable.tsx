@@ -10,6 +10,7 @@ export interface Column<T> {
   sortable?: boolean
   align?: 'left' | 'center' | 'right'
   render?: (row: T) => React.ReactNode
+  headerRender?: () => React.ReactNode
   className?: string
 }
 
@@ -63,7 +64,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
                   <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
-                    {col.label}
+                    {col.headerRender ? col.headerRender() : col.label}
                     {col.sortable && (
                       sortKey === col.key
                         ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)
