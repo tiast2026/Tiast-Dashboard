@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
@@ -87,40 +87,59 @@ export default function DashboardPage() {
     return () => { mountedRef.current = false }
   }, [fetchData, cacheKey])
 
-  // Build brand×channel matrix from YoY data
-  const { channels, brands, matrix, channelTotals, grandTotal } = (() => {
-    const channelSet = new Set<string>()
-    const brandSet = new Set<string>()
-    const map: Record<string, Record<string, { current: number; prev: number }>> = {}
+  // Build brand-grouped channel sales from YoY data
+  const { brandGroups, grandTotal } = (() => {
+    // Extract pure channel name from patterns like 【楽天】NOAHL
+    function extractChannel(raw: string): string {
+      const m = raw.match(/【(.+?)】/)
+      if (m) return m[1]
+      return raw
+    }
+
+    // Ensure numeric values (BigQuery NUMERIC can come as strings)
+    function num(v: unknown): number {
+      if (typeof v === 'number') return v
+      if (typeof v === 'string') return Number(v) || 0
+      return 0
+    }
+
+    // Group: brand → channel → { current, prev }
+    const brandMap: Record<string, { channel: string; current: number; prev: number }[]> = {}
+    let gCurrent = 0
+    let gPrev = 0
 
     for (const item of yoy) {
-      channelSet.add(item.channel)
-      brandSet.add(item.brand)
-      if (!map[item.channel]) map[item.channel] = {}
-      map[item.channel][item.brand] = {
-        current: item.current_sales,
-        prev: item.previous_year_sales,
+      const b = item.brand
+      const ch = extractChannel(item.channel)
+      const cur = num(item.current_sales)
+      const prev = num(item.previous_year_sales)
+
+      if (!brandMap[b]) brandMap[b] = []
+      // Merge if same channel exists for same brand
+      const existing = brandMap[b].find((x) => x.channel === ch)
+      if (existing) {
+        existing.current += cur
+        existing.prev += prev
+      } else {
+        brandMap[b].push({ channel: ch, current: cur, prev: prev })
       }
+      gCurrent += cur
+      gPrev += prev
     }
 
-    const channels = Array.from(channelSet)
-    const brands = Array.from(brandSet)
+    // Sort channels within each brand by current sales desc
+    const brandGroups = Object.entries(brandMap)
+      .map(([brand, channels]) => {
+        channels.sort((a, b) => b.current - a.current)
+        const subtotal = {
+          current: channels.reduce((s, c) => s + c.current, 0),
+          prev: channels.reduce((s, c) => s + c.prev, 0),
+        }
+        return { brand, channels, subtotal }
+      })
+      .sort((a, b) => b.subtotal.current - a.subtotal.current)
 
-    // Calculate totals per channel
-    const channelTotals: Record<string, { current: number; prev: number }> = {}
-    let grandTotal = { current: 0, prev: 0 }
-    for (const ch of channels) {
-      let chCurrent = 0
-      let chPrev = 0
-      for (const b of brands) {
-        chCurrent += map[ch]?.[b]?.current || 0
-        chPrev += map[ch]?.[b]?.prev || 0
-      }
-      channelTotals[ch] = { current: chCurrent, prev: chPrev }
-      grandTotal = { current: grandTotal.current + chCurrent, prev: grandTotal.prev + chPrev }
-    }
-
-    return { channels, brands, matrix: map, channelTotals, grandTotal }
+    return { brandGroups, grandTotal: { current: gCurrent, prev: gPrev } }
   })()
 
   const barData = ranking.map((r) => ({
@@ -178,67 +197,67 @@ export default function DashboardPage() {
           <CardContent>
             {loading ? (
               <Skeleton className="h-[200px]" />
-            ) : yoy.length > 0 ? (
+            ) : brandGroups.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left p-2 font-medium text-gray-600">チャネル</th>
-                      {brands.map((b) => (
-                        <th key={b} className="text-right p-2 font-medium text-gray-600">{b}</th>
-                      ))}
-                      <th className="text-right p-2 font-semibold text-gray-700">合計</th>
-                      <th className="text-right p-2 font-medium text-gray-600">構成比</th>
-                      <th className="text-right p-2 font-medium text-gray-600">前年比</th>
+                      <th className="text-left p-2 font-medium text-gray-600 w-[200px]"></th>
+                      <th className="text-right p-2 font-medium text-gray-600">売上金額</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[80px]">構成比</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[80px]">前年比</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {channels.map((ch) => {
-                      const chTotal = channelTotals[ch]
-                      const ratio = grandTotal.current > 0 ? chTotal.current / grandTotal.current : 0
-                      const yoyRatio = chTotal.prev > 0 ? chTotal.current / chTotal.prev : null
+                    {brandGroups.map((group) => {
+                      const brandRatio = grandTotal.current > 0 ? group.subtotal.current / grandTotal.current : 0
+                      const brandYoy = group.subtotal.prev > 0 ? group.subtotal.current / group.subtotal.prev : null
                       return (
-                        <tr key={ch} className="border-b hover:bg-gray-50/50">
-                          <td className="p-2 font-medium">{ch}</td>
-                          {brands.map((b) => {
-                            const val = matrix[ch]?.[b]?.current || 0
+                        <React.Fragment key={group.brand}>
+                          {/* Brand header row */}
+                          <tr className="border-b bg-gray-50/80">
+                            <td className="p-2 font-semibold text-gray-800">{group.brand}</td>
+                            <td className="p-2 text-right font-semibold tabular-nums">
+                              {formatCurrency(group.subtotal.current)}
+                            </td>
+                            <td className="p-2 text-right tabular-nums text-gray-500 font-medium">
+                              {(brandRatio * 100).toFixed(1)}%
+                            </td>
+                            <td className={`p-2 text-right text-sm font-semibold ${
+                              brandYoy == null ? '' : brandYoy >= 1 ? 'text-green-700' : 'text-red-600'
+                            }`}>
+                              {brandYoy != null ? `${(brandYoy * 100).toFixed(1)}%` : '-'}
+                            </td>
+                          </tr>
+                          {/* Channel rows */}
+                          {group.channels.map((ch) => {
+                            const chRatio = grandTotal.current > 0 ? ch.current / grandTotal.current : 0
+                            const chYoy = ch.prev > 0 ? ch.current / ch.prev : null
                             return (
-                              <td key={b} className="p-2 text-right tabular-nums">
-                                {val > 0 ? formatCurrency(val) : <span className="text-gray-300">-</span>}
-                              </td>
+                              <tr key={`${group.brand}-${ch.channel}`} className="border-b hover:bg-gray-50/50">
+                                <td className="p-2 pl-6 text-gray-600">{ch.channel}</td>
+                                <td className="p-2 text-right tabular-nums">{formatCurrency(ch.current)}</td>
+                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
+                                  {(chRatio * 100).toFixed(1)}%
+                                </td>
+                                <td className={`p-2 text-right text-xs font-medium ${
+                                  chYoy == null ? '' : chYoy >= 1 ? 'text-green-700' : 'text-red-600'
+                                }`}>
+                                  {chYoy != null ? `${(chYoy * 100).toFixed(1)}%` : '-'}
+                                </td>
+                              </tr>
                             )
                           })}
-                          <td className="p-2 text-right font-semibold tabular-nums">
-                            {formatCurrency(chTotal.current)}
-                          </td>
-                          <td className="p-2 text-right tabular-nums text-gray-500">
-                            {(ratio * 100).toFixed(1)}%
-                          </td>
-                          <td className={`p-2 text-right text-xs font-medium ${
-                            yoyRatio == null ? '' : yoyRatio >= 1 ? 'text-green-700' : 'text-red-600'
-                          }`}>
-                            {yoyRatio != null ? `${(yoyRatio * 100).toFixed(1)}%` : '-'}
-                          </td>
-                        </tr>
+                        </React.Fragment>
                       )
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 bg-gray-50 font-semibold">
+                    <tr className="border-t-2 bg-gray-100 font-semibold">
                       <td className="p-2">合計</td>
-                      {brands.map((b) => {
-                        const brandTotal = channels.reduce((sum, ch) => sum + (matrix[ch]?.[b]?.current || 0), 0)
-                        return (
-                          <td key={b} className="p-2 text-right tabular-nums">
-                            {brandTotal > 0 ? formatCurrency(brandTotal) : '-'}
-                          </td>
-                        )
-                      })}
-                      <td className="p-2 text-right tabular-nums">
-                        {formatCurrency(grandTotal.current)}
-                      </td>
+                      <td className="p-2 text-right tabular-nums">{formatCurrency(grandTotal.current)}</td>
                       <td className="p-2 text-right tabular-nums text-gray-500">100.0%</td>
-                      <td className={`p-2 text-right text-xs font-medium ${
+                      <td className={`p-2 text-right text-sm font-semibold ${
                         grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''
                       }`}>
                         {grandTotal.prev > 0 ? `${(grandTotal.current / grandTotal.prev * 100).toFixed(1)}%` : '-'}
