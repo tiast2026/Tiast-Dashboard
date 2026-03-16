@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMasterList, upsertMasterItem, deleteMasterItem, importMasterItems } from '@/lib/master-store'
+import { getMasterList, upsertMasterItem, deleteMasterItemAsync, importMasterItems } from '@/lib/master-store'
 
 // GET /api/master - List master items
 export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams
-    const result = getMasterList({
+    const result = await getMasterList({
       page: sp.get('page') ? Number(sp.get('page')) : 1,
       per_page: sp.get('per_page') ? Number(sp.get('per_page')) : 30,
       brand: sp.get('brand') || undefined,
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const item = upsertMasterItem(body)
+    const item = await upsertMasterItem(body)
     return NextResponse.json(item)
   } catch (e) {
     console.error('Master upsert error:', e)
@@ -41,7 +41,7 @@ export async function DELETE(request: NextRequest) {
     if (!code) {
       return NextResponse.json({ error: 'product_code is required' }, { status: 400 })
     }
-    const ok = deleteMasterItem(code)
+    const ok = await deleteMasterItemAsync(code)
     if (!ok) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
@@ -59,7 +59,7 @@ export async function PUT(request: NextRequest) {
     if (!Array.isArray(body.items)) {
       return NextResponse.json({ error: 'items array is required' }, { status: 400 })
     }
-    const count = importMasterItems(body.items)
+    const count = await importMasterItems(body.items)
     return NextResponse.json({ imported: count })
   } catch (e) {
     console.error('Master import error:', e)

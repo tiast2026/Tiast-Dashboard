@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
 import { getMockProductDetail } from '@/lib/mock-data'
+import { getSheetProduct, isSheetsConfigured } from '@/lib/google-sheets'
 
 interface SalesRow {
   product_code: string
@@ -195,6 +196,25 @@ export async function GET(
 
     if (!data) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    // Overlay spreadsheet master data (image_url, brand, category, season, dates, prices)
+    if (isSheetsConfigured()) {
+      try {
+        const sheet = await getSheetProduct(product_code)
+        if (sheet) {
+          if (sheet.image_url) data.image_url = sheet.image_url
+          if (sheet.brand) data.brand = sheet.brand
+          if (sheet.category) data.category = sheet.category
+          if (sheet.season) data.season = sheet.season
+          if (sheet.sales_start_date) data.sales_start_date = sheet.sales_start_date
+          if (sheet.sales_end_date) data.sales_end_date = sheet.sales_end_date
+          if (sheet.selling_price) data.selling_price = sheet.selling_price
+          if (sheet.cost_price) data.cost_price = sheet.cost_price
+        }
+      } catch (e) {
+        console.error('Failed to fetch sheet data for product detail:', e)
+      }
     }
 
     return NextResponse.json(data)

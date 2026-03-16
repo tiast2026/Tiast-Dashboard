@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
 import { getMockProductsList } from '@/lib/mock-data'
+import { fetchSheetData, isSheetsConfigured } from '@/lib/google-sheets'
 
 interface ProductRow {
   product_code: string
@@ -126,6 +127,29 @@ export async function GET(request: NextRequest) {
         total_pages: Math.ceil(total / per_page),
       }
     })
+
+    // Overlay spreadsheet master data onto product list
+    if (data && isSheetsConfigured()) {
+      try {
+        const sheetData = await fetchSheetData()
+        const sheetMap = new Map(sheetData.map(s => [s.product_code, s]))
+        for (const row of data.data) {
+          const sheet = sheetMap.get(row.product_code)
+          if (sheet) {
+            if (sheet.image_url) row.image_url = sheet.image_url
+            if (sheet.brand) row.brand = sheet.brand
+            if (sheet.category) row.category = sheet.category
+            if (sheet.season) row.season = sheet.season
+            if (sheet.sales_start_date) row.sales_start_date = sheet.sales_start_date
+            if (sheet.sales_end_date) row.sales_end_date = sheet.sales_end_date
+            if (sheet.selling_price) row.selling_price = sheet.selling_price
+            if (sheet.cost_price) row.cost_price = sheet.cost_price
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch sheet data for product list:', e)
+      }
+    }
 
     return NextResponse.json(data)
   } catch (error) {

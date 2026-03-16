@@ -45,6 +45,7 @@ function emptyForm(): Partial<ProductMaster> {
     brand: 'NOAHL',
     category: 'トップス',
     season: '春',
+    season_extraction: '',
     collaborator: '',
     commission_rate: 0.05,
     selling_price: 0,
@@ -52,6 +53,9 @@ function emptyForm(): Partial<ProductMaster> {
     order_lot: null,
     sales_start_date: '',
     sales_end_date: '',
+    is_focus: '',
+    restock: '',
+    size: '',
     lifecycle_stance: '助走期',
     operation_note: '',
     image_url: null,
@@ -276,6 +280,14 @@ export default function MasterPage() {
         </div>
       ),
     },
+    {
+      key: 'is_focus',
+      label: '注力',
+      className: 'w-[40px]',
+      render: (row) => row.is_focus ? (
+        <Badge className="bg-orange-100 text-orange-700 text-[11px]">{row.is_focus}</Badge>
+      ) : <span className="text-gray-300">-</span>,
+    },
     { key: 'brand', label: 'ブランド' },
     { key: 'category', label: 'カテゴリ' },
     { key: 'season', label: 'シーズン' },
@@ -285,31 +297,26 @@ export default function MasterPage() {
       render: (row) => <span className="text-sm">{row.collaborator || '-'}</span>,
     },
     {
-      key: 'commission_rate',
-      label: '紹介料',
-      align: 'right',
-      render: (row) => <span className="text-sm">{formatPercent(row.commission_rate, 0)}</span>,
+      key: 'size',
+      label: 'サイズ',
+      render: (row) => <span className="text-sm text-gray-500">{row.size || '-'}</span>,
     },
     {
       key: 'selling_price',
-      label: '販売価格',
+      label: '上代',
       align: 'right',
-      render: (row) => <span className="text-sm">{formatCurrency(row.selling_price)}</span>,
+      render: (row) => <span className="text-sm">{row.selling_price ? formatCurrency(row.selling_price) : '-'}</span>,
     },
     {
-      key: 'order_lot',
-      label: 'ロット',
+      key: 'cost_price',
+      label: '下代',
       align: 'right',
-      render: (row) => <span className="text-sm">{row.order_lot || '-'}</span>,
+      render: (row) => <span className="text-sm">{row.cost_price ? formatCurrency(row.cost_price) : '-'}</span>,
     },
     {
-      key: 'lifecycle_stance',
-      label: 'スタンス',
-      render: (row) => (
-        <Badge className={`text-[11px] ${STANCE_COLORS[row.lifecycle_stance] || 'bg-gray-100'}`}>
-          {row.lifecycle_stance}
-        </Badge>
-      ),
+      key: 'restock',
+      label: '再入荷',
+      render: (row) => <span className="text-sm text-gray-500">{row.restock || '-'}</span>,
     },
     {
       key: 'sales_start_date',
@@ -481,7 +488,7 @@ export default function MasterPage() {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">コラボ</label>
                   <Input
@@ -491,15 +498,38 @@ export default function MasterPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">スタンス</label>
-                  <Select value={editForm.lifecycle_stance || '助走期'} onValueChange={(v) => setEditForm(f => ({ ...f, lifecycle_stance: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(['助走期', '最盛期', '安定期', '衰退期'] as const).map(s => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">注力</label>
+                  <Input
+                    value={editForm.is_focus || ''}
+                    onChange={(e) => setEditForm(f => ({ ...f, is_focus: e.target.value }))}
+                    placeholder="例: ○"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">再入荷</label>
+                  <Input
+                    value={editForm.restock || ''}
+                    onChange={(e) => setEditForm(f => ({ ...f, restock: e.target.value }))}
+                    placeholder="例: ○"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">サイズ</label>
+                  <Input
+                    value={editForm.size || ''}
+                    onChange={(e) => setEditForm(f => ({ ...f, size: e.target.value }))}
+                    placeholder="例: F / S,M,L"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">シーズン抽出</label>
+                  <Input
+                    value={editForm.season_extraction || ''}
+                    onChange={(e) => setEditForm(f => ({ ...f, season_extraction: e.target.value }))}
+                    placeholder=""
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
