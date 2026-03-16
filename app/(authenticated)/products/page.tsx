@@ -64,7 +64,7 @@ interface SkuRow {
   turnover_days: number
   last_io_date: string | null
   days_since_last_io: number
-  stagnation_alert: string | null
+  stagnation_alert: boolean
   lifecycle_action: string | null
 }
 
@@ -171,7 +171,7 @@ function SkuDetailPanel({ sku, onClose }: { sku: SkuRow; onClose: () => void }) 
           <div className="text-gray-500 mb-1">アラート</div>
           <div className="space-y-1">
             {sku.stagnation_alert && (
-              <div className="text-red-600 font-medium">{sku.stagnation_alert}</div>
+              <div className="text-red-600 font-medium">滞留アラート</div>
             )}
             {sku.lifecycle_action && (
               <div className="text-amber-700">{sku.lifecycle_action}</div>
@@ -179,7 +179,7 @@ function SkuDetailPanel({ sku, onClose }: { sku: SkuRow; onClose: () => void }) 
             {sku.days_since_last_io > 0 && (
               <div className="flex justify-between"><span>入出庫なし</span><span className="font-medium">{sku.days_since_last_io}日</span></div>
             )}
-            {!sku.stagnation_alert && !sku.lifecycle_action && sku.days_since_last_io === 0 && (
+            {!sku.stagnation_alert && !sku.lifecycle_action && !sku.days_since_last_io && (
               <div className="text-green-600">問題なし</div>
             )}
           </div>
