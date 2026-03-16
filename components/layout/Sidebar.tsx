@@ -45,7 +45,7 @@ export default function Sidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
     for (const s of brandSections) {
-      init[s.brand] = s.brand === currentBrand
+      init[s.brand] = true
     }
     return init
   })
