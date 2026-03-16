@@ -48,12 +48,6 @@ interface SkuImageItem {
   extra_fields: Record<string, string>
 }
 
-interface SkuHeaderInfo {
-  key: string
-  label: string
-  isExtra: boolean
-}
-
 // Known column renderers (special formatting)
 function getKnownColumnRenderer(key: string): ((row: MasterRow) => React.ReactNode) | null {
   switch (key) {
@@ -118,7 +112,7 @@ export default function MasterPage() {
   const [skuDialogOpen, setSkuDialogOpen] = useState(false)
   const [skuDialogProduct, setSkuDialogProduct] = useState<MasterRow | null>(null)
   const [skuImages, setSkuImages] = useState<SkuImageItem[]>([])
-  const [skuHeaders, setSkuHeaders] = useState<SkuHeaderInfo[]>([])
+
   const [skuLoading, setSkuLoading] = useState(false)
 
   const fetchList = useCallback(async () => {
@@ -157,14 +151,12 @@ export default function MasterPage() {
     setSkuDialogOpen(true)
     setSkuLoading(true)
     setSkuImages([])
-    setSkuHeaders([])
 
     try {
       const res = await fetch(`/api/master/sku-images?product_code=${encodeURIComponent(row.product_code)}`)
       if (res.ok) {
         const data = await res.json()
         setSkuImages(data.data || [])
-        setSkuHeaders(data.headers || [])
       }
     } catch (e) {
       console.error('Failed to fetch SKU images:', e)
@@ -357,14 +349,9 @@ export default function MasterPage() {
                   <thead>
                     <tr className="bg-gray-50 border-b">
                       <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">画像</th>
-                      {skuHeaders
-                        .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code' && h.key !== 'shop_name')
-                        .map(h => (
-                          <th key={h.key} className="px-3 py-2 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                            {h.label}
-                          </th>
-                        ))
-                      }
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">カラー</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">サイズ</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">SKU番号</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -379,24 +366,9 @@ export default function MasterPage() {
                             </div>
                           )}
                         </td>
-                        {skuHeaders
-                          .filter(h => h.key !== 'sku_image_url' && h.key !== 'product_code' && h.key !== 'shop_name')
-                          .map(h => {
-                            let val: string
-                            if (h.isExtra) {
-                              val = sku.extra_fields?.[h.label] || '-'
-                            } else {
-                              val = String((sku as unknown as Record<string, unknown>)[h.key] ?? '-')
-                            }
-                            return (
-                              <td key={h.key} className="px-3 py-2 whitespace-nowrap">
-                                {h.key === 'sku_code' ? (
-                                  <span className="font-mono">{val}</span>
-                                ) : val}
-                              </td>
-                            )
-                          })
-                        }
+                        <td className="px-3 py-2 whitespace-nowrap">{sku.color || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">{sku.size || '-'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap"><span className="font-mono">{sku.sku_code || '-'}</span></td>
                       </tr>
                     ))}
                   </tbody>
