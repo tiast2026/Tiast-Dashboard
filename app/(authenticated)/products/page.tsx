@@ -424,25 +424,25 @@ function ProductsPageContent() {
             className="w-64 bg-white"
           />
           <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
             <SelectContent>
               {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{b}</SelectItem>))}
             </SelectContent>
           </Select>
           <Select value={category} onValueChange={(v) => v && setCategory(v)}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="カテゴリ" /></SelectTrigger>
             <SelectContent>
-              {CATEGORY_OPTIONS.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+              {CATEGORY_OPTIONS.map((c) => (<SelectItem key={c} value={c}>{c === '全て' ? 'カテゴリ: 全て' : c}</SelectItem>))}
             </SelectContent>
           </Select>
           <Select value={season} onValueChange={(v) => v && setSeason(v)}>
-            <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-32 bg-white"><SelectValue placeholder="シーズン" /></SelectTrigger>
             <SelectContent>
-              {SEASON_OPTIONS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+              {SEASON_OPTIONS.map((s) => (<SelectItem key={s} value={s}>{s === '全て' ? 'シーズン: 全て' : s}</SelectItem>))}
             </SelectContent>
           </Select>
           <Select value={period} onValueChange={(v) => v && setPeriod(v)}>
-            <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-28 bg-white"><SelectValue placeholder="期間" /></SelectTrigger>
             <SelectContent>
               {PERIOD_OPTIONS.map((p) => (<SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>))}
             </SelectContent>

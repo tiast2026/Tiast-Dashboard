@@ -25,6 +25,8 @@ interface ProductMasterRow {
   sales_start_date: string | null
   sales_end_date: string | null
   sku_count: number
+  selling_price: number
+  cost_price: number
 }
 
 interface InventoryRow {
@@ -105,36 +107,39 @@ export async function GET(
           MAX(image_url) AS image_url,
           MIN(sales_start_date) AS sales_start_date,
           MAX(sales_end_date) AS sales_end_date,
-          COUNT(DISTINCT goods_id) AS sku_count
+          COUNT(DISTINCT goods_id) AS sku_count,
+          MAX(selling_price) AS selling_price,
+          MAX(cost_price) AS cost_price
         FROM ${tableName('mart_product_master')}
-        WHERE goods_representation_id = @product_code
+        WHERE product_code = @product_code
       `
 
-      // Fetch inventory data per SKU (mart_inventory_health has no product_code column,
-      // so we join through products to find SKUs belonging to this product)
+      // Fetch inventory data per SKU
+      // Use products as base table with LEFT JOIN to inventory_health
+      // so we always get SKU list even when stock data is missing
       const inventoryQuery = `
         SELECT
-          ih.goods_id,
-          ih.goods_name,
-          ih.total_stock,
-          ih.free_stock,
-          ih.zozo_stock,
-          ih.own_stock,
-          ih.sales_1day,
-          ih.sales_7days,
-          ih.sales_30days,
-          ih.daily_sales,
-          ih.stock_days,
-          ih.season_remaining_days,
-          ih.is_overstock,
-          ih.is_stockout,
-          ih.reorder_judgment,
+          p.goods_id,
+          p.goods_name,
+          COALESCE(ih.total_stock, 0) AS total_stock,
+          COALESCE(ih.free_stock, 0) AS free_stock,
+          COALESCE(ih.zozo_stock, 0) AS zozo_stock,
+          COALESCE(ih.own_stock, 0) AS own_stock,
+          COALESCE(ih.sales_1day, 0) AS sales_1day,
+          COALESCE(ih.sales_7days, 0) AS sales_7days,
+          COALESCE(ih.sales_30days, 0) AS sales_30days,
+          COALESCE(ih.daily_sales, 0) AS daily_sales,
+          COALESCE(ih.stock_days, 0) AS stock_days,
+          COALESCE(ih.season_remaining_days, 0) AS season_remaining_days,
+          COALESCE(ih.is_overstock, false) AS is_overstock,
+          COALESCE(ih.is_stockout, false) AS is_stockout,
+          COALESCE(ih.reorder_judgment, '不明') AS reorder_judgment,
           ih.recommended_discount,
-          ih.selling_price,
-          ih.cost_price
-        FROM ${tableName('mart_inventory_health')} ih
-        INNER JOIN \`tiast-data-platform.raw_nextengine.products\` p
-          ON ih.goods_id = p.goods_id
+          COALESCE(ih.selling_price, p.selling_price) AS selling_price,
+          COALESCE(ih.cost_price, p.cost_price) AS cost_price
+        FROM \`tiast-data-platform.raw_nextengine.products\` p
+        LEFT JOIN ${tableName('mart_inventory_health')} ih
+          ON p.goods_id = ih.goods_id
         WHERE p.goods_representation_id = @product_code
       `
 
@@ -165,30 +170,31 @@ export async function GET(
       ])
 
       const sales = salesRows[0]
-      if (!sales) {
+      const master = masterRows[0]
+
+      // Even if no sales data, return product info with inventory
+      if (!sales && inventoryRows.length === 0 && !master) {
         return null
       }
 
-      const master = masterRows[0]
-
       return {
-        product_code: sales.product_code,
-        product_name: sales.product_name,
-        brand: sales.brand,
-        category: sales.category,
-        season: sales.season,
-        price_tier: sales.price_tier,
-        selling_price: sales.selling_price,
-        cost_price: sales.cost_price,
-        sku_count: master?.sku_count || 0,
+        product_code: sales?.product_code || product_code,
+        product_name: sales?.product_name || inventoryRows[0]?.goods_name || product_code,
+        brand: sales?.brand || '',
+        category: sales?.category || '',
+        season: sales?.season || '',
+        price_tier: sales?.price_tier || '',
+        selling_price: sales?.selling_price || master?.selling_price || 0,
+        cost_price: sales?.cost_price || master?.cost_price || 0,
+        sku_count: master?.sku_count || inventoryRows.length,
         image_url: master?.image_url || null,
         sales_start_date: master?.sales_start_date || null,
         sales_end_date: master?.sales_end_date || null,
-        total_quantity: sales.total_quantity,
-        order_count: sales.order_count,
-        sales_amount: sales.sales_amount,
-        gross_profit: sales.gross_profit,
-        gross_profit_rate: sales.gross_profit_rate,
+        total_quantity: sales?.total_quantity || 0,
+        order_count: sales?.order_count || 0,
+        sales_amount: sales?.sales_amount || 0,
+        gross_profit: sales?.gross_profit || 0,
+        gross_profit_rate: sales?.gross_profit_rate || 0,
         inventory: inventoryRows,
         md_analysis: mdRows,
       }
