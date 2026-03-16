@@ -520,6 +520,8 @@ function generateProductItems() {
       image_url: null as string | null,
       sales_start_date: '2024-09-01',
       sales_end_date: null as string | null,
+      collaborator: i % 5 === 0 ? 'cocoさん' : null as string | null,
+      size: ['S', 'M', 'L', 'F'][Math.floor(rand() * 4)],
       total_stock: totalStock,
       daily_sales: dailySales,
       stock_days: stockDays,
