@@ -28,6 +28,8 @@ interface ProductRow {
   image_url: string | null
   sales_start_date: string | null
   sales_end_date: string | null
+  collaborator: string | null
+  size: string
   total_stock: number
   daily_sales: number
   stock_days: number
@@ -175,6 +177,14 @@ function ProductsPageContent() {
     { key: 'brand', label: 'ブランド' },
     { key: 'category', label: 'カテゴリ' },
     { key: 'season', label: 'シーズン' },
+    {
+      key: 'collaborator',
+      label: 'コラボ',
+      render: (row) => row.collaborator ? (
+        <span className="text-xs text-purple-600">{row.collaborator}</span>
+      ) : <span className="text-gray-300">-</span>,
+    },
+    { key: 'size', label: 'サイズ', render: (row) => <span className="text-xs">{row.size || '-'}</span> },
     {
       key: 'selling_price',
       label: '販売価格',

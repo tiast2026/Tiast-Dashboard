@@ -19,6 +19,8 @@ interface ProductRow {
   image_url: string | null
   sales_start_date: string | null
   sales_end_date: string | null
+  collaborator: string | null
+  size: string
   total_stock: number
   daily_sales: number
   stock_days: number
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Overlay spreadsheet master data onto product list
+    // Overlay product master data (Google Sheets = authoritative source for master fields)
     if (data && isSheetsConfigured()) {
       try {
         const sheetData = await fetchSheetData()
@@ -163,14 +165,17 @@ export async function GET(request: NextRequest) {
         for (const row of data.data) {
           const sheet = sheetMap.get(row.product_code)
           if (sheet) {
-            if (sheet.image_url) row.image_url = sheet.image_url
-            if (sheet.brand) row.brand = sheet.brand
-            if (sheet.category) row.category = sheet.category
+            // Master fields: always use product master as the source of truth
             if (sheet.season) row.season = sheet.season
-            if (sheet.sales_start_date) row.sales_start_date = sheet.sales_start_date
-            if (sheet.sales_end_date) row.sales_end_date = sheet.sales_end_date
+            if (sheet.category) row.category = sheet.category
             if (sheet.selling_price) row.selling_price = sheet.selling_price
             if (sheet.cost_price) row.cost_price = sheet.cost_price
+            row.sales_start_date = sheet.sales_start_date || row.sales_start_date
+            row.sales_end_date = sheet.sales_end_date || row.sales_end_date
+            row.collaborator = sheet.collaborator || null
+            row.size = sheet.size || ''
+            row.image_url = sheet.image_url || row.image_url
+            if (sheet.brand) row.brand = sheet.brand
           }
         }
       } catch (e) {
