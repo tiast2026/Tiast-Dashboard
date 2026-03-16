@@ -90,7 +90,7 @@ export default function DataTable<T extends Record<string, unknown>>({
               data.map((row, i) => (
                 <TableRow
                   key={i}
-                  className={`border-b border-black/[0.04] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''}`}
+                  className={`border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''}`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {columns.map((col) => (
