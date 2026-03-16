@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
+import { runQuery, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
 import { getSkuImagesForProduct, isSheetsConfigured } from '@/lib/google-sheets'
 
@@ -109,26 +109,102 @@ export async function GET(
         GROUP BY o.goods_id
       `
 
-      // 3. SKU-level inventory from mart_md_dashboard
+      // 3. SKU-level inventory directly from stock tables (not mart_md_dashboard)
+      //    mart_md_dashboard has WHERE total_stock > 0, which drops zero-stock SKUs
+      //    and can cause goods_id mismatch issues.
       const inventoryQuery = `
+        WITH sku_stock AS (
+          SELECT
+            s.goods_id,
+            SUM(s.stock_quantity) AS total_stock,
+            SUM(s.stock_free_quantity) AS free_stock
+          FROM \`tiast-data-platform.raw_nextengine.stock\` s
+          JOIN \`tiast-data-platform.raw_nextengine.products\` p ON s.goods_id = p.goods_id
+          WHERE p.goods_representation_id = @product_code
+          GROUP BY s.goods_id
+        ),
+        sku_zozo AS (
+          SELECT
+            zs.ne_goods_id AS goods_id,
+            SUM(zs.stock_quantity) AS zozo_stock
+          FROM \`tiast-data-platform.raw_zozo.zozo_stock\` zs
+          JOIN \`tiast-data-platform.raw_nextengine.products\` p ON zs.ne_goods_id = p.goods_id
+          WHERE p.goods_representation_id = @product_code
+            AND zs.ne_goods_id IS NOT NULL AND zs.ne_goods_id != ''
+          GROUP BY zs.ne_goods_id
+        ),
+        sku_daily AS (
+          SELECT
+            o.goods_id,
+            SUM(o.quantity) * 1.0 / 30 AS daily_qty,
+            SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) / 30 AS daily_sales_amount
+          FROM \`tiast-data-platform.raw_nextengine.orders\` o
+          JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+          WHERE p.goods_representation_id = @product_code
+            AND CAST(o.cancel_type_id AS STRING) = '0'
+            AND CAST(o.row_cancel_flag AS STRING) = '0'
+            AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          GROUP BY o.goods_id
+        ),
+        sku_annual AS (
+          SELECT
+            o.goods_id,
+            SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity) AS annual_cogs
+          FROM \`tiast-data-platform.raw_nextengine.orders\` o
+          JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+          WHERE p.goods_representation_id = @product_code
+            AND CAST(o.cancel_type_id AS STRING) = '0'
+            AND CAST(o.row_cancel_flag AS STRING) = '0'
+            AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 365 DAY)
+          GROUP BY o.goods_id
+        ),
+        sku_io AS (
+          SELECT
+            goods_id,
+            MAX(io_date) AS last_io_date
+          FROM \`tiast-data-platform.raw_nextengine.stock_io_history\`
+          WHERE CAST(deleted_flag AS STRING) = '0'
+          GROUP BY goods_id
+        )
         SELECT
-          md.goods_id,
-          COALESCE(md.total_stock, 0) AS total_stock,
-          COALESCE(md.free_stock, 0) AS free_stock,
-          COALESCE(md.zozo_stock, 0) AS zozo_stock,
-          COALESCE(md.own_stock, 0) AS own_stock,
-          COALESCE(md.daily_sales, 0) AS daily_sales,
-          COALESCE(md.stock_days, 0) AS stock_days,
-          COALESCE(md.inventory_status, '') AS inventory_status,
-          COALESCE(md.lifecycle_stance, '') AS lifecycle_stance,
-          COALESCE(md.turnover_rate_annual, 0) AS turnover_rate_annual,
-          COALESCE(md.turnover_days, 0) AS turnover_days,
-          md.last_io_date,
-          COALESCE(md.days_since_last_io, 0) AS days_since_last_io,
-          COALESCE(md.stagnation_alert, false) AS stagnation_alert,
-          md.lifecycle_action
-        FROM ${tableName('mart_md_dashboard')} md
-        WHERE md.product_code = @product_code
+          p.goods_id,
+          COALESCE(ss.total_stock, 0) AS total_stock,
+          COALESCE(ss.free_stock, 0) AS free_stock,
+          COALESCE(sz.zozo_stock, 0) AS zozo_stock,
+          COALESCE(ss.total_stock, 0) - COALESCE(sz.zozo_stock, 0) AS own_stock,
+          COALESCE(sd.daily_sales_amount, 0) AS daily_sales,
+          SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) AS stock_days,
+          CASE
+            WHEN COALESCE(ss.total_stock, 0) = 0 THEN '在庫なし'
+            WHEN COALESCE(ss.free_stock, 0) <= 0 AND COALESCE(sd.daily_qty, 0) > 0 THEN '欠品'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) > 90 THEN '過剰'
+            ELSE '適正'
+          END AS inventory_status,
+          CASE
+            WHEN COALESCE(sd.daily_qty, 0) = 0 AND COALESCE(ss.total_stock, 0) > 0 THEN '衰退期'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) > 90 THEN '安定期'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) < 14 THEN '最盛期'
+            ELSE '助走期'
+          END AS lifecycle_stance,
+          SAFE_DIVIDE(COALESCE(sa.annual_cogs, 0), COALESCE(ss.total_stock, 0) * COALESCE(p.goods_cost_price, 0)) AS turnover_rate_annual,
+          SAFE_DIVIDE(365.0, SAFE_DIVIDE(COALESCE(sa.annual_cogs, 0), COALESCE(ss.total_stock, 0) * COALESCE(p.goods_cost_price, 0))) AS turnover_days,
+          sio.last_io_date,
+          DATE_DIFF(CURRENT_DATE(), SAFE.PARSE_DATE('%Y-%m-%d', LEFT(sio.last_io_date, 10)), DAY) AS days_since_last_io,
+          DATE_DIFF(CURRENT_DATE(), SAFE.PARSE_DATE('%Y-%m-%d', LEFT(sio.last_io_date, 10)), DAY) > 30 AS stagnation_alert,
+          CASE
+            WHEN COALESCE(ss.free_stock, 0) <= 0 AND COALESCE(sd.daily_qty, 0) > 0 THEN '緊急補充'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) > 180 THEN '値引販売で在庫消化'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) > 90 THEN '発注抑制・在庫圧縮'
+            WHEN SAFE_DIVIDE(COALESCE(ss.total_stock, 0), GREATEST(COALESCE(sd.daily_qty, 0), 0.01)) < 14 THEN '追加発注を検討'
+            ELSE '現状維持'
+          END AS lifecycle_action
+        FROM \`tiast-data-platform.raw_nextengine.products\` p
+        LEFT JOIN sku_stock ss ON p.goods_id = ss.goods_id
+        LEFT JOIN sku_zozo sz ON p.goods_id = sz.goods_id
+        LEFT JOIN sku_daily sd ON p.goods_id = sd.goods_id
+        LEFT JOIN sku_annual sa ON p.goods_id = sa.goods_id
+        LEFT JOIN sku_io sio ON p.goods_id = sio.goods_id
+        WHERE p.goods_representation_id = @product_code
       `
 
       // Run all three in parallel

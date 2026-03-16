@@ -274,18 +274,40 @@ export async function GET(request: NextRequest) {
           FROM ${tableName('mart_product_master')}
         ) pm ON s.product_code = pm.goods_representation_id
         LEFT JOIN (
+          WITH prod_stock AS (
+            SELECT
+              p.goods_representation_id AS product_code,
+              SUM(st.stock_quantity) AS total_stock,
+              SUM(st.stock_free_quantity) AS free_stock
+            FROM \`tiast-data-platform.raw_nextengine.stock\` st
+            JOIN \`tiast-data-platform.raw_nextengine.products\` p ON st.goods_id = p.goods_id
+            GROUP BY p.goods_representation_id
+          ),
+          prod_daily AS (
+            SELECT
+              p.goods_representation_id AS product_code,
+              SUM(o.quantity) * 1.0 / 30 AS daily_qty
+            FROM \`tiast-data-platform.raw_nextengine.orders\` o
+            JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+            WHERE CAST(o.cancel_type_id AS STRING) = '0'
+              AND CAST(o.row_cancel_flag AS STRING) = '0'
+              AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+            GROUP BY p.goods_representation_id
+          )
           SELECT
-            product_code,
-            SUM(total_stock) AS total_stock,
-            SUM(daily_sales) AS daily_sales,
-            CASE WHEN SUM(daily_sales) > 0 THEN SAFE_DIVIDE(SUM(total_stock), SUM(daily_sales)) ELSE 0 END AS stock_days,
+            ps.product_code,
+            COALESCE(ps.total_stock, 0) AS total_stock,
+            COALESCE(pd.daily_qty, 0) AS daily_sales,
+            CASE WHEN COALESCE(pd.daily_qty, 0) > 0
+              THEN SAFE_DIVIDE(COALESCE(ps.total_stock, 0), pd.daily_qty)
+              ELSE 0 END AS stock_days,
             CASE
-              WHEN SUM(total_stock) = 0 THEN '在庫なし'
-              WHEN SUM(daily_sales) > 0 AND SAFE_DIVIDE(SUM(total_stock), SUM(daily_sales)) > 90 THEN '過剰'
+              WHEN COALESCE(ps.total_stock, 0) = 0 THEN '在庫なし'
+              WHEN COALESCE(pd.daily_qty, 0) > 0 AND SAFE_DIVIDE(COALESCE(ps.total_stock, 0), pd.daily_qty) > 90 THEN '過剰'
               ELSE '適正'
             END AS inventory_status
-          FROM ${tableName('mart_md_dashboard')}
-          GROUP BY product_code
+          FROM prod_stock ps
+          LEFT JOIN prod_daily pd ON ps.product_code = pd.product_code
         ) inv ON s.product_code = inv.product_code
         ${whereClause}
         ORDER BY ${sortTable}.${sort_by} ${orderDirection}
