@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runQuery, tableName, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
 import { getMockInventoryList } from '@/lib/mock-data'
+import { fetchSheetData, isSheetsConfigured } from '@/lib/google-sheets'
 
 interface InventoryRow {
+  [key: string]: unknown
   goods_id: string
   product_code: string
   goods_name: string
@@ -14,6 +16,8 @@ interface InventoryRow {
   free_stock: number
   zozo_stock: number
   own_stock: number
+  selling_price: number
+  cost_price: number
   stock_retail_value: number
   daily_sales: number
   stock_days: number
@@ -24,6 +28,10 @@ interface InventoryRow {
   recommended_discount: number
   lifecycle_action: string
   is_overstock: boolean
+  image_url: string | null
+  is_focus: string
+  restock: string
+  order_lot: number | null
 }
 
 const ALLOWED_SORT_COLUMNS = new Set([
@@ -158,14 +166,46 @@ export async function GET(request: NextRequest) {
 
       const total = countRows[0]?.total || 0
 
+      // Set default values for fields that come from the sheet overlay
+      const enrichedRows = dataRows.map(row => ({
+        ...row,
+        selling_price: row.selling_price || 0,
+        cost_price: row.cost_price || 0,
+        image_url: row.image_url || null,
+        is_focus: row.is_focus || '',
+        restock: row.restock || '',
+        order_lot: row.order_lot || null,
+      }))
+
       return {
-        data: dataRows,
+        data: enrichedRows,
         total,
         page,
         per_page: perPage,
         total_pages: Math.ceil(total / perPage),
       }
     })
+
+    // Overlay spreadsheet master data (image_url, is_focus, restock, order_lot, prices)
+    if (data && isSheetsConfigured()) {
+      try {
+        const sheetData = await fetchSheetData()
+        const sheetMap = new Map(sheetData.map(s => [s.product_code, s]))
+        for (const row of data.data) {
+          const sheet = sheetMap.get(row.product_code)
+          if (sheet) {
+            if (sheet.image_url) row.image_url = sheet.image_url
+            if (sheet.is_focus) row.is_focus = sheet.is_focus
+            if (sheet.restock) row.restock = sheet.restock
+            if (sheet.order_lot) row.order_lot = sheet.order_lot
+            if (sheet.selling_price) row.selling_price = sheet.selling_price
+            if (sheet.cost_price) row.cost_price = sheet.cost_price
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch sheet data for inventory list:', e)
+      }
+    }
 
     return NextResponse.json(data)
   } catch (error) {
