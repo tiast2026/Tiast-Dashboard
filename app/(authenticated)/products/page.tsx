@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import ProductDetailPanel from '@/components/products/ProductDetailPanel'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatDate } from '@/lib/format'
+import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PRICE_TIER_OPTIONS, PROFIT_RATE_COLORS } from '@/lib/constants'
 
 interface ProductRow {
@@ -64,12 +65,22 @@ export default function ProductsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
   const [perPage] = useState(50)
-  const [loading, setLoading] = useState(true)
-  const [result, setResult] = useState<ProductListResponse | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+
+  const buildCacheKey = useCallback(() => {
+    return `products:${search}:${brand}:${category}:${season}:${priceTier}:${sortBy}:${sortOrder}:${page}`
+  }, [search, brand, category, season, priceTier, sortBy, sortOrder, page])
+
+  const cached = getCached<ProductListResponse>(buildCacheKey())
+  const [loading, setLoading] = useState(!cached)
+  const [result, setResult] = useState<ProductListResponse | null>(cached)
 
   const fetchProducts = useCallback(async () => {
-    setLoading(true)
+    const key = buildCacheKey()
+    if (isFresh(key)) return
+    if (!getCached(key)) setLoading(true)
+
     try {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
@@ -84,17 +95,28 @@ export default function ProductsPage() {
 
       const res = await fetch(`/api/products/list?${params.toString()}`)
       const data = res.ok ? await res.json() : null
-      setResult(data)
+      if (mountedRef.current) {
+        setResult(data)
+        if (data) setCache(key, data)
+      }
     } catch (e) {
       console.error('Failed to fetch products:', e)
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
-  }, [search, brand, category, season, priceTier, sortBy, sortOrder, page, perPage])
+  }, [search, brand, category, season, priceTier, sortBy, sortOrder, page, perPage, buildCacheKey])
 
   useEffect(() => {
+    mountedRef.current = true
+    const key = buildCacheKey()
+    const c = getCached<ProductListResponse>(key)
+    if (c) {
+      setResult(c)
+      setLoading(false)
+    }
     fetchProducts()
-  }, [fetchProducts])
+    return () => { mountedRef.current = false }
+  }, [fetchProducts, buildCacheKey])
 
   // Reset page when filters change
   useEffect(() => {
