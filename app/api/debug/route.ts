@@ -62,5 +62,54 @@ export async function GET() {
     }
   }
 
+  // Test 4: ZOZO data investigation
+  try {
+    // Sample ZOZO orders to check data format
+    const zozoSample = await runQuery<Record<string, unknown>>(
+      `SELECT
+        order_number,
+        order_date,
+        brand_code,
+        ne_goods_id,
+        product_name,
+        selling_price,
+        order_quantity,
+        cancel_flag,
+        LEFT(order_date, 10) AS date_part
+      FROM \`tiast-data-platform.raw_zozo.zozo_orders\`
+      LIMIT 5`
+    )
+    results.zozo_sample = zozoSample
+
+    // Check cancel_flag distribution
+    const zozoCancelDist = await runQuery<{ cancel_flag: string | null; cnt: number }>(
+      `SELECT cancel_flag, COUNT(*) AS cnt
+       FROM \`tiast-data-platform.raw_zozo.zozo_orders\`
+       GROUP BY cancel_flag
+       ORDER BY cnt DESC`
+    )
+    results.zozo_cancel_distribution = zozoCancelDist
+
+    // Check if ZOZO rows exist in the VIEW
+    const zozoInView = await runQuery<{ shop_name: string; cnt: number; total_sales: number }>(
+      `SELECT shop_name, COUNT(*) AS cnt, SUM(sales_amount) AS total_sales
+       FROM \`tiast-data-platform.analytics_mart.mart_sales_by_shop_month\`
+       WHERE shop_name = 'ZOZO'
+       GROUP BY shop_name`
+    )
+    results.zozo_in_view = zozoInView.length > 0 ? zozoInView : 'NO_ZOZO_ROWS_IN_VIEW'
+
+    // Try parsing ZOZO date to see if format works
+    const zozoDateTest = await runQuery<{ ok_count: number; fail_count: number }>(
+      `SELECT
+        COUNTIF(SAFE.PARSE_DATE('%Y/%m/%d', LEFT(order_date, 10)) IS NOT NULL) AS ok_count,
+        COUNTIF(SAFE.PARSE_DATE('%Y/%m/%d', LEFT(order_date, 10)) IS NULL) AS fail_count
+       FROM \`tiast-data-platform.raw_zozo.zozo_orders\``
+    )
+    results.zozo_date_parse = zozoDateTest[0] || null
+  } catch (e) {
+    results.zozo_investigation = { error: e instanceof Error ? e.message : String(e) }
+  }
+
   return NextResponse.json(results, { status: 200 })
 }
