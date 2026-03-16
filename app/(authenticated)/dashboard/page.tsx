@@ -103,16 +103,24 @@ export default function DashboardPage() {
       return 0
     }
 
-    // Group: brand → channel → { current, prev }
-    const brandMap: Record<string, { channel: string; current: number; prev: number }[]> = {}
+    // Group: brand → channel → { current, prev, orders, profit }
+    const brandMap: Record<string, { channel: string; current: number; prev: number; orders: number; prevOrders: number; profit: number; prevProfit: number }[]> = {}
     let gCurrent = 0
     let gPrev = 0
+    let gOrders = 0
+    let gPrevOrders = 0
+    let gProfit = 0
+    let gPrevProfit = 0
 
     for (const item of yoy) {
       const b = item.brand
       const ch = extractChannel(item.channel)
       const cur = num(item.current_sales)
       const prev = num(item.previous_year_sales)
+      const orders = num(item.current_order_count)
+      const prevOrders = num(item.previous_year_order_count)
+      const profit = num(item.current_gross_profit)
+      const prevProfit = num(item.previous_year_gross_profit)
 
       if (!brandMap[b]) brandMap[b] = []
       // Merge if same channel exists for same brand
@@ -120,11 +128,19 @@ export default function DashboardPage() {
       if (existing) {
         existing.current += cur
         existing.prev += prev
+        existing.orders += orders
+        existing.prevOrders += prevOrders
+        existing.profit += profit
+        existing.prevProfit += prevProfit
       } else {
-        brandMap[b].push({ channel: ch, current: cur, prev: prev })
+        brandMap[b].push({ channel: ch, current: cur, prev, orders, prevOrders, profit, prevProfit })
       }
       gCurrent += cur
       gPrev += prev
+      gOrders += orders
+      gPrevOrders += prevOrders
+      gProfit += profit
+      gPrevProfit += prevProfit
     }
 
     // Sort channels within each brand by current sales desc
@@ -134,12 +150,16 @@ export default function DashboardPage() {
         const subtotal = {
           current: channels.reduce((s, c) => s + c.current, 0),
           prev: channels.reduce((s, c) => s + c.prev, 0),
+          orders: channels.reduce((s, c) => s + c.orders, 0),
+          prevOrders: channels.reduce((s, c) => s + c.prevOrders, 0),
+          profit: channels.reduce((s, c) => s + c.profit, 0),
+          prevProfit: channels.reduce((s, c) => s + c.prevProfit, 0),
         }
         return { brand, channels, subtotal }
       })
       .sort((a, b) => b.subtotal.current - a.subtotal.current)
 
-    return { brandGroups, grandTotal: { current: gCurrent, prev: gPrev } }
+    return { brandGroups, grandTotal: { current: gCurrent, prev: gPrev, orders: gOrders, prevOrders: gPrevOrders, profit: gProfit, prevProfit: gPrevProfit } }
   })()
 
   const barData = ranking.map((r) => ({
@@ -202,10 +222,13 @@ export default function DashboardPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="text-left p-2 font-medium text-gray-600 w-[200px]"></th>
+                      <th className="text-left p-2 font-medium text-gray-600 w-[160px]"></th>
                       <th className="text-right p-2 font-medium text-gray-600">売上金額</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[80px]">構成比</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[80px]">前年比</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[70px]">受注件数</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[90px]">粗利額</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">粗利率</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">構成比</th>
+                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">前年比</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -219,6 +242,15 @@ export default function DashboardPage() {
                             <td className="p-2 font-semibold text-gray-800">{group.brand}</td>
                             <td className="p-2 text-right font-semibold tabular-nums">
                               {formatCurrency(group.subtotal.current)}
+                            </td>
+                            <td className="p-2 text-right font-semibold tabular-nums">
+                              {formatNumber(group.subtotal.orders)}
+                            </td>
+                            <td className="p-2 text-right font-semibold tabular-nums">
+                              {formatCurrency(group.subtotal.profit)}
+                            </td>
+                            <td className="p-2 text-right font-semibold tabular-nums text-gray-500">
+                              {group.subtotal.current > 0 ? formatPercent(group.subtotal.profit / group.subtotal.current) : '-'}
                             </td>
                             <td className="p-2 text-right tabular-nums text-gray-500 font-medium">
                               {(brandRatio * 100).toFixed(1)}%
@@ -237,6 +269,15 @@ export default function DashboardPage() {
                               <tr key={`${group.brand}-${ch.channel}`} className="border-b hover:bg-gray-50/50">
                                 <td className="p-2 pl-6 text-gray-600">{ch.channel}</td>
                                 <td className="p-2 text-right tabular-nums">{formatCurrency(ch.current)}</td>
+                                <td className="p-2 text-right tabular-nums text-gray-500 text-xs">
+                                  {formatNumber(ch.orders)}
+                                </td>
+                                <td className="p-2 text-right tabular-nums text-xs">
+                                  {formatCurrency(ch.profit)}
+                                </td>
+                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
+                                  {ch.current > 0 ? formatPercent(ch.profit / ch.current) : '-'}
+                                </td>
                                 <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
                                   {(chRatio * 100).toFixed(1)}%
                                 </td>
@@ -256,6 +297,11 @@ export default function DashboardPage() {
                     <tr className="border-t-2 bg-gray-100 font-semibold">
                       <td className="p-2">合計</td>
                       <td className="p-2 text-right tabular-nums">{formatCurrency(grandTotal.current)}</td>
+                      <td className="p-2 text-right tabular-nums">{formatNumber(grandTotal.orders)}</td>
+                      <td className="p-2 text-right tabular-nums">{formatCurrency(grandTotal.profit)}</td>
+                      <td className="p-2 text-right tabular-nums text-gray-500">
+                        {grandTotal.current > 0 ? formatPercent(grandTotal.profit / grandTotal.current) : '-'}
+                      </td>
                       <td className="p-2 text-right tabular-nums text-gray-500">100.0%</td>
                       <td className={`p-2 text-right text-sm font-semibold ${
                         grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''

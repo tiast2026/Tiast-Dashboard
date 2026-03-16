@@ -116,15 +116,15 @@ export function getMockCategoryRanking(_month?: string, _brand?: string) {
 // ============================================================
 export function getMockYoyComparison(_month?: string) {
   return [
-    { brand: 'NOAHL', channel: 'NOAHL楽天市場店', current_sales: 6500000, previous_year_sales: 5800000, yoy_ratio: 1.12 },
-    { brand: 'NOAHL', channel: 'NOAHL公式サイト', current_sales: 4200000, previous_year_sales: 3500000, yoy_ratio: 1.20 },
-    { brand: 'NOAHL', channel: 'NOAHL_TIKTOK', current_sales: 2800000, previous_year_sales: 1200000, yoy_ratio: 2.33 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN楽天市場店', current_sales: 5200000, previous_year_sales: 5500000, yoy_ratio: 0.95 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN公式サイト', current_sales: 3800000, previous_year_sales: 3200000, yoy_ratio: 1.19 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN_ZOZO', current_sales: 2100000, previous_year_sales: 2400000, yoy_ratio: 0.88 },
-    { brand: 'MYRTH', channel: 'MYRTH楽天市場店', current_sales: 3900000, previous_year_sales: 3100000, yoy_ratio: 1.26 },
-    { brand: 'MYRTH', channel: 'MYRTH公式サイト', current_sales: 2500000, previous_year_sales: 2200000, yoy_ratio: 1.14 },
-    { brand: 'MYRTH', channel: 'MYRTH_YAHOO', current_sales: 1500000, previous_year_sales: 1800000, yoy_ratio: 0.83 },
+    { brand: 'NOAHL', channel: 'NOAHL楽天市場店', current_sales: 6500000, previous_year_sales: 5800000, yoy_ratio: 1.12, current_order_count: 320, previous_year_order_count: 290, current_gross_profit: 2600000, previous_year_gross_profit: 2200000 },
+    { brand: 'NOAHL', channel: 'NOAHL公式サイト', current_sales: 4200000, previous_year_sales: 3500000, yoy_ratio: 1.20, current_order_count: 180, previous_year_order_count: 150, current_gross_profit: 2100000, previous_year_gross_profit: 1700000 },
+    { brand: 'NOAHL', channel: 'NOAHL_TIKTOK', current_sales: 2800000, previous_year_sales: 1200000, yoy_ratio: 2.33, current_order_count: 95, previous_year_order_count: 40, current_gross_profit: 980000, previous_year_gross_profit: 420000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN楽天市場店', current_sales: 5200000, previous_year_sales: 5500000, yoy_ratio: 0.95, current_order_count: 260, previous_year_order_count: 275, current_gross_profit: 2080000, previous_year_gross_profit: 2200000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN公式サイト', current_sales: 3800000, previous_year_sales: 3200000, yoy_ratio: 1.19, current_order_count: 160, previous_year_order_count: 135, current_gross_profit: 1900000, previous_year_gross_profit: 1600000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN_ZOZO', current_sales: 2100000, previous_year_sales: 2400000, yoy_ratio: 0.88, current_order_count: 110, previous_year_order_count: 125, current_gross_profit: 630000, previous_year_gross_profit: 720000 },
+    { brand: 'MYRTH', channel: 'MYRTH楽天市場店', current_sales: 3900000, previous_year_sales: 3100000, yoy_ratio: 1.26, current_order_count: 195, previous_year_order_count: 155, current_gross_profit: 1560000, previous_year_gross_profit: 1240000 },
+    { brand: 'MYRTH', channel: 'MYRTH公式サイト', current_sales: 2500000, previous_year_sales: 2200000, yoy_ratio: 1.14, current_order_count: 105, previous_year_order_count: 92, current_gross_profit: 1250000, previous_year_gross_profit: 1100000 },
+    { brand: 'MYRTH', channel: 'MYRTH_YAHOO', current_sales: 1500000, previous_year_sales: 1800000, yoy_ratio: 0.83, current_order_count: 75, previous_year_order_count: 90, current_gross_profit: 450000, previous_year_gross_profit: 540000 },
   ]
 }
 

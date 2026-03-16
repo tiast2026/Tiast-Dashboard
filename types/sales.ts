@@ -34,6 +34,10 @@ export interface YoYComparisonItem {
   current_sales: number
   previous_year_sales: number
   yoy_ratio: number | null
+  current_order_count: number
+  previous_year_order_count: number
+  current_gross_profit: number
+  previous_year_gross_profit: number
 }
 
 export interface DailySalesItem {
