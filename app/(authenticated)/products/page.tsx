@@ -98,6 +98,16 @@ function ProfitRateBar({ rate }: { rate: number }) {
   )
 }
 
+// Column header with help tooltip
+function colHelp(label: string, tooltip: string) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      <span title={tooltip}><HelpCircle className="w-3 h-3 text-gray-400 cursor-help" /></span>
+    </span>
+  )
+}
+
 // Inline SKU expansion row
 function SkuExpansion({ productCode }: { productCode: string }) {
   const [skus, setSkus] = useState<SkuItem[]>([])
@@ -278,9 +288,9 @@ function ProductsPageContent() {
       className: 'w-[60px]',
       render: (row) =>
         row.image_url ? (
-          <img src={row.image_url} alt="" className="w-[50px] h-[50px] object-cover rounded" />
+          <img src={row.image_url} alt="" className="w-[50px] aspect-square object-cover rounded" />
         ) : (
-          <div className="w-[50px] h-[50px] bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px]">
+          <div className="w-[50px] aspect-square bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px]">
             No Img
           </div>
         ),
@@ -298,12 +308,19 @@ function ProductsPageContent() {
         </div>
       ),
     },
-    ...(!urlBrand ? [{ key: 'brand' as const, label: 'ブランド' }] : []),
-    { key: 'category', label: 'カテゴリ' },
-    { key: 'season', label: 'シーズン' },
+    ...(!urlBrand ? [{ key: 'brand' as const, label: 'ブランド', headerRender: () => colHelp('ブランド', '商品マスタ（Googleスプレッドシート）') }] : []),
+    {
+      key: 'category', label: 'カテゴリ',
+      headerRender: () => colHelp('カテゴリ', '商品マスタ（Googleスプレッドシート）'),
+    },
+    {
+      key: 'season', label: 'シーズン',
+      headerRender: () => colHelp('シーズン', '商品マスタ（Googleスプレッドシート）'),
+    },
     {
       key: 'collaborator',
       label: 'コラボ',
+      headerRender: () => colHelp('コラボ', '商品マスタ（Googleスプレッドシート）'),
       render: (row: ProductRow) => row.collaborator ? (
         <span className="text-xs text-purple-600">{row.collaborator}</span>
       ) : <span className="text-gray-300">-</span>,
@@ -312,6 +329,7 @@ function ProductsPageContent() {
       key: 'size',
       label: '配送',
       className: 'w-[50px]',
+      headerRender: () => colHelp('配送', '商品マスタ「サイズ」列\nメール便=✉ ¥330 / 宅配便=🚚 ¥660'),
       render: (row: ProductRow) => {
         const s = (row.size || '').trim()
         if (s.includes('メール') || s === 'M' || s === 'メール便') {
@@ -327,12 +345,14 @@ function ProductsPageContent() {
       key: 'selling_price',
       label: '販売価格',
       align: 'right',
+      headerRender: () => colHelp('販売価格', '商品マスタ「上代」列'),
       render: (row) => formatCurrency(row.selling_price),
     },
     {
       key: 'cost_price',
       label: '原価',
       align: 'right',
+      headerRender: () => colHelp('原価', '商品マスタ「下代」列'),
       render: (row) => formatCurrency(row.cost_price),
     },
     {
@@ -340,6 +360,7 @@ function ProductsPageContent() {
       label: '販売数',
       align: 'right',
       sortable: true,
+      headerRender: () => colHelp('販売数', 'BigQuery受注データ\nNE+ZOZO合算の販売個数'),
       render: (row) => formatNumber(row.total_quantity),
     },
     {
@@ -347,17 +368,13 @@ function ProductsPageContent() {
       label: '売上金額',
       align: 'right',
       sortable: true,
+      headerRender: () => colHelp('売上金額', 'BigQuery受注データ\nNE+ZOZO合算の売上合計'),
       render: (row) => formatCurrency(row.sales_amount),
     },
     {
       key: 'gross_profit_rate',
       label: '粗利率',
-      headerRender: () => (
-        <span className="inline-flex items-center gap-1">
-          粗利率
-          <span title={"(売上 - 仕入原価 - 送料) / 売上\nメール便: ¥330/個, 宅配便: ¥660/個"}><HelpCircle className="w-3 h-3 text-gray-400 cursor-help" /></span>
-        </span>
-      ),
+      headerRender: () => colHelp('粗利率', '(売上 - 仕入原価 - 送料) / 売上\nメール便: ¥330/個, 宅配便: ¥660/個\n仕入原価: BigQuery受注データ\n送料: 商品マスタ「サイズ」列'),
       align: 'right',
       sortable: true,
       render: (row: ProductRow) => <ProfitRateBar rate={row.gross_profit_rate} />,
@@ -367,6 +384,7 @@ function ProductsPageContent() {
       label: '在庫数',
       align: 'right',
       sortable: true,
+      headerRender: () => colHelp('在庫数', 'BigQuery在庫データ\nNextEngine在庫+ZOZO在庫の合計'),
       render: (row) => formatNumber(row.total_stock),
     },
     {
@@ -374,6 +392,7 @@ function ProductsPageContent() {
       label: '在庫日数',
       align: 'right',
       sortable: true,
+      headerRender: () => colHelp('在庫日数', 'BigQuery在庫データ\n在庫数 ÷ 30日間平均日販\n90日超: 赤, 60日超: 黄'),
       render: (row) => {
         const days = Math.round(row.stock_days)
         const color = days > 90 ? 'text-red-600' : days > 60 ? 'text-amber-600' : 'text-gray-700'
@@ -383,6 +402,7 @@ function ProductsPageContent() {
     {
       key: 'inventory_status',
       label: '在庫状態',
+      headerRender: () => colHelp('在庫状態', 'BigQuery在庫データ\n適正 / 過剰（在庫日数>90日）/ 在庫なし'),
       render: (row) => {
         const s = row.inventory_status
         const cls = s === '過剰' ? 'bg-red-100 text-red-700' : s === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
@@ -392,11 +412,13 @@ function ProductsPageContent() {
     {
       key: 'sales_start_date',
       label: '販売開始',
+      headerRender: () => colHelp('販売開始', '商品マスタ「販売日」列'),
       render: (row) => <span className="text-xs text-gray-500">{formatDate(row.sales_start_date)}</span>,
     },
     {
       key: 'sales_end_date',
       label: '販売終了',
+      headerRender: () => colHelp('販売終了', '商品マスタ「終了日」列'),
       render: (row) => <span className="text-xs text-gray-500">{formatDate(row.sales_end_date)}</span>,
     },
   ]
