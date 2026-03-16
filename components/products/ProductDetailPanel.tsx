@@ -91,15 +91,25 @@ export default function ProductDetailPanel({ productCode, onClose }: ProductDeta
     setLoading(true)
 
     fetch(`/api/products/${encodeURIComponent(productCode)}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch')
+        return res.json()
+      })
       .then((json) => {
         if (!cancelled) {
-          setData(json)
+          setData({
+            ...json,
+            inventory: json.inventory || [],
+            md_analysis: json.md_analysis || [],
+          })
           setLoading(false)
         }
       })
       .catch(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setData(null)
+          setLoading(false)
+        }
       })
 
     return () => {

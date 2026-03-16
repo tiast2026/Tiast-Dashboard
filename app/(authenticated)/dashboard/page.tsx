@@ -4,22 +4,17 @@ import { useState, useEffect, useCallback } from 'react'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
-import SalesLineChart from '@/components/charts/SalesLineChart'
 import DailySalesChart from '@/components/charts/DailySalesChart'
-import DonutChart from '@/components/charts/DonutChart'
 import BarChart from '@/components/charts/BarChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth, getPreviousMonth, getLastYearMonth, formatMonth } from '@/lib/format'
-import { BRAND_COLORS, CHANNEL_GROUP_COLORS } from '@/lib/constants'
-import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
+import type { SalesSummaryResponse, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
 
 export default function DashboardPage() {
   const [month, setMonth] = useState(getCurrentMonth())
   const [brand, setBrand] = useState('全て')
   const [summary, setSummary] = useState<SalesSummaryResponse | null>(null)
-  const [trend, setTrend] = useState<MonthlyTrendItem[]>([])
-  const [composition, setComposition] = useState<BrandCompositionItem[]>([])
   const [ranking, setRanking] = useState<CategoryRankingItem[]>([])
   const [yoy, setYoy] = useState<YoYComparisonItem[]>([])
   const [dailyTrend, setDailyTrend] = useState<DailySalesItem[]>([])
@@ -30,25 +25,19 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [summaryRes, trendRes, compRes, rankRes, yoyRes, dailyRes] = await Promise.all([
+      const [summaryRes, rankRes, yoyRes, dailyRes] = await Promise.all([
         fetch(`/api/sales/summary?month=${month}${brandParam}`),
-        fetch(`/api/sales/monthly-trend?months=24${brandParam}`),
-        fetch(`/api/sales/brand-composition?month=${month}`),
         fetch(`/api/sales/category-ranking?month=${month}${brandParam}`),
         fetch(`/api/sales/yoy-comparison?month=${month}`),
         fetch(`/api/sales/daily-trend?month=${month}${brandParam}`),
       ])
-      const [summaryData, trendData, compData, rankData, yoyData, dailyData] = await Promise.all([
+      const [summaryData, rankData, yoyData, dailyData] = await Promise.all([
         summaryRes.ok ? summaryRes.json() : null,
-        trendRes.ok ? trendRes.json() : [],
-        compRes.ok ? compRes.json() : [],
         rankRes.ok ? rankRes.json() : [],
         yoyRes.ok ? yoyRes.json() : [],
         dailyRes.ok ? dailyRes.json() : [],
       ])
       setSummary(summaryData)
-      setTrend(Array.isArray(trendData) ? trendData : [])
-      setComposition(Array.isArray(compData) ? compData : [])
       setRanking(Array.isArray(rankData) ? rankData : [])
       setYoy(Array.isArray(yoyData) ? yoyData : [])
       setDailyTrend(Array.isArray(dailyData) ? dailyData : [])
@@ -63,36 +52,46 @@ export default function DashboardPage() {
     fetchData()
   }, [fetchData])
 
-  // Transform trend data for line chart: pivot channel_group into columns per month
-  const trendChartData = (() => {
-    const grouped: Record<string, Record<string, number>> = {}
-    for (const item of trend) {
-      if (!grouped[item.month]) grouped[item.month] = {}
-      grouped[item.month][item.channel_group] = (grouped[item.month][item.channel_group] || 0) + item.sales_amount
+  // Build brand×channel matrix from YoY data
+  const { channels, brands, matrix, channelTotals, grandTotal } = (() => {
+    const channelSet = new Set<string>()
+    const brandSet = new Set<string>()
+    const map: Record<string, Record<string, { current: number; prev: number }>> = {}
+
+    for (const item of yoy) {
+      channelSet.add(item.channel)
+      brandSet.add(item.brand)
+      if (!map[item.channel]) map[item.channel] = {}
+      map[item.channel][item.brand] = {
+        current: item.current_sales,
+        prev: item.previous_year_sales,
+      }
     }
-    return Object.entries(grouped)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([m, channels]) => ({ month: m, ...channels }))
+
+    const channels = Array.from(channelSet)
+    const brands = Array.from(brandSet)
+
+    // Calculate totals per channel
+    const channelTotals: Record<string, { current: number; prev: number }> = {}
+    let grandTotal = { current: 0, prev: 0 }
+    for (const ch of channels) {
+      let chCurrent = 0
+      let chPrev = 0
+      for (const b of brands) {
+        chCurrent += map[ch]?.[b]?.current || 0
+        chPrev += map[ch]?.[b]?.prev || 0
+      }
+      channelTotals[ch] = { current: chCurrent, prev: chPrev }
+      grandTotal = { current: grandTotal.current + chCurrent, prev: grandTotal.prev + chPrev }
+    }
+
+    return { channels, brands, matrix: map, channelTotals, grandTotal }
   })()
-
-  const trendKeys = Object.keys(CHANNEL_GROUP_COLORS)
-
-  const donutData = composition.map((c) => ({
-    name: c.brand,
-    value: c.sales_amount,
-    color: BRAND_COLORS[c.brand] || '#999',
-  }))
-
-  const donutCenter = summary ? formatCurrency(summary.current.sales_amount) : ''
 
   const barData = ranking.map((r) => ({
     name: r.category,
     value: r.sales_amount,
   }))
-
-  // YoY table: group by brand, then channels
-  const yoyBrands = Array.from(new Set(yoy.map((y) => y.brand)))
-  const yoyChannels = Array.from(new Set(yoy.map((y) => y.channel)))
 
   return (
     <>
@@ -136,6 +135,89 @@ export default function DashboardPage() {
           </div>
         ) : null}
 
+        {/* Brand × Channel Sales Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">ブランド×チャネル売上</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[200px]" />
+            ) : yoy.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-2 font-medium text-gray-600">チャネル</th>
+                      {brands.map((b) => (
+                        <th key={b} className="text-right p-2 font-medium text-gray-600">{b}</th>
+                      ))}
+                      <th className="text-right p-2 font-semibold text-gray-700">合計</th>
+                      <th className="text-right p-2 font-medium text-gray-600">構成比</th>
+                      <th className="text-right p-2 font-medium text-gray-600">前年比</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {channels.map((ch) => {
+                      const chTotal = channelTotals[ch]
+                      const ratio = grandTotal.current > 0 ? chTotal.current / grandTotal.current : 0
+                      const yoyRatio = chTotal.prev > 0 ? chTotal.current / chTotal.prev : null
+                      return (
+                        <tr key={ch} className="border-b hover:bg-gray-50/50">
+                          <td className="p-2 font-medium">{ch}</td>
+                          {brands.map((b) => {
+                            const val = matrix[ch]?.[b]?.current || 0
+                            return (
+                              <td key={b} className="p-2 text-right tabular-nums">
+                                {val > 0 ? formatCurrency(val) : <span className="text-gray-300">-</span>}
+                              </td>
+                            )
+                          })}
+                          <td className="p-2 text-right font-semibold tabular-nums">
+                            {formatCurrency(chTotal.current)}
+                          </td>
+                          <td className="p-2 text-right tabular-nums text-gray-500">
+                            {(ratio * 100).toFixed(1)}%
+                          </td>
+                          <td className={`p-2 text-right text-xs font-medium ${
+                            yoyRatio == null ? '' : yoyRatio >= 1 ? 'text-green-700' : 'text-red-600'
+                          }`}>
+                            {yoyRatio != null ? `${(yoyRatio * 100).toFixed(1)}%` : '-'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 bg-gray-50 font-semibold">
+                      <td className="p-2">合計</td>
+                      {brands.map((b) => {
+                        const brandTotal = channels.reduce((sum, ch) => sum + (matrix[ch]?.[b]?.current || 0), 0)
+                        return (
+                          <td key={b} className="p-2 text-right tabular-nums">
+                            {brandTotal > 0 ? formatCurrency(brandTotal) : '-'}
+                          </td>
+                        )
+                      })}
+                      <td className="p-2 text-right tabular-nums">
+                        {formatCurrency(grandTotal.current)}
+                      </td>
+                      <td className="p-2 text-right tabular-nums text-gray-500">100.0%</td>
+                      <td className={`p-2 text-right text-xs font-medium ${
+                        grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''
+                      }`}>
+                        {grandTotal.prev > 0 ? `${(grandTotal.current / grandTotal.prev * 100).toFixed(1)}%` : '-'}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Daily Sales Chart */}
         <Card>
           <CardHeader>
@@ -157,96 +239,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Main Charts */}
-        <div className="grid grid-cols-5 gap-6">
-          <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle className="text-base">月別売上推移（チャネル別）</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-[350px]" />
-              ) : trendChartData.length > 0 ? (
-                <SalesLineChart data={trendChartData} keys={trendKeys} colors={CHANNEL_GROUP_COLORS} />
-              ) : (
-                <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">ブランド別売上構成比</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-[300px]" />
-              ) : donutData.length > 0 ? (
-                <DonutChart data={donutData} centerLabel={donutCenter} />
-              ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sub Charts */}
-        <div className="grid grid-cols-5 gap-6">
-          <Card className="col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">カテゴリ別売上ランキング</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-[400px]" />
-              ) : barData.length > 0 ? (
-                <BarChart data={barData} color="#6B7280" />
-              ) : (
-                <div className="h-[400px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle className="text-base">ブランド×チャネル 前年同月比</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-[200px]" />
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50">
-                        <th className="text-left p-2 font-medium text-gray-600">ブランド</th>
-                        {yoyChannels.map((ch) => (
-                          <th key={ch} className="text-right p-2 font-medium text-gray-600 text-xs">{ch}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {yoyBrands.map((b) => (
-                        <tr key={b} className="border-b">
-                          <td className="p-2 font-medium">{b}</td>
-                          {yoyChannels.map((ch) => {
-                            const item = yoy.find((y) => y.brand === b && y.channel === ch)
-                            const ratio = item?.yoy_ratio
-                            const display = ratio != null ? `${(ratio * 100).toFixed(1)}%` : '-'
-                            const color = ratio == null ? '' : ratio >= 1 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                            return (
-                              <td key={ch} className={`p-2 text-right text-xs font-medium ${color}`}>
-                                {display}
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Category Ranking */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">カテゴリ別売上ランキング</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[300px]" />
+            ) : barData.length > 0 ? (
+              <BarChart data={barData} color="#6B7280" />
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   )
