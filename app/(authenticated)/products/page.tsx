@@ -44,16 +44,13 @@ interface ProductListResponse {
 }
 
 interface SkuItem {
-  goods_id: string
-  goods_name: string
-  total_stock: number
-  free_stock: number
-  zozo_stock: number
-  own_stock: number
-  daily_sales: number
-  stock_days: number
-  selling_price: number
-  cost_price: number
+  product_code: string
+  sku_code: string
+  color: string
+  size: string
+  sku_image_url: string
+  shop_name: string
+  extra_fields: Record<string, string>
 }
 
 const PERIOD_OPTIONS = [
@@ -108,16 +105,16 @@ function colHelp(label: string, tooltip: string) {
   )
 }
 
-// Inline SKU expansion row
+// Inline SKU expansion row — fetches from Google Sheets SKU画像 sheet
 function SkuExpansion({ productCode }: { productCode: string }) {
   const [skus, setSkus] = useState<SkuItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/products/${encodeURIComponent(productCode)}`)
+    fetch(`/api/master/sku-images?product_code=${encodeURIComponent(productCode)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        setSkus(data?.inventory || [])
+        setSkus(data?.data || [])
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -131,31 +128,27 @@ function SkuExpansion({ productCode }: { productCode: string }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-gray-500 border-b border-gray-100">
-            <th className="text-left py-1.5 font-medium">SKU名</th>
-            <th className="text-right py-1.5 font-medium">総在庫</th>
-            <th className="text-right py-1.5 font-medium">フリー</th>
-            <th className="text-right py-1.5 font-medium">ZOZO</th>
-            <th className="text-right py-1.5 font-medium">自社</th>
-            <th className="text-right py-1.5 font-medium">日販</th>
-            <th className="text-right py-1.5 font-medium">在庫日数</th>
+            <th className="text-left py-1.5 font-medium w-[50px]">画像</th>
+            <th className="text-left py-1.5 font-medium">SKUコード</th>
+            <th className="text-left py-1.5 font-medium">カラー</th>
+            <th className="text-left py-1.5 font-medium">サイズ</th>
+            <th className="text-left py-1.5 font-medium">店舗</th>
           </tr>
         </thead>
         <tbody>
-          {skus.map(sku => (
-            <tr key={sku.goods_id} className="border-b border-gray-50 hover:bg-gray-50/50">
-              <td className="py-1.5 max-w-[200px] truncate" title={sku.goods_name}>{sku.goods_name}</td>
-              <td className="text-right py-1.5">{formatNumber(sku.total_stock)}</td>
-              <td className="text-right py-1.5">{formatNumber(sku.free_stock)}</td>
-              <td className="text-right py-1.5">{formatNumber(sku.zozo_stock)}</td>
-              <td className="text-right py-1.5">{formatNumber(sku.own_stock)}</td>
-              <td className="text-right py-1.5">{sku.daily_sales?.toFixed(1) || '-'}</td>
-              <td className="text-right py-1.5">
-                {sku.stock_days > 0 ? (
-                  <span className={sku.stock_days > 90 ? 'text-red-600 font-medium' : ''}>
-                    {Math.round(sku.stock_days)}日
-                  </span>
-                ) : '-'}
+          {skus.map((sku, i) => (
+            <tr key={sku.sku_code || i} className="border-b border-gray-50 hover:bg-gray-50/50">
+              <td className="py-1.5">
+                {sku.sku_image_url ? (
+                  <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
+                ) : (
+                  <div className="w-[40px] aspect-square bg-gray-100 rounded" />
+                )}
               </td>
+              <td className="py-1.5 font-mono text-[11px]">{sku.sku_code || '-'}</td>
+              <td className="py-1.5">{sku.color || '-'}</td>
+              <td className="py-1.5">{sku.size || '-'}</td>
+              <td className="py-1.5">{sku.shop_name || '-'}</td>
             </tr>
           ))}
         </tbody>

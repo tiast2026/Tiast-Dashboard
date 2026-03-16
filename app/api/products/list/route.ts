@@ -83,6 +83,23 @@ export async function GET(request: NextRequest) {
 
     const dateRange = getDateRange(safePeriod, month)
 
+    // Pre-fetch sheet data for category/season filtering (sheet is authoritative)
+    let sheetFilterCodes: string[] | null = null
+    if ((category || season) && isSheetsConfigured()) {
+      try {
+        const sheetData = await fetchSheetData()
+        const filtered = sheetData.filter(s => {
+          if (category && s.category !== category) return false
+          if (season && s.season !== season) return false
+          if (brand && s.brand !== brand) return false
+          return true
+        })
+        sheetFilterCodes = filtered.map(s => s.product_code)
+      } catch (e) {
+        console.error('Failed to pre-fetch sheet data for filtering:', e)
+      }
+    }
+
     const data = await cachedQuery(cacheKey, async () => {
       const conditions: string[] = []
       const params: Record<string, unknown> = {}
@@ -91,26 +108,37 @@ export async function GET(request: NextRequest) {
         // Support multiple product codes separated by comma or newline
         const terms = search.split(/[,\n\r]+/).map(s => s.trim()).filter(Boolean)
         if (terms.length > 1) {
-          // Multiple codes: exact match on product_code
           const placeholders = terms.map((t, i) => `@search_${i}`)
           conditions.push(`s.product_code IN (${placeholders.join(', ')})`)
           terms.forEach((t, i) => { params[`search_${i}`] = t })
-        } else {
+        } else if (terms.length === 1) {
           conditions.push('(s.product_name LIKE CONCAT(\'%\', @search, \'%\') OR s.product_code LIKE CONCAT(\'%\', @search, \'%\'))')
-          params.search = terms[0] || search
+          params.search = terms[0]
         }
       }
       if (brand) {
         conditions.push('s.brand = @brand')
         params.brand = brand
       }
-      if (category) {
-        conditions.push('s.category = @category')
-        params.category = category
-      }
-      if (season) {
-        conditions.push('s.season = @season')
-        params.season = season
+      // Category and season: use sheet-filtered product codes instead of SQL filter
+      if (sheetFilterCodes !== null) {
+        if (sheetFilterCodes.length === 0) {
+          // No matching products in sheet — return empty
+          return { data: [], total: 0, page, per_page, total_pages: 0 }
+        }
+        const placeholders = sheetFilterCodes.map((_, i) => `@sf_${i}`)
+        conditions.push(`s.product_code IN (${placeholders.join(', ')})`)
+        sheetFilterCodes.forEach((code, i) => { params[`sf_${i}`] = code })
+      } else {
+        // Fallback to SQL-based filtering when sheet is not available
+        if (category) {
+          conditions.push('s.category = @category')
+          params.category = category
+        }
+        if (season) {
+          conditions.push('s.season = @season')
+          params.season = season
+        }
       }
       if (price_tier) {
         conditions.push('s.price_tier = @price_tier')
