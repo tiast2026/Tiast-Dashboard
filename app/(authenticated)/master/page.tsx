@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS } from '@/lib/constants'
-import { ExternalLink, Image, RefreshCw } from 'lucide-react'
+import { ExternalLink, Image, RefreshCw, AlertCircle } from 'lucide-react'
 import type { ProductMaster } from '@/types/master'
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1m_slCKW-k_pcEDW7goMDc7Mt3-gTQBL75mchKU-GOv8/edit?gid=1735499737#gid=1735499737'
@@ -34,10 +34,12 @@ export default function MasterPage() {
   const [season, setSeason] = useState('全て')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ListResponse | null>(null)
 
   const fetchList = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
@@ -50,9 +52,13 @@ export default function MasterPage() {
       const res = await fetch(`/api/master?${params}`)
       if (res.ok) {
         setResult(await res.json())
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setError(body.error || `データの取得に失敗しました (${res.status})`)
       }
     } catch (e) {
       console.error('Failed to fetch master:', e)
+      setError('ネットワークエラーが発生しました')
     } finally {
       setLoading(false)
     }
@@ -169,25 +175,45 @@ export default function MasterPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-56 bg-white"
           />
-          <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {BRAND_OPTIONS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={category} onValueChange={(v) => v && setCategory(v)}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CATEGORY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={season} onValueChange={(v) => v && setSeason(v)}>
-            <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {SEASON_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">ブランド</span>
+            <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
+              <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {BRAND_OPTIONS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">カテゴリ</span>
+            <Select value={category} onValueChange={(v) => v && setCategory(v)}>
+              <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">シーズン</span>
+            <Select value={season} onValueChange={(v) => v && setSeason(v)}>
+              <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SEASON_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <div className="text-sm text-red-700">{error}</div>
+            <Button variant="outline" size="sm" className="ml-auto" onClick={() => fetchList()}>
+              再試行
+            </Button>
+          </div>
+        )}
 
         {/* Table (read-only) */}
         {loading ? (
