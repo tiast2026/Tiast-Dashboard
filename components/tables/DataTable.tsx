@@ -29,6 +29,8 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void
   expandedRowKeys?: Set<string>
   renderExpandedRow?: (row: T) => React.ReactNode
+  /** Render expanded content as inline sibling <tr> elements (no colSpan wrapper) */
+  renderExpandedRows?: (row: T, columns: Column<T>[]) => React.ReactNode
   rowKeyField?: string
 }
 
@@ -46,6 +48,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   onRowClick,
   expandedRowKeys,
   renderExpandedRow,
+  renderExpandedRows,
   rowKeyField,
 }: DataTableProps<T>) {
   const total = totalItems ?? data.length
@@ -113,7 +116,8 @@ export default function DataTable<T extends Record<string, unknown>>({
                         </TableCell>
                       ))}
                     </TableRow>
-                    {isExpanded && renderExpandedRow && (
+                    {isExpanded && renderExpandedRows && renderExpandedRows(row, columns)}
+                    {isExpanded && !renderExpandedRows && renderExpandedRow && (
                       <TableRow className="bg-[#FAFAF8] border-b border-black/[0.08]">
                         <TableCell colSpan={columns.length} className="p-0">
                           {renderExpandedRow(row)}
