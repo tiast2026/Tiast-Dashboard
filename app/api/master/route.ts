@@ -16,8 +16,9 @@ export async function GET(request: NextRequest) {
     })
     return NextResponse.json(result)
   } catch (e) {
-    console.error('Master list error:', e)
-    return NextResponse.json({ error: 'Failed to fetch master data' }, { status: 500 })
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('Master list error:', msg)
+    return NextResponse.json({ error: `マスタデータの取得に失敗しました: ${msg}` }, { status: 500 })
   }
 }
 
