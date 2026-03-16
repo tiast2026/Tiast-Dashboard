@@ -190,6 +190,47 @@ export default function ProductDetailPanel({ productCode, onClose }: ProductDeta
               </Card>
             </div>
 
+            {/* Section B2: Inventory Summary */}
+            {data.inventory.length > 0 && (() => {
+              const totalStock = data.inventory.reduce((s, i) => s + i.total_stock, 0)
+              const totalDailySales = data.inventory.reduce((s, i) => s + i.daily_sales, 0)
+              const stockDays = totalDailySales > 0 ? Math.round(totalStock / totalDailySales) : 0
+              const stockValue = totalStock * data.selling_price
+              const hasOverstock = data.inventory.some(i => i.is_overstock)
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Card>
+                    <CardContent className="px-3 py-2">
+                      <p className="text-xs text-gray-500">総在庫数</p>
+                      <p className="text-base font-semibold">{formatNumber(totalStock)}点</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="px-3 py-2">
+                      <p className="text-xs text-gray-500">在庫金額</p>
+                      <p className="text-base font-semibold">{formatCurrency(stockValue)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="px-3 py-2">
+                      <p className="text-xs text-gray-500">在庫日数</p>
+                      <p className={`text-base font-semibold ${stockDays > 90 ? 'text-red-600' : stockDays > 60 ? 'text-amber-600' : ''}`}>
+                        {stockDays > 0 ? `${stockDays}日` : '-'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="px-3 py-2">
+                      <p className="text-xs text-gray-500">在庫状態</p>
+                      <p className={`text-base font-semibold ${hasOverstock ? 'text-red-600' : totalStock === 0 ? 'text-gray-400' : 'text-green-600'}`}>
+                        {totalStock === 0 ? '在庫なし' : hasOverstock ? '過剰あり' : '適正'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )
+            })()}
+
             {/* Section C: Inventory Breakdown */}
             {data.inventory.length > 0 && (
               <Card>

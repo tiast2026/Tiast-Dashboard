@@ -26,6 +26,10 @@ interface ProductRow {
   image_url: string | null
   sales_start_date: string | null
   sales_end_date: string | null
+  total_stock: number
+  daily_sales: number
+  stock_days: number
+  inventory_status: string
 }
 
 interface ProductListResponse {
@@ -190,6 +194,33 @@ export default function ProductsPage() {
       align: 'right',
       sortable: true,
       render: (row) => <ProfitRateBar rate={row.gross_profit_rate} />,
+    },
+    {
+      key: 'total_stock',
+      label: '在庫数',
+      align: 'right',
+      sortable: true,
+      render: (row) => formatNumber(row.total_stock),
+    },
+    {
+      key: 'stock_days',
+      label: '在庫日数',
+      align: 'right',
+      sortable: true,
+      render: (row) => {
+        const days = Math.round(row.stock_days)
+        const color = days > 90 ? 'text-red-600' : days > 60 ? 'text-amber-600' : 'text-gray-700'
+        return <span className={`text-xs font-medium ${color}`}>{days > 0 ? `${days}日` : '-'}</span>
+      },
+    },
+    {
+      key: 'inventory_status',
+      label: '在庫状態',
+      render: (row) => {
+        const s = row.inventory_status
+        const cls = s === '過剰' ? 'bg-red-100 text-red-700' : s === '在庫なし' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+        return s ? <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${cls}`}>{s}</span> : null
+      },
     },
     {
       key: 'sales_start_date',
