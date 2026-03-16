@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
@@ -19,9 +20,11 @@ interface DashboardData {
   dailyTrend: DailySalesItem[]
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
+  const searchParams = useSearchParams()
+  const urlBrand = searchParams.get('brand')
   const [month, setMonth] = useState(getCurrentMonth())
-  const [brand, setBrand] = useState('全て')
+  const [brand, setBrand] = useState(urlBrand || '全て')
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
   const cacheKey = `dashboard:${month}:${brandParam}`
 
@@ -169,7 +172,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <Header title="ダッシュボード" />
+      <Header title={urlBrand ? `${urlBrand} 売上分析` : 'ダッシュボード'} />
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={setBrand} />
 
@@ -356,5 +359,13 @@ export default function DashboardPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardPageContent />
+    </Suspense>
   )
 }

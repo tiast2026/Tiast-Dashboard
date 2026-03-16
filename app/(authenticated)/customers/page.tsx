@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
@@ -63,9 +64,11 @@ function extractBrand(shopName: string): string {
   return match ? match[1] : shopName
 }
 
-export default function CustomersPage() {
+function CustomersPageContent() {
+  const searchParams = useSearchParams()
+  const urlBrand = searchParams.get('brand')
   const [month, setMonth] = useState(getCurrentMonth())
-  const [brand, setBrand] = useState('全て')
+  const [brand, setBrand] = useState(urlBrand || '全て')
   const [summary, setSummary] = useState<SummaryData | null>(null)
   const [trend, setTrend] = useState<TrendItem[]>([])
   const [channelRepeat, setChannelRepeat] = useState<ChannelRepeatItem[]>([])
@@ -161,7 +164,7 @@ export default function CustomersPage() {
 
   return (
     <>
-      <Header title="顧客分析" />
+      <Header title={urlBrand ? `${urlBrand} 顧客分析` : '顧客分析'} />
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={setBrand} />
 
@@ -361,5 +364,13 @@ export default function CustomersPage() {
         </Card>
       </div>
     </>
+  )
+}
+
+export default function CustomersPage() {
+  return (
+    <Suspense>
+      <CustomersPageContent />
+    </Suspense>
   )
 }

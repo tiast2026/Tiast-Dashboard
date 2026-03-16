@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import ProductDetailPanel from '@/components/products/ProductDetailPanel'
+import AlertCard from '@/components/cards/AlertCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -59,9 +61,11 @@ function ProfitRateBar({ rate }: { rate: number }) {
   )
 }
 
-export default function ProductsPage() {
+function ProductsPageContent() {
+  const searchParams = useSearchParams()
+  const urlBrand = searchParams.get('brand')
   const [search, setSearch] = useState('')
-  const [brand, setBrand] = useState('全て')
+  const [brand, setBrand] = useState(urlBrand || '全て')
   const [category, setCategory] = useState('全て')
   const [season, setSeason] = useState('全て')
   const [priceTier, setPriceTier] = useState('全て')
@@ -70,6 +74,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1)
   const [perPage] = useState(50)
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<{ overstock: { count: number; amount: number }; season_ending: { count: number; amount: number }; season_exceeded: { count: number; amount: number } } | null>(null)
   const mountedRef = useRef(true)
 
   const buildCacheKey = useCallback(() => {
@@ -121,6 +126,14 @@ export default function ProductsPage() {
     fetchProducts()
     return () => { mountedRef.current = false }
   }, [fetchProducts, buildCacheKey])
+
+  // Fetch inventory alerts
+  useEffect(() => {
+    fetch('/api/inventory/alerts')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (mountedRef.current) setAlerts(data) })
+      .catch(() => {})
+  }, [])
 
   // Reset page when filters change
   useEffect(() => {
@@ -236,8 +249,32 @@ export default function ProductsPage() {
 
   return (
     <>
-      <Header title="商品分析" />
+      <Header title={urlBrand ? `${urlBrand} 商品分析` : '商品分析'} />
       <div className="p-6 space-y-4">
+        {/* Inventory Alerts */}
+        {alerts && (
+          <div className="grid grid-cols-3 gap-4">
+            <AlertCard
+              title="過剰在庫"
+              count={alerts.overstock.count}
+              amount={formatCurrency(alerts.overstock.amount)}
+              color="red"
+            />
+            <AlertCard
+              title="シーズン終了間近（30日以内）"
+              count={alerts.season_ending.count}
+              amount={formatCurrency(alerts.season_ending.amount)}
+              color="yellow"
+            />
+            <AlertCard
+              title="シーズン超過"
+              count={alerts.season_exceeded.count}
+              amount={formatCurrency(alerts.season_exceeded.amount)}
+              color="red"
+            />
+          </div>
+        )}
+
         {/* Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
           <Input
@@ -319,5 +356,13 @@ export default function ProductsPage() {
         />
       )}
     </>
+  )
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense>
+      <ProductsPageContent />
+    </Suspense>
   )
 }
