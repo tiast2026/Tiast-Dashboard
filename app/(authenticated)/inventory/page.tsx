@@ -7,13 +7,16 @@ import DataTable, { Column } from '@/components/tables/DataTable'
 import LifecycleBadge from '@/components/products/LifecycleBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, BRAND_COLORS } from '@/lib/constants'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { Package, Image as ImageIcon, Search, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 
 // Types
 interface AlertData {
@@ -46,6 +49,8 @@ interface InventoryItem {
   free_stock: number
   zozo_stock: number
   own_stock: number
+  selling_price: number
+  cost_price: number
   stock_retail_value: number
   daily_sales: number
   stock_days: number
@@ -56,6 +61,10 @@ interface InventoryItem {
   recommended_discount: number
   lifecycle_action: string
   is_overstock: boolean
+  image_url: string | null
+  is_focus: string
+  restock: string
+  order_lot: number | null
 }
 
 interface InventoryListResponse {
@@ -83,6 +92,7 @@ function currencyFormatter(value: any) {
 
 export default function InventoryPage() {
   // Filter state
+  const [search, setSearch] = useState('')
   const [brand, setBrand] = useState('全て')
   const [category, setCategory] = useState('全て')
   const [season, setSeason] = useState('全て')
@@ -104,9 +114,14 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [listLoading, setListLoading] = useState(true)
 
+  // Detail dialog
+  const [detailItem, setDetailItem] = useState<InventoryItem | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+
   // Build query params for list
   const buildListParams = useCallback(() => {
     const params = new URLSearchParams()
+    if (search) params.set('search', search)
     if (brand !== '全て') params.set('brand', brand)
     if (category !== '全て') params.set('category', category)
     if (season !== '全て') params.set('season', season)
@@ -118,7 +133,7 @@ export default function InventoryPage() {
     params.set('page', String(page))
     params.set('per_page', String(perPage))
     return params.toString()
-  }, [brand, category, season, status, lifecycle, alertType, sortBy, sortOrder, page, perPage])
+  }, [search, brand, category, season, status, lifecycle, alertType, sortBy, sortOrder, page, perPage])
 
   // Fetch summary data (alerts, season, category)
   const fetchSummaryData = useCallback(async () => {
@@ -170,7 +185,7 @@ export default function InventoryPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [brand, category, season, status, lifecycle, alertType])
+  }, [search, brand, category, season, status, lifecycle, alertType])
 
   // Handle alert card click
   const handleAlertClick = (type: string) => {
@@ -182,6 +197,12 @@ export default function InventoryPage() {
     setSortBy(key)
     setSortOrder(order)
     setPage(1)
+  }
+
+  // Handle row click -> open detail dialog
+  const handleRowClick = (row: Record<string, unknown>) => {
+    setDetailItem(row as unknown as InventoryItem)
+    setDetailOpen(true)
   }
 
   // Row background color
@@ -215,14 +236,44 @@ export default function InventoryPage() {
 
   // Table columns
   const columns: Column<Record<string, unknown>>[] = [
-    { key: 'product_code', label: '品番', className: 'min-w-[80px]' },
+    {
+      key: 'image_url',
+      label: '',
+      className: 'w-[52px]',
+      render: (row) => {
+        const url = row.image_url as string | null
+        return url ? (
+          <img src={url} alt="" className="w-[40px] min-w-[40px] h-[40px] min-h-[40px] object-cover rounded shrink-0" />
+        ) : (
+          <div className="w-[40px] min-w-[40px] h-[40px] min-h-[40px] bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
+            <ImageIcon className="w-4 h-4" />
+          </div>
+        )
+      },
+    },
+    {
+      key: 'product_code',
+      label: '品番',
+      className: 'min-w-[100px]',
+      render: (row) => {
+        const focus = row.is_focus as string
+        return (
+          <div>
+            <span className="font-mono font-medium text-sm">{String(row.product_code || '-')}</span>
+            {focus ? (
+              <Badge className="ml-1.5 bg-orange-100 text-orange-700 px-1 py-0 text-[10px]">{focus}</Badge>
+            ) : null}
+          </div>
+        )
+      },
+    },
     {
       key: 'goods_name',
       label: '商品名',
       sortable: true,
-      className: 'min-w-[200px] max-w-[250px]',
+      className: 'min-w-[180px] max-w-[220px]',
       render: (row) => (
-        <span className="truncate block" title={String(row.goods_name || '')}>
+        <span className="truncate block text-sm" title={String(row.goods_name || '')}>
           {String(row.goods_name || '-')}
         </span>
       ),
@@ -231,19 +282,13 @@ export default function InventoryPage() {
       key: 'brand',
       label: 'ブランド',
       sortable: true,
-      className: 'min-w-[100px]',
-    },
-    {
-      key: 'category',
-      label: 'カテゴリ',
-      sortable: true,
       className: 'min-w-[90px]',
     },
     {
       key: 'season',
       label: 'シーズン',
       sortable: true,
-      className: 'min-w-[80px]',
+      className: 'min-w-[70px]',
     },
     {
       key: 'total_stock',
@@ -276,7 +321,10 @@ export default function InventoryPage() {
       align: 'right',
       render: (row) => {
         const v = row.stock_days as number
-        return v != null ? formatNumber(v) : '-'
+        if (v == null) return '-'
+        if (v > 180) return <span className="text-red-600 font-medium">{formatNumber(v)}</span>
+        if (v > 90) return <span className="text-yellow-600">{formatNumber(v)}</span>
+        return formatNumber(v)
       },
     },
     {
@@ -302,24 +350,45 @@ export default function InventoryPage() {
       label: 'ステータス',
       render: (row) => {
         const s = String(row.inventory_status || '-')
-        const variant = s === '過剰' ? 'destructive' : s === '在庫なし' ? 'outline' : 'secondary'
+        const variant = s.includes('過剰') ? 'destructive' : s.includes('不足') ? 'outline' : 'secondary'
         return <Badge variant={variant}>{s}</Badge>
       },
     },
     {
-      key: 'lifecycle_action',
-      label: 'アクション',
-      className: 'min-w-[120px]',
-      render: (row) => String(row.lifecycle_action || '-'),
+      key: 'reorder_judgment',
+      label: '発注判定',
+      className: 'min-w-[110px]',
+      render: (row) => {
+        const v = String(row.reorder_judgment || '-')
+        if (v === '追加発注推奨') return <span className="text-blue-600 font-medium">{v}</span>
+        if (v === '値引推奨') return <span className="text-red-600 font-medium">{v}</span>
+        return <span className="text-gray-500">{v}</span>
+      },
     },
   ]
 
+  // Compute summary from current list
+  const listSummary = inventoryList ? {
+    totalItems: inventoryList.total,
+    totalStock: inventoryList.data.reduce((s, d) => s + d.total_stock, 0),
+    totalValue: inventoryList.data.reduce((s, d) => s + d.stock_retail_value, 0),
+  } : null
+
   return (
     <>
-      <Header title="在庫管理" />
+      <Header title="在庫管理" subtitle="商品マスタ連携" />
       <div className="p-6 space-y-6">
-        {/* Filter Bar */}
+        {/* Search & Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="品番・商品名で検索"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-52 pl-9 bg-white"
+            />
+          </div>
           <Select value={brand} onValueChange={(v) => setBrand(v ?? '全て')}>
             <SelectTrigger className="w-36 bg-white">
               <SelectValue placeholder="ブランド" />
@@ -480,14 +549,23 @@ export default function InventoryPage() {
         {/* Inventory Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">
-              在庫一覧
-              {inventoryList && (
-                <span className="text-sm font-normal text-gray-500 ml-2">
-                  ({formatNumber(inventoryList.total)}件)
-                </span>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Package className="w-4 h-4" />
+                在庫一覧
+                {inventoryList && (
+                  <span className="text-sm font-normal text-gray-500">
+                    ({formatNumber(inventoryList.total)}件)
+                  </span>
+                )}
+              </CardTitle>
+              {listSummary && (
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span>表示分 在庫数: <strong className="text-gray-700">{formatNumber(listSummary.totalStock)}</strong></span>
+                  <span>在庫金額: <strong className="text-gray-700">{formatCurrency(listSummary.totalValue)}</strong></span>
+                </div>
               )}
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {listLoading ? (
@@ -504,6 +582,7 @@ export default function InventoryPage() {
                 sortKey={sortBy}
                 sortOrder={sortOrder}
                 rowClassName={getRowClassName}
+                onRowClick={handleRowClick}
               />
             ) : (
               <div className="text-center py-8 text-gray-500">データの読み込みに失敗しました</div>
@@ -511,6 +590,130 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              {detailItem?.image_url ? (
+                <img src={detailItem.image_url} alt="" className="w-14 h-14 object-cover rounded" />
+              ) : (
+                <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+                  <ImageIcon className="w-6 h-6" />
+                </div>
+              )}
+              <div>
+                <div className="font-mono text-base">{detailItem?.product_code}</div>
+                <div className="text-sm text-gray-500 font-normal">{detailItem?.goods_name}</div>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          {detailItem && (
+            <div className="mt-4 space-y-5">
+              {/* Basic Info */}
+              <div className="grid grid-cols-3 gap-3">
+                <InfoCell label="ブランド" value={detailItem.brand} />
+                <InfoCell label="カテゴリ" value={detailItem.category} />
+                <InfoCell label="シーズン" value={detailItem.season} />
+              </div>
+
+              {/* Master Info */}
+              <div className="grid grid-cols-4 gap-3">
+                <InfoCell label="上代" value={formatCurrency(detailItem.selling_price)} />
+                <InfoCell label="下代" value={formatCurrency(detailItem.cost_price)} />
+                <InfoCell label="注力" value={detailItem.is_focus || '-'} />
+                <InfoCell label="再入荷" value={detailItem.restock || '-'} />
+              </div>
+
+              {/* Stock Breakdown */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">在庫内訳</h4>
+                <div className="grid grid-cols-4 gap-3">
+                  <InfoCell label="総在庫" value={formatNumber(detailItem.total_stock)} highlight />
+                  <InfoCell label="フリー在庫" value={formatNumber(detailItem.free_stock)} />
+                  <InfoCell label="ZOZO在庫" value={formatNumber(detailItem.zozo_stock)} />
+                  <InfoCell label="自社在庫" value={formatNumber(detailItem.own_stock)} />
+                </div>
+              </div>
+
+              {/* Sales & Stock Analysis */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">販売・在庫分析</h4>
+                <div className="grid grid-cols-4 gap-3">
+                  <InfoCell label="在庫金額" value={formatCurrency(detailItem.stock_retail_value)} highlight />
+                  <InfoCell label="日販" value={`${detailItem.daily_sales.toFixed(1)} 個/日`} />
+                  <InfoCell label="在庫日数" value={`${formatNumber(detailItem.stock_days)} 日`} />
+                  <InfoCell label="残日数" value={
+                    detailItem.season_remaining_days <= 0
+                      ? 'シーズン超過'
+                      : `${detailItem.season_remaining_days} 日`
+                  } warn={detailItem.season_remaining_days <= 30} />
+                </div>
+              </div>
+
+              {/* Status & Action */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">ステータス・アクション</h4>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-[11px] text-gray-500 mb-1">ライフサイクル</div>
+                    <LifecycleBadge stage={detailItem.lifecycle_stance} />
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-[11px] text-gray-500 mb-1">在庫ステータス</div>
+                    <Badge variant={detailItem.inventory_status.includes('過剰') ? 'destructive' : detailItem.inventory_status.includes('不足') ? 'outline' : 'secondary'}>
+                      {detailItem.inventory_status}
+                    </Badge>
+                  </div>
+                  <InfoCell label="発注判定" value={detailItem.reorder_judgment || '-'} />
+                  <InfoCell label="発注ロット" value={detailItem.order_lot ? `${detailItem.order_lot} 個` : '-'} />
+                </div>
+              </div>
+
+              {/* Recommended Action */}
+              {detailItem.lifecycle_action && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    {detailItem.lifecycle_action.includes('値引') ? (
+                      <TrendingDown className="w-4 h-4 text-red-500" />
+                    ) : detailItem.lifecycle_action.includes('発注') ? (
+                      <TrendingUp className="w-4 h-4 text-blue-500" />
+                    ) : (
+                      <Minus className="w-4 h-4 text-gray-500" />
+                    )}
+                    <span className="font-medium text-blue-800">推奨アクション:</span>
+                    <span className="text-blue-700">{detailItem.lifecycle_action}</span>
+                    {detailItem.recommended_discount > 0 && (
+                      <Badge className="bg-red-100 text-red-700 ml-2">
+                        {detailItem.recommended_discount}%OFF推奨
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
+  )
+}
+
+// Info cell for detail dialog
+function InfoCell({ label, value, highlight, warn }: {
+  label: string
+  value: string
+  highlight?: boolean
+  warn?: boolean
+}) {
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="text-[11px] text-gray-500 mb-0.5">{label}</div>
+      <div className={`text-sm font-medium ${highlight ? 'text-gray-900' : warn ? 'text-red-600' : 'text-gray-700'}`}>
+        {value}
+      </div>
+    </div>
   )
 }
