@@ -8,6 +8,23 @@ interface TrendRow {
   sales_amount: number
 }
 
+interface ChannelRow {
+  channel: string
+  quantity: number
+  sales_amount: number
+}
+
+const SHOP_NAME_CASE = `
+  CASE
+    WHEN o.receive_order_shop_id = 1 THEN '自社EC'
+    WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\\d{5,6}-\\d{8}-') THEN '楽天市場'
+    WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^[Yy]') THEN 'Yahoo!'
+    WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\\d{3}-\\d{7}-') THEN 'Amazon'
+    WHEN LOWER(COALESCE(o.receive_order_shop_cut_form_id, '')) LIKE '%qoo10%' THEN 'Qoo10'
+    ELSE CONCAT('EC_', CAST(o.receive_order_shop_id AS STRING))
+  END
+`
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ product_code: string }> }
@@ -19,7 +36,7 @@ export async function GET(
     const months = Math.min(Number(searchParams.get('months') || '12'), 24)
 
     if (!isBigQueryConfigured()) {
-      return NextResponse.json({ data: [], prev_year: [] })
+      return NextResponse.json({ data: [], prev_year: [], channels: [] })
     }
 
     const level = goods_id ? 'sku' : 'product'
@@ -65,14 +82,32 @@ export async function GET(
         ORDER BY month
       `
 
+      // Channel breakdown for the current period
+      const channelQuery = `
+        SELECT
+          ${SHOP_NAME_CASE} AS channel,
+          SUM(o.quantity) AS quantity,
+          SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount
+        FROM \`tiast-data-platform.raw_nextengine.orders\` o
+        JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+        WHERE ${filterCol} = @${paramName}
+          AND CAST(o.cancel_type_id AS STRING) = '0'
+          AND CAST(o.row_cancel_flag AS STRING) = '0'
+          AND o.receive_order_date IS NOT NULL
+          AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+        GROUP BY channel
+        ORDER BY sales_amount DESC
+      `
+
       const queryParams = level === 'sku' ? { goods_id: filterVal! } : { product_code: filterVal! }
 
-      const [trendRows, prevYearRows] = await Promise.all([
+      const [trendRows, prevYearRows, channelRows] = await Promise.all([
         runQuery<TrendRow>(trendQuery, queryParams),
         runQuery<TrendRow>(prevYearQuery, queryParams).catch(() => [] as TrendRow[]),
+        runQuery<ChannelRow>(channelQuery, queryParams).catch(() => [] as ChannelRow[]),
       ])
 
-      return { data: trendRows, prev_year: prevYearRows }
+      return { data: trendRows, prev_year: prevYearRows, channels: channelRows }
     })
 
     return NextResponse.json(data)

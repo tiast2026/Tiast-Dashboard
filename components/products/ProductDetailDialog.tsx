@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ChevronLeft } from 'lucide-react'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
+import { getChannelKey, CHANNEL_COLORS } from '@/lib/constants'
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -63,9 +64,16 @@ interface TrendPoint {
   sales_amount: number
 }
 
+interface ChannelRow {
+  channel: string
+  quantity: number
+  sales_amount: number
+}
+
 interface TrendData {
   data: TrendPoint[]
   prev_year: TrendPoint[]
+  channels: ChannelRow[]
 }
 
 interface ProductDetailDialogProps {
@@ -117,6 +125,61 @@ function SalesCard({ label, quantity, amount, prevQuantity, prevAmount, prevLabe
             <ComparisonBadge current={amount} previous={prevAmount} label={prevLabel} />
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+const CHANNEL_COLOR_MAP: Record<string, string> = {
+  '自社EC': CHANNEL_COLORS.official,
+  '楽天市場': CHANNEL_COLORS.rakuten,
+  'Yahoo!': CHANNEL_COLORS.yahoo,
+  'Amazon': '#FF9900',
+  'Qoo10': '#E91E63',
+  'ZOZO': CHANNEL_COLORS.zozo || '#1A1A1A',
+}
+
+function getColor(channel: string): string {
+  if (CHANNEL_COLOR_MAP[channel]) return CHANNEL_COLOR_MAP[channel]
+  const key = getChannelKey(channel)
+  return CHANNEL_COLORS[key] || '#999999'
+}
+
+function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
+  if (channels.length === 0) return null
+  const totalAmount = channels.reduce((s, c) => s + c.sales_amount, 0)
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-4">
+      <div className="text-gray-500 text-sm mb-3 font-medium">チャネル別販売実績</div>
+      {/* Stacked bar */}
+      <div className="flex h-3 rounded-full overflow-hidden mb-3">
+        {channels.map((c) => {
+          const pct = totalAmount > 0 ? (c.sales_amount / totalAmount) * 100 : 0
+          if (pct < 0.5) return null
+          return (
+            <div
+              key={c.channel}
+              style={{ width: `${pct}%`, backgroundColor: getColor(c.channel) }}
+              title={`${c.channel}: ${pct.toFixed(1)}%`}
+            />
+          )
+        })}
+      </div>
+      {/* Channel list */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+        {channels.map((c) => {
+          const pct = totalAmount > 0 ? (c.sales_amount / totalAmount) * 100 : 0
+          return (
+            <div key={c.channel} className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getColor(c.channel) }} />
+              <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">{c.channel}</span>
+              <span className="text-sm font-medium text-gray-800 tabular-nums">{formatNumber(c.quantity)}<span className="text-xs text-gray-400">点</span></span>
+              <span className="text-sm font-medium text-gray-800 tabular-nums w-24 text-right">{formatCurrency(c.sales_amount)}</span>
+              <span className="text-xs text-gray-400 w-12 text-right">{pct.toFixed(1)}%</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -373,6 +436,11 @@ export default function ProductDetailDialog({
             </div>
           )}
         </div>
+
+        {/* Channel breakdown */}
+        {trend?.channels && trend.channels.length > 0 && (
+          <ChannelBreakdown channels={trend.channels} />
+        )}
 
         {/* Inventory & detail cards */}
         <div className="grid grid-cols-2 gap-3 text-sm">
