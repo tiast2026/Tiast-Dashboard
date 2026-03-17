@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     })
 
     const data = await cachedQuery(cacheKey, async () => {
-      const brandFilter = brand ? `AND shop_name LIKE CONCAT('%', @brand, '%')` : ''
+      const brandFilter = brand ? `AND shop_brand = @brand` : ''
 
       const query = `
         SELECT

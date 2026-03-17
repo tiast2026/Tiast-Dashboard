@@ -10,20 +10,33 @@ WITH ne_orders_with_customer AS (
     o.receive_order_id,
     o.receive_order_date,
     FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS order_month,
-    -- 店舗名: receive_order_shop_cut_form_idのパターンで判別
-    CASE
-      WHEN o.receive_order_shop_id = 1 THEN '自社EC'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{5,6}-\d{8}-') THEN '楽天市場'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^[Yy]') THEN 'Yahoo!'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{3}-\d{7}-') THEN 'Amazon'
-      WHEN LOWER(COALESCE(o.receive_order_shop_cut_form_id, '')) LIKE '%qoo10%' THEN 'Qoo10'
-      ELSE CONCAT('EC_', CAST(o.receive_order_shop_id AS STRING))
+    -- 店舗名: receive_order_shop_idで判別（NE店舗マスタに基づく）
+    CASE o.receive_order_shop_id
+      WHEN 1 THEN '公式'
+      WHEN 7 THEN '公式'
+      WHEN 2 THEN '楽天市場'
+      WHEN 4 THEN '楽天市場'
+      WHEN 10 THEN '楽天市場'
+      WHEN 3 THEN 'SHOPLIST'
+      WHEN 5 THEN 'Amazon'
+      WHEN 6 THEN 'aupay'
+      WHEN 8 THEN 'サステナ'
+      WHEN 9 THEN 'Yahoo!'
+      WHEN 11 THEN 'RakutenFashion'
+      WHEN 12 THEN 'TikTok'
+      WHEN 13 THEN 'TikTok'
+      ELSE CONCAT('その他(', CAST(o.receive_order_shop_id AS STRING), ')')
     END AS shop_name,
     -- 購入者キー（メールアドレス or 購入者名+電話番号でユニーク化）
     COALESCE(
       NULLIF(o.purchaser_mail_address, ''),
       CONCAT(COALESCE(o.purchaser_name, ''), '_', COALESCE(o.purchaser_tel, ''))
     ) AS customer_key,
+    CASE
+      WHEN LEFT(o.goods_id, 1) = 'n' THEN 'NOAHL'
+      WHEN LEFT(o.goods_id, 1) = 'b' THEN 'BLACKQUEEN'
+      ELSE 'OTHER'
+    END AS shop_brand,
     o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount) AS line_sales
   FROM `tiast-data-platform.raw_nextengine.orders` o
   WHERE CAST(o.cancel_type_id AS STRING) = '0'
@@ -46,6 +59,7 @@ order_level AS (
     o.receive_order_id,
     o.order_month,
     o.shop_name,
+    o.shop_brand,
     o.customer_key,
     SUM(o.line_sales) AS order_sales,
     -- 新規/リピート判定
@@ -55,16 +69,17 @@ order_level AS (
     END AS customer_type
   FROM ne_orders_with_customer o
   LEFT JOIN customer_first_order cfo ON o.customer_key = cfo.customer_key
-  GROUP BY o.receive_order_id, o.order_month, o.shop_name, o.customer_key, cfo.first_order_month
+  GROUP BY o.receive_order_id, o.order_month, o.shop_name, o.shop_brand, o.customer_key, cfo.first_order_month
 )
 
 SELECT
   order_month,
   shop_name,
+  shop_brand,
   customer_type,
   COUNT(DISTINCT customer_key) AS customer_count,
   SUM(order_sales) AS sales_amount,
   COUNT(DISTINCT receive_order_id) AS order_count
 FROM order_level
-GROUP BY order_month, shop_name, customer_type
+GROUP BY order_month, shop_name, shop_brand, customer_type
 ;

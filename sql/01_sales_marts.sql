@@ -17,8 +17,8 @@
 --   ZOZO: cancel_flag = '' OR cancel_flag IS NULL
 --
 -- ブランド判別: goods_id先頭1文字 n=NOAHL, b=BLACKQUEEN
--- 店舗判別: receive_order_shop_cut_form_idのパターンで判定
---   楽天: 数字6桁-YYYYMMDD-数字 (例: 338335-20230909-0688303402)
+-- 店舗判別: receive_order_shop_idで判定（NE店舗マスタに基づく）
+--   1,7=公式 2,4,10=楽天 3=SHOPLIST 5=Amazon 6=aupay 8=サステナ 9=Yahoo 11=RF 12,13=TikTok
 -- ============================================================
 
 
@@ -32,15 +32,22 @@ CREATE OR REPLACE VIEW `tiast-data-platform.analytics_mart.mart_sales_by_shop_mo
 WITH ne_sales AS (
   SELECT
     FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS order_month,
-    -- 店舗名: receive_order_shop_cut_form_idのパターンで判別
-    -- (import_type_nameは取込種類='ＣＳＶ'等で店舗判別不可)
-    CASE
-      WHEN o.receive_order_shop_id = 1 THEN '自社EC'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{5,6}-\d{8}-') THEN '楽天市場'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^[Yy]') THEN 'Yahoo!'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\d{3}-\d{7}-') THEN 'Amazon'
-      WHEN LOWER(COALESCE(o.receive_order_shop_cut_form_id, '')) LIKE '%qoo10%' THEN 'Qoo10'
-      ELSE CONCAT('EC_', CAST(o.receive_order_shop_id AS STRING))
+    -- 店舗名: receive_order_shop_idで判別（NE店舗マスタに基づく）
+    CASE o.receive_order_shop_id
+      WHEN 1 THEN '公式'
+      WHEN 7 THEN '公式'
+      WHEN 2 THEN '楽天市場'
+      WHEN 4 THEN '楽天市場'
+      WHEN 10 THEN '楽天市場'
+      WHEN 3 THEN 'SHOPLIST'
+      WHEN 5 THEN 'Amazon'
+      WHEN 6 THEN 'aupay'
+      WHEN 8 THEN 'サステナ'
+      WHEN 9 THEN 'Yahoo!'
+      WHEN 11 THEN 'RakutenFashion'
+      WHEN 12 THEN 'TikTok'
+      WHEN 13 THEN 'TikTok'
+      ELSE CONCAT('その他(', CAST(o.receive_order_shop_id AS STRING), ')')
     END AS shop_name,
     -- ブランド判別
     CASE

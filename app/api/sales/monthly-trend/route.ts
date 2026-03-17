@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
         SELECT
           order_month AS month,
           CASE
-            WHEN shop_name LIKE '%楽天%' AND shop_name NOT LIKE '%RakutenFashion%' THEN '楽天系'
-            WHEN shop_name LIKE '%公式%' THEN '公式系'
-            WHEN shop_name LIKE '%TIKTOK%' THEN 'TikTok系'
+            WHEN shop_name = '楽天市場' THEN '楽天系'
+            WHEN shop_name = '公式' THEN '公式系'
+            WHEN shop_name = 'TikTok' THEN 'TikTok系'
             ELSE 'その他'
           END AS channel_group,
           SUM(sales_amount) AS sales_amount

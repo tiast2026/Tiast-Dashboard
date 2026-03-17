@@ -131,11 +131,15 @@ function SalesCard({ label, quantity, amount, prevQuantity, prevAmount, prevLabe
 }
 
 const CHANNEL_COLOR_MAP: Record<string, string> = {
-  '自社EC': CHANNEL_COLORS.official,
+  '公式': CHANNEL_COLORS.official,
   '楽天市場': CHANNEL_COLORS.rakuten,
+  'RakutenFashion': CHANNEL_COLORS.rakuten_fashion,
   'Yahoo!': CHANNEL_COLORS.yahoo,
   'Amazon': '#FF9900',
-  'Qoo10': '#E91E63',
+  'SHOPLIST': CHANNEL_COLORS.shoplist,
+  'aupay': CHANNEL_COLORS.aupay,
+  'TikTok': CHANNEL_COLORS.tiktok,
+  'サステナ': '#4CAF50',
   'ZOZO': CHANNEL_COLORS.zozo || '#1A1A1A',
 }
 
