@@ -436,6 +436,11 @@ export default function ProductDetailDialog({
           </div>
         </div>
 
+        {/* Channel breakdown (current month) */}
+        {trend?.channels && trend.channels.length > 0 && (
+          <ChannelBreakdown channels={trend.channels} />
+        )}
+
         {/* Trend chart */}
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="text-gray-500 text-sm mb-2 font-medium">売上推移（12ヶ月）</div>
@@ -451,11 +456,6 @@ export default function ProductDetailDialog({
             </div>
           )}
         </div>
-
-        {/* Channel breakdown */}
-        {trend?.channels && trend.channels.length > 0 && (
-          <ChannelBreakdown channels={trend.channels} />
-        )}
 
         {/* Inventory & detail cards */}
         <div className="grid grid-cols-2 gap-3 text-sm">
