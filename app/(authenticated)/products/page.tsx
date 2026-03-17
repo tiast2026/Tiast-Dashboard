@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Mail, Truck, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PROFIT_RATE_COLORS } from '@/lib/constants'
+import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PROFIT_RATE_COLORS, getBrandDisplayName } from '@/lib/constants'
 import ProductDetailDialog from '@/components/products/ProductDetailDialog'
 
 interface ProductRow {
@@ -576,7 +576,7 @@ function ProductsPageContent() {
 
   return (
     <>
-      <Header title={urlBrand ? `${urlBrand} 商品分析` : '商品分析'} />
+      <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 商品分析` : '商品分析'} />
       <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
         {/* Inventory Alerts */}
         {alerts && (
@@ -611,7 +611,7 @@ function ProductsPageContent() {
             <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
               <SelectContent>
-                {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{b}</SelectItem>))}
+                {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{getBrandDisplayName(b)}</SelectItem>))}
               </SelectContent>
             </Select>
           )}

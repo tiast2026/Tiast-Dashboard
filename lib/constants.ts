@@ -50,6 +50,18 @@ export const BRAND_SUB_ITEMS = [
 // Brands shown in sidebar
 export const SIDEBAR_BRANDS = ['NOAHL', 'BLACKQUEEN'] as const
 
+// Brand display name mapping
+export const BRAND_DISPLAY_NAMES: Record<string, string> = {
+  'NOAHL': 'NOAHL',
+  'BLACKQUEEN': 'BLACKQueen',
+  'MYRTH': 'MYRTH',
+}
+
+// Get brand display name
+export function getBrandDisplayName(brand: string): string {
+  return BRAND_DISPLAY_NAMES[brand] || brand
+}
+
 // Brand options for filters
 export const BRAND_OPTIONS = ['全て', 'NOAHL', 'MYRTH', 'BLACKQUEEN'] as const
 
