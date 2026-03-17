@@ -193,14 +193,14 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
   }, [productCode, period, month])
 
   if (loading) return (
-    <TableRow className="bg-[#FAFAF8]">
+    <TableRow className="bg-[#F3F1ED]">
       <TableCell colSpan={columns.length} className="py-3 px-4">
         <Skeleton className="h-16 w-full" />
       </TableCell>
     </TableRow>
   )
   if (skus.length === 0) return (
-    <TableRow className="bg-[#FAFAF8]">
+    <TableRow className="bg-[#F3F1ED]">
       <TableCell colSpan={columns.length} className="py-3 px-4 text-xs text-gray-400">
         SKUデータなし
       </TableCell>
@@ -218,7 +218,7 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
         return (
           <TableRow
             key={sku.goods_id}
-            className="bg-[#FAFAF8] border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+            className="bg-[#F3F1ED] border-b border-gray-100 hover:bg-[#EBE8E3] cursor-pointer transition-colors"
             onClick={() => setSelectedSku(isSelected ? null : sku.goods_id)}
           >
             {columns.map((col) => {
@@ -228,7 +228,7 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
               return (
                 <TableCell
                   key={col.key}
-                  className={`py-1.5 text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? 'bg-[#FAFAF8]' : ''} ${col.className || ''}`}
+                  className={`py-1.5 text-sm ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? 'bg-[#F3F1ED]' : ''} ${col.className || ''}`}
                   style={stickyStyle}
                 >
                   {skuCellContent(sku, col.key, stockDays, stockDayColor, statusCls, isSelected)}
