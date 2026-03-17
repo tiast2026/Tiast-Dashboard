@@ -27,7 +27,7 @@ const brandSections: BrandSection[] = [
   },
   {
     brand: 'BLACKQUEEN',
-    label: 'BLACKQueen',
+    label: 'BLACKQUEEN',
     color: '#9CA3AF',
     items: [
       { label: '売上分析', href: '/dashboard', icon: TrendingUp },

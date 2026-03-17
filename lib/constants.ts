@@ -53,7 +53,7 @@ export const SIDEBAR_BRANDS = ['NOAHL', 'BLACKQUEEN'] as const
 // Brand display name mapping
 export const BRAND_DISPLAY_NAMES: Record<string, string> = {
   'NOAHL': 'NOAHL',
-  'BLACKQUEEN': 'BLACKQueen',
+  'BLACKQUEEN': 'BLACKQUEEN',
   'MYRTH': 'MYRTH',
 }
 
