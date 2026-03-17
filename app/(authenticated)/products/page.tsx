@@ -643,7 +643,7 @@ function ProductsPageContent() {
   return (
     <>
       <Header title={urlBrand ? `${urlBrand} 商品分析` : '商品分析'} />
-      <div className="p-6 pb-0 space-y-4">
+      <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
         {/* Inventory Alerts */}
         {alerts && (
           <div className="grid grid-cols-3 gap-4">
@@ -710,6 +710,7 @@ function ProductsPageContent() {
         </div>
 
         {/* Data Table */}
+        <div className="flex-1 min-h-0">
         {loading ? (
           <div className="space-y-2">
             {[...Array(10)].map((_, i) => (
@@ -739,6 +740,7 @@ function ProductsPageContent() {
             rowKeyField="product_code"
           />
         ) : null}
+        </div>
       </div>
     </>
   )
