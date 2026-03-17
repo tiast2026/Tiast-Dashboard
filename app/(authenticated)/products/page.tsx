@@ -31,6 +31,9 @@ interface ProductRow {
   collaborator: string | null
   size: string
   total_stock: number
+  free_stock: number
+  reserved_stock: number
+  zozo_stock: number
   daily_sales: number
   stock_days: number
   inventory_status: string
@@ -216,8 +219,14 @@ function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDay
       return <span className="text-sm text-[#3D352F]">{sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}</span>
     case 'gross_profit_rate':
       return sku.gross_profit_rate > 0 ? <ProfitRateBar rate={sku.gross_profit_rate} /> : <span className="text-gray-300">-</span>
-    case 'total_stock':
-      return <span className="text-sm text-[#3D352F]">{formatNumber(sku.total_stock)}</span>
+    case 'free_stock':
+      return <span className="text-sm text-[#3D352F]">{formatNumber(sku.free_stock)}</span>
+    case 'reserved_stock': {
+      const reserved = sku.total_stock - sku.free_stock
+      return reserved > 0 ? <span className="text-sm text-[#3D352F]">{formatNumber(reserved)}</span> : <span className="text-gray-300">-</span>
+    }
+    case 'zozo_stock':
+      return sku.zozo_stock > 0 ? <span className="text-sm text-[#3D352F]">{formatNumber(sku.zozo_stock)}</span> : <span className="text-gray-300">-</span>
     case 'stock_days':
       return <span className={`text-xs font-medium ${stockDayColor}`}>{stockDays > 0 ? `${stockDays}日` : '-'}</span>
     case 'inventory_status':
@@ -408,12 +417,29 @@ function ProductsPageContent() {
 
   const monthOptions = generateMonths()
 
+  // Compute cumulative sticky left offsets
+  const stickyWidths: [string, number][] = [
+    ['expand', 40],
+    ['image_url', 68],
+    ['product_name', 240],
+    ...(!urlBrand ? [['brand', 80] as [string, number]] : []),
+    ['category', 80],
+    ['season', 64],
+    ['collaborator', 80],
+  ]
+  const sl: Record<string, number> = {}
+  let cumLeft = 0
+  for (const [key, w] of stickyWidths) {
+    sl[key] = cumLeft
+    cumLeft += w
+  }
+
   const columns: Column<ProductRow>[] = [
     {
       key: 'expand',
       label: '',
       className: 'w-[40px] !px-1',
-      stickyLeft: 0,
+      stickyLeft: sl.expand,
       render: (row) => {
         const isExpanded = expandedRows.has(row.product_code)
         return (
@@ -432,7 +458,7 @@ function ProductsPageContent() {
       key: 'image_url',
       label: '',
       className: 'w-[68px] !px-1',
-      stickyLeft: 40,
+      stickyLeft: sl.image_url,
       render: (row) =>
         row.image_url ? (
           <img src={row.image_url} alt="" className="w-[50px] aspect-square object-cover rounded" />
@@ -445,8 +471,8 @@ function ProductsPageContent() {
     {
       key: 'product_name',
       label: '商品名',
-      className: 'min-w-[180px] max-w-[240px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]',
-      stickyLeft: 108,
+      className: 'w-[240px] min-w-[180px] max-w-[240px]',
+      stickyLeft: sl.product_name,
       render: (row) => (
         <div className="max-w-[220px]">
           <div className="truncate font-medium text-sm" title={row.product_name}>
@@ -456,18 +482,30 @@ function ProductsPageContent() {
         </div>
       ),
     },
-    ...(!urlBrand ? [{ key: 'brand' as const, label: 'ブランド', headerRender: () => colHelp('ブランド', '商品マスタ（Googleスプレッドシート）') }] : []),
+    ...(!urlBrand ? [{
+      key: 'brand' as const,
+      label: 'ブランド',
+      className: 'whitespace-nowrap',
+      stickyLeft: sl.brand,
+      headerRender: () => colHelp('ブランド', '商品マスタ（Googleスプレッドシート）'),
+    }] : []),
     {
       key: 'category', label: 'カテゴリ',
+      className: 'whitespace-nowrap',
+      stickyLeft: sl.category,
       headerRender: () => colHelp('カテゴリ', '商品マスタ（Googleスプレッドシート）'),
     },
     {
       key: 'season', label: 'シーズン',
+      className: 'whitespace-nowrap',
+      stickyLeft: sl.season,
       headerRender: () => colHelp('シーズン', '商品マスタ（Googleスプレッドシート）'),
     },
     {
       key: 'collaborator',
       label: 'コラボ',
+      className: 'whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]',
+      stickyLeft: sl.collaborator,
       headerRender: () => colHelp('コラボ', '商品マスタ（Googleスプレッドシート）'),
       render: (row: ProductRow) => row.collaborator ? (
         <span className="text-xs text-purple-600">{row.collaborator}</span>
@@ -528,12 +566,27 @@ function ProductsPageContent() {
       render: (row: ProductRow) => <ProfitRateBar rate={row.gross_profit_rate} />,
     },
     {
-      key: 'total_stock',
-      label: '在庫数',
+      key: 'free_stock',
+      label: 'NE(フリー)',
       align: 'right',
       sortable: true,
-      headerRender: () => colHelp('在庫数', 'NE在庫+ZOZO在庫の合計'),
-      render: (row) => formatNumber(row.total_stock),
+      headerRender: () => colHelp('NE(フリー)', 'NextEngine フリー在庫'),
+      render: (row) => formatNumber(row.free_stock),
+    },
+    {
+      key: 'reserved_stock',
+      label: 'NE(予約)',
+      align: 'right',
+      headerRender: () => colHelp('NE(予約)', 'NextEngine 総在庫 - フリー在庫'),
+      render: (row) => row.reserved_stock > 0 ? formatNumber(row.reserved_stock) : <span className="text-gray-300">-</span>,
+    },
+    {
+      key: 'zozo_stock',
+      label: 'ZOZO在庫',
+      align: 'right',
+      sortable: true,
+      headerRender: () => colHelp('ZOZO在庫', 'ZOZO預け在庫'),
+      render: (row) => row.zozo_stock > 0 ? formatNumber(row.zozo_stock) : <span className="text-gray-300">-</span>,
     },
     {
       key: 'stock_days',
@@ -557,18 +610,6 @@ function ProductsPageContent() {
         return s ? <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${cls}`}>{s}</span> : null
       },
     },
-    {
-      key: 'sales_start_date',
-      label: '販売開始',
-      headerRender: () => colHelp('販売開始', '商品マスタ「販売日」列'),
-      render: (row) => <span className="text-xs text-gray-500">{formatDate(row.sales_start_date)}</span>,
-    },
-    {
-      key: 'sales_end_date',
-      label: '販売終了',
-      headerRender: () => colHelp('販売終了', '商品マスタ「終了日」列'),
-      render: (row) => <span className="text-xs text-gray-500">{formatDate(row.sales_end_date)}</span>,
-    },
   ]
 
   return (
@@ -586,6 +627,24 @@ function ProductsPageContent() {
 
         {/* Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative">
+            <textarea
+              placeholder={"商品名・商品コードで検索\n複数: カンマ or 改行で区切り"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              rows={1}
+              onFocus={(e) => { e.currentTarget.rows = 3 }}
+              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.rows = 1 }}
+              className="w-72 min-h-[36px] px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            {search && (
+              <span className="absolute right-2 top-1.5 text-[10px] text-gray-400">
+                {search.split(/[,\n\r]+/).filter(s => s.trim()).length > 1
+                  ? `${search.split(/[,\n\r]+/).filter(s => s.trim()).length}件`
+                  : ''}
+              </span>
+            )}
+          </div>
           {!urlBrand && (
             <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
@@ -620,24 +679,6 @@ function ProductsPageContent() {
               </SelectContent>
             </Select>
           )}
-          <div className="ml-auto relative">
-            <textarea
-              placeholder={"商品名・商品コードで検索\n複数: カンマ or 改行で区切り"}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              rows={1}
-              onFocus={(e) => { e.currentTarget.rows = 3 }}
-              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.rows = 1 }}
-              className="w-72 min-h-[36px] px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-            />
-            {search && (
-              <span className="absolute right-2 top-1.5 text-[10px] text-gray-400">
-                {search.split(/[,\n\r]+/).filter(s => s.trim()).length > 1
-                  ? `${search.split(/[,\n\r]+/).filter(s => s.trim()).length}件`
-                  : ''}
-              </span>
-            )}
-          </div>
         </div>
 
         {/* Data Table */}

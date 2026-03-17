@@ -265,6 +265,9 @@ export async function GET(request: NextRequest) {
           pm.sales_start_date,
           pm.sales_end_date,
           COALESCE(inv.total_stock, 0) AS total_stock,
+          COALESCE(inv.free_stock, 0) AS free_stock,
+          COALESCE(inv.total_stock, 0) - COALESCE(inv.free_stock, 0) AS reserved_stock,
+          COALESCE(inv.zozo_stock, 0) AS zozo_stock,
           COALESCE(inv.daily_sales, 0) AS daily_sales,
           COALESCE(inv.stock_days, 0) AS stock_days,
           COALESCE(inv.inventory_status, '') AS inventory_status
@@ -283,6 +286,15 @@ export async function GET(request: NextRequest) {
             JOIN \`tiast-data-platform.raw_nextengine.products\` p ON st.goods_id = p.goods_id
             GROUP BY p.goods_representation_id
           ),
+          prod_zozo AS (
+            SELECT
+              p.goods_representation_id AS product_code,
+              SUM(zs.stock_quantity) AS zozo_stock
+            FROM \`tiast-data-platform.raw_zozo.zozo_stock\` zs
+            JOIN \`tiast-data-platform.raw_nextengine.products\` p ON zs.ne_goods_id = p.goods_id
+            WHERE zs.ne_goods_id IS NOT NULL AND zs.ne_goods_id != ''
+            GROUP BY p.goods_representation_id
+          ),
           prod_daily AS (
             SELECT
               p.goods_representation_id AS product_code,
@@ -297,6 +309,8 @@ export async function GET(request: NextRequest) {
           SELECT
             ps.product_code,
             COALESCE(ps.total_stock, 0) AS total_stock,
+            COALESCE(ps.free_stock, 0) AS free_stock,
+            COALESCE(pz.zozo_stock, 0) AS zozo_stock,
             COALESCE(pd.daily_qty, 0) AS daily_sales,
             CASE WHEN COALESCE(pd.daily_qty, 0) > 0
               THEN SAFE_DIVIDE(COALESCE(ps.total_stock, 0), pd.daily_qty)
@@ -307,6 +321,7 @@ export async function GET(request: NextRequest) {
               ELSE '適正'
             END AS inventory_status
           FROM prod_stock ps
+          LEFT JOIN prod_zozo pz ON ps.product_code = pz.product_code
           LEFT JOIN prod_daily pd ON ps.product_code = pd.product_code
         ) inv ON s.product_code = inv.product_code
         ${whereClause}
