@@ -33,6 +33,7 @@ interface ProductRow {
   total_stock: number
   free_stock: number
   reserved_stock: number
+  advance_stock?: number
   zozo_stock: number
   daily_sales: number
   stock_days: number
@@ -58,6 +59,7 @@ interface SkuRow {
   gross_profit_rate: number
   total_stock: number
   free_stock: number
+  advance_stock?: number
   zozo_stock: number
   own_stock: number
   daily_sales: number
@@ -222,8 +224,8 @@ function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDay
     case 'free_stock':
       return <span className="text-xs text-[#3D352F]">{formatNumber(sku.free_stock)}</span>
     case 'reserved_stock': {
-      const reserved = sku.total_stock - sku.free_stock
-      return reserved > 0 ? <span className="text-xs text-[#3D352F]">{formatNumber(reserved)}</span> : <span className="text-gray-300">-</span>
+      const advanceStock = sku.advance_stock ?? 0
+      return advanceStock > 0 ? <span className="text-xs text-[#3D352F]">{formatNumber(advanceStock)}</span> : <span className="text-gray-300">-</span>
     }
     case 'zozo_stock':
       return sku.zozo_stock > 0 ? <span className="text-xs text-[#3D352F]">{formatNumber(sku.zozo_stock)}</span> : <span className="text-gray-300">-</span>
@@ -589,10 +591,10 @@ function ProductsPageContent() {
     },
     {
       key: 'reserved_stock',
-      label: 'NE(引当)',
+      label: 'NE(予約)',
       width: 80,
       align: 'right',
-      headerRender: () => colHelp('NE(引当)', 'NextEngine 総在庫 - フリー在庫（注文引当済み数）'),
+      headerRender: () => colHelp('NE(予約)', 'NextEngine 予約在庫数'),
       render: (row) => row.reserved_stock > 0 ? formatNumber(row.reserved_stock) : <span className="text-gray-300">-</span>,
     },
     {

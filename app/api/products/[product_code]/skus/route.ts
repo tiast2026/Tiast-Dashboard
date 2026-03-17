@@ -117,7 +117,8 @@ export async function GET(
           SELECT
             s.goods_id,
             SUM(s.stock_quantity) AS total_stock,
-            SUM(s.stock_free_quantity) AS free_stock
+            SUM(s.stock_free_quantity) AS free_stock,
+            SUM(COALESCE(s.stock_advance_quantity, 0)) AS advance_stock
           FROM \`tiast-data-platform.raw_nextengine.stock\` s
           JOIN \`tiast-data-platform.raw_nextengine.products\` p ON s.goods_id = p.goods_id
           WHERE p.goods_representation_id = @product_code
@@ -170,6 +171,7 @@ export async function GET(
           p.goods_id,
           COALESCE(ss.total_stock, 0) AS total_stock,
           COALESCE(ss.free_stock, 0) AS free_stock,
+          COALESCE(ss.advance_stock, 0) AS advance_stock,
           COALESCE(sz.zozo_stock, 0) AS zozo_stock,
           COALESCE(ss.total_stock, 0) - COALESCE(sz.zozo_stock, 0) AS own_stock,
           COALESCE(sd.daily_sales_amount, 0) AS daily_sales,
