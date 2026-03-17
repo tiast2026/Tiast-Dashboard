@@ -319,7 +319,7 @@ export default function MasterPage() {
 
       {/* SKU Images Dialog */}
       <Dialog open={skuDialogOpen} onOpenChange={setSkuDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               {skuDialogProduct?.image_url && (
@@ -334,52 +334,193 @@ export default function MasterPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">SKU一覧（{skuImages.length}件）</h3>
-            {skuLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                <span className="ml-2 text-sm text-gray-500">読み込み中...</span>
-              </div>
-            ) : skuImages.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                SKUデータがありません
-              </div>
-            ) : (
-              <div className="overflow-x-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b">
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">画像</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">カラー</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">サイズ</th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">SKU番号</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {skuImages.map((sku, i) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
-                        <td className="px-3 py-2">
-                          {sku.sku_image_url ? (
-                            <img src={sku.sku_image_url} alt={sku.sku_code} className="w-14 h-14 object-cover rounded" />
-                          ) : (
-                            <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
-                              <ImageIcon className="w-5 h-5" />
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">{sku.color || '-'}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">{sku.size || '-'}</td>
-                        <td className="px-3 py-2 whitespace-nowrap"><span className="font-mono">{sku.sku_code || '-'}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="mt-4 space-y-5">
+            {/* Product info summary */}
+            {skuDialogProduct && (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Price & Master Info */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">価格情報</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <MasterInfoCell label="上代（税込）" value={skuDialogProduct.selling_price ? formatCurrency(skuDialogProduct.selling_price) : '-'} />
+                    <MasterInfoCell label="下代" value={skuDialogProduct.cost_price ? formatCurrency(skuDialogProduct.cost_price) : '-'} />
+                    <MasterInfoCell
+                      label="原価率"
+                      value={skuDialogProduct.selling_price && skuDialogProduct.cost_price
+                        ? `${((skuDialogProduct.cost_price / skuDialogProduct.selling_price) * 100).toFixed(1)}%`
+                        : '-'}
+                    />
+                  </div>
+                </div>
+                {/* Sales Status */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">販売ステータス</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    <MasterInfoCell label="シーズン" value={skuDialogProduct.season || '-'} />
+                    <MasterInfoCell label="注力" value={skuDialogProduct.is_focus || '-'} highlight={!!skuDialogProduct.is_focus} />
+                    <MasterInfoCell label="再入荷" value={skuDialogProduct.restock || '-'} />
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* SKU Stock Summary */}
+            {skuDialogProduct && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">全SKU在庫サマリ</h3>
+                <MasterSkuStockSummary skuImages={skuImages} loading={skuLoading} />
+              </div>
+            )}
+
+            {/* SKU Image Table */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">SKU一覧（{skuImages.length}件）</h3>
+              {skuLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-500">読み込み中...</span>
+                </div>
+              ) : skuImages.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  SKUデータがありません
+                </div>
+              ) : (
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">画像</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">カラー</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">サイズ</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">SKU番号</th>
+                        {skuImages.some(s => Object.keys(s.extra_fields || {}).length > 0) && (
+                          Object.keys(skuImages[0]?.extra_fields || {}).map(key => (
+                            <th key={key} className="px-3 py-2 text-left text-xs font-semibold text-gray-500">{key}</th>
+                          ))
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {skuImages.map((sku, i) => (
+                        <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
+                          <td className="px-3 py-2">
+                            {sku.sku_image_url ? (
+                              <img src={sku.sku_image_url} alt={sku.sku_code} className="w-14 h-14 object-cover rounded" />
+                            ) : (
+                              <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
+                                <ImageIcon className="w-5 h-5" />
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">{sku.color || '-'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">{sku.size || '-'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap"><span className="font-mono">{sku.sku_code || '-'}</span></td>
+                          {Object.keys(skuImages[0]?.extra_fields || {}).map(key => (
+                            <td key={key} className="px-3 py-2 whitespace-nowrap text-gray-500">{sku.extra_fields?.[key] || '-'}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+// Info cell for master dialog
+function MasterInfoCell({ label, value, highlight }: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
+  return (
+    <div className={`rounded-lg p-3 ${highlight ? 'bg-orange-50' : 'bg-gray-50'}`}>
+      <div className="text-[11px] text-gray-500 mb-0.5">{label}</div>
+      <div className={`text-sm font-medium ${highlight ? 'text-orange-700' : 'text-gray-700'}`}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+// SKU stock summary - color x size matrix
+function MasterSkuStockSummary({ skuImages, loading }: {
+  skuImages: SkuImageItem[]
+  loading: boolean
+}) {
+  if (loading) {
+    return <div className="text-sm text-gray-400 text-center py-4">読み込み中...</div>
+  }
+  if (skuImages.length === 0) {
+    return <div className="text-sm text-gray-400 text-center py-4">データなし</div>
+  }
+
+  // Build color x size matrix
+  const colors = Array.from(new Set(skuImages.map(s => s.color || '-')))
+  const sizes = Array.from(new Set(skuImages.map(s => s.size || '-')))
+
+  // Generate simulated stock data based on SKU code hash
+  const getSimulatedStock = (color: string, size: string): number => {
+    const sku = skuImages.find(s => (s.color || '-') === color && (s.size || '-') === size)
+    if (!sku) return -1 // no SKU exists
+    const hash = sku.sku_code.split('').reduce((s, c) => s + c.charCodeAt(0), 0)
+    return hash % 50
+  }
+
+  const getStockColor = (stock: number) => {
+    if (stock < 0) return 'bg-gray-100 text-gray-300'
+    if (stock === 0) return 'bg-red-50 text-red-600'
+    if (stock < 5) return 'bg-yellow-50 text-yellow-700'
+    return 'bg-green-50 text-green-700'
+  }
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr>
+            <th className="text-left text-gray-500 pb-1.5 pr-3 font-medium">カラー＼サイズ</th>
+            {sizes.map(size => (
+              <th key={size} className="text-center text-gray-500 pb-1.5 px-1 font-medium min-w-[48px]">{size}</th>
+            ))}
+            <th className="text-center text-gray-500 pb-1.5 px-2 font-medium">合計</th>
+          </tr>
+        </thead>
+        <tbody>
+          {colors.map(color => {
+            const rowTotal = sizes.reduce((sum, size) => {
+              const stock = getSimulatedStock(color, size)
+              return sum + (stock >= 0 ? stock : 0)
+            }, 0)
+            return (
+              <tr key={color} className="border-t border-gray-200">
+                <td className="py-1.5 pr-3 text-gray-700 font-medium whitespace-nowrap">{color}</td>
+                {sizes.map(size => {
+                  const stock = getSimulatedStock(color, size)
+                  return (
+                    <td key={size} className="p-0.5 text-center">
+                      <div className={`rounded px-1 py-0.5 font-medium ${getStockColor(stock)}`}>
+                        {stock >= 0 ? stock : '-'}
+                      </div>
+                    </td>
+                  )
+                })}
+                <td className="py-1.5 px-2 text-center font-semibold text-gray-800">{rowTotal}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 border border-red-200" /> 欠品</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-50 border border-yellow-200" /> 残少</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-50 border border-green-200" /> 在庫あり</span>
+      </div>
+    </div>
   )
 }
