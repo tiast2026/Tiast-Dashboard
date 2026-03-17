@@ -80,11 +80,11 @@ interface ProductDetailDialogProps {
 }
 
 function ComparisonBadge({ current, previous, label }: { current: number; previous: number; label: string }) {
-  if (previous <= 0) return <span className="text-[10px] text-gray-400">{label}: -</span>
+  if (previous <= 0) return <span className="text-xs text-gray-400">{label}: -</span>
   const rate = (current - previous) / previous
   const isPositive = rate >= 0
   return (
-    <span className={`text-[10px] font-medium ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
+    <span className={`text-xs font-medium ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
       {label}: {isPositive ? '↑' : '↓'}{Math.abs(rate * 100).toFixed(1)}%
     </span>
   )
@@ -99,19 +99,19 @@ function SalesCard({ label, quantity, amount, prevQuantity, prevAmount, prevLabe
   prevLabel?: string
 }) {
   return (
-    <div className="bg-gray-50 rounded-lg p-3">
-      <div className="text-gray-500 text-[11px] mb-1.5 font-medium">{label}</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+    <div className="bg-gray-50 rounded-lg p-4">
+      <div className="text-gray-500 text-sm mb-2 font-medium">{label}</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
         <div>
-          <div className="text-[10px] text-gray-400">販売数</div>
-          <div className="text-sm font-semibold text-gray-800">{formatNumber(quantity)}<span className="text-[10px] font-normal text-gray-400">点</span></div>
+          <div className="text-xs text-gray-400">販売数</div>
+          <div className="text-base font-semibold text-gray-800">{formatNumber(quantity)}<span className="text-xs font-normal text-gray-400 ml-0.5">点</span></div>
           {prevQuantity != null && prevLabel && (
             <ComparisonBadge current={quantity} previous={prevQuantity} label={prevLabel} />
           )}
         </div>
         <div>
-          <div className="text-[10px] text-gray-400">売上金額</div>
-          <div className="text-sm font-semibold text-gray-800">{formatCurrency(amount)}</div>
+          <div className="text-xs text-gray-400">売上金額</div>
+          <div className="text-base font-semibold text-gray-800">{formatCurrency(amount)}</div>
           {prevAmount != null && prevLabel && (
             <ComparisonBadge current={amount} previous={prevAmount} label={prevLabel} />
           )}
@@ -144,16 +144,16 @@ function TrendChart({ trend }: { trend: TrendData }) {
   })
 
   if (chartData.length === 0) {
-    return <div className="text-xs text-gray-400 text-center py-8">データなし</div>
+    return <div className="text-sm text-gray-400 text-center py-8">データなし</div>
   }
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={260}>
       <ComposedChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 10 }} />
-        <YAxis yAxisId="amount" tickFormatter={fmtYAxis} tick={{ fontSize: 10 }} width={55} />
-        <YAxis yAxisId="qty" orientation="right" tick={{ fontSize: 10 }} width={35} />
+        <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 12 }} />
+        <YAxis yAxisId="amount" tickFormatter={fmtYAxis} tick={{ fontSize: 12 }} width={60} />
+        <YAxis yAxisId="qty" orientation="right" tick={{ fontSize: 12 }} width={40} />
         <Tooltip
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(value: any, name: any) => {
@@ -165,7 +165,7 @@ function TrendChart({ trend }: { trend: TrendData }) {
             return `${parts[0]}年${parseInt(parts[1])}月`
           }}
         />
-        <Legend wrapperStyle={{ fontSize: 10 }} />
+        <Legend wrapperStyle={{ fontSize: 12 }} />
         <Bar
           yAxisId="amount"
           dataKey="sales_amount"
@@ -288,15 +288,15 @@ export default function ProductDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             {imageUrl ? (
-              <img src={imageUrl} alt="" className="w-16 h-16 object-cover rounded" />
+              <img src={imageUrl} alt="" className="w-20 h-20 object-cover rounded" />
             ) : null}
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-sm">{title}</DialogTitle>
-              <DialogDescription className="truncate">{subtitle}</DialogDescription>
+              <DialogTitle className="text-base">{title}</DialogTitle>
+              <DialogDescription className="truncate text-sm">{subtitle}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -306,13 +306,13 @@ export default function ProductDetailDialog({
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
             <button
               onClick={() => setViewMode('sku')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${viewMode === 'sku' ? 'bg-white shadow-sm font-medium text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3.5 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'sku' ? 'bg-white shadow-sm font-medium text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
             >
               SKU別
             </button>
             <button
               onClick={() => setViewMode('product')}
-              className={`px-3 py-1 text-xs rounded-md transition-colors ${viewMode === 'product' ? 'bg-white shadow-sm font-medium text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3.5 py-1.5 text-sm rounded-md transition-colors ${viewMode === 'product' ? 'bg-white shadow-sm font-medium text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
             >
               代表品番
             </button>
@@ -340,26 +340,26 @@ export default function ProductDetailDialog({
         </div>
 
         {/* Trend chart */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="text-gray-500 text-[11px] mb-2 font-medium">売上推移（12ヶ月）</div>
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="text-gray-500 text-sm mb-2 font-medium">売上推移（12ヶ月）</div>
           {trendLoading ? (
-            <div className="h-[200px] flex items-center justify-center">
-              <div className="text-xs text-gray-400">読み込み中...</div>
+            <div className="h-[260px] flex items-center justify-center">
+              <div className="text-sm text-gray-400">読み込み中...</div>
             </div>
           ) : trend ? (
             <TrendChart trend={trend} />
           ) : (
-            <div className="h-[200px] flex items-center justify-center">
-              <div className="text-xs text-gray-400">データなし</div>
+            <div className="h-[260px] flex items-center justify-center">
+              <div className="text-sm text-gray-400">データなし</div>
             </div>
           )}
         </div>
 
         {/* Inventory & Lifecycle (detail cards) */}
-        <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-2 gap-3 text-sm">
           {/* Channel breakdown */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">チャネル別在庫</div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-gray-500 mb-1.5 font-medium">チャネル別在庫</div>
             <div className="space-y-1">
               {showInventoryDetail ? (
                 <>
@@ -378,8 +378,8 @@ export default function ProductDetailDialog({
           </div>
 
           {/* Sales velocity */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">販売速度</div>
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="text-gray-500 mb-1.5 font-medium">販売速度</div>
             <div className="space-y-1">
               {showInventoryDetail ? (
                 <>
