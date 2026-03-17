@@ -155,7 +155,7 @@ function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
-      <div className="text-gray-500 text-sm mb-3 font-medium">チャネル別販売実績</div>
+      <div className="text-gray-500 text-sm mb-3 font-medium">チャネル別販売実績（当月）</div>
       {/* Stacked bar */}
       <div className="flex h-3 rounded-full overflow-hidden mb-3">
         {channels.map((c) => {
@@ -415,14 +415,25 @@ export default function ProductDetailDialog({
             prevAmount={prevMonthData?.sales_amount}
             prevLabel="前月比"
           />
-          <SalesCard
-            label="前年比較"
-            quantity={displayQuantity}
-            amount={displayAmount}
-            prevQuantity={prevYearData?.quantity}
-            prevAmount={prevYearData?.sales_amount}
-            prevLabel="前年比"
-          />
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-gray-500 text-sm mb-2 font-medium">前年同月</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              <div>
+                <div className="text-xs text-gray-400">販売数</div>
+                <div className="text-base font-semibold text-gray-800">{formatNumber(prevYearData?.quantity ?? 0)}<span className="text-xs font-normal text-gray-400 ml-0.5">点</span></div>
+                {prevYearData && prevYearData.quantity > 0 && (
+                  <ComparisonBadge current={displayQuantity} previous={prevYearData.quantity} label="前年比" />
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">売上金額</div>
+                <div className="text-base font-semibold text-gray-800">{formatCurrency(prevYearData?.sales_amount ?? 0)}</div>
+                {prevYearData && prevYearData.sales_amount > 0 && (
+                  <ComparisonBadge current={displayAmount} previous={prevYearData.sales_amount} label="前年比" />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Trend chart */}
