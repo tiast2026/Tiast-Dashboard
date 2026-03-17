@@ -40,17 +40,24 @@
   }
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling — always visible */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: hsl(30 10% 95%);
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(30 10% 82%);
-  border-radius: 3px;
+  background: hsl(30 10% 78%);
+  border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(30 10% 70%);
+  background: hsl(30 10% 65%);
+}
+
+/* Force scrollbars to always show (non-webkit browsers) */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: hsl(30 10% 78%) hsl(30 10% 95%);
 }
