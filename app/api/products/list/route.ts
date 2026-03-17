@@ -266,7 +266,7 @@ export async function GET(request: NextRequest) {
           pm.sales_end_date,
           COALESCE(inv.total_stock, 0) AS total_stock,
           COALESCE(inv.free_stock, 0) AS free_stock,
-          COALESCE(inv.total_stock, 0) - COALESCE(inv.free_stock, 0) AS reserved_stock,
+          COALESCE(inv.advance_stock, 0) AS reserved_stock,
           COALESCE(inv.zozo_stock, 0) AS zozo_stock,
           COALESCE(inv.daily_sales, 0) AS daily_sales,
           COALESCE(inv.stock_days, 0) AS stock_days,
@@ -281,7 +281,8 @@ export async function GET(request: NextRequest) {
             SELECT
               p.goods_representation_id AS product_code,
               SUM(st.stock_quantity) AS total_stock,
-              SUM(st.stock_free_quantity) AS free_stock
+              SUM(st.stock_free_quantity) AS free_stock,
+              SUM(COALESCE(st.stock_advance_quantity, 0)) AS advance_stock
             FROM \`tiast-data-platform.raw_nextengine.stock\` st
             JOIN \`tiast-data-platform.raw_nextengine.products\` p ON st.goods_id = p.goods_id
             GROUP BY p.goods_representation_id

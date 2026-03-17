@@ -265,7 +265,8 @@ WITH ne_stock AS (
   SELECT
     s.goods_id,
     SUM(s.stock_quantity) AS total_stock,
-    SUM(s.stock_free_quantity) AS free_stock
+    SUM(s.stock_free_quantity) AS free_stock,
+    SUM(COALESCE(s.stock_advance_quantity, 0)) AS advance_stock
   FROM `tiast-data-platform.raw_nextengine.stock` s
   GROUP BY s.goods_id
 ),
@@ -310,6 +311,7 @@ SELECT
   p.goods_name,
   COALESCE(ns.total_stock, 0) AS total_stock,
   COALESCE(ns.free_stock, 0) AS free_stock,
+  COALESCE(ns.advance_stock, 0) AS advance_stock,
   COALESCE(zs.zozo_stock, 0) AS zozo_stock,
   COALESCE(ns.total_stock, 0) - COALESCE(zs.zozo_stock, 0) AS own_stock,
   COALESCE(rs.sales_1day, 0) AS sales_1day,
@@ -352,7 +354,8 @@ WITH product_stock AS (
   SELECT
     s.goods_id,
     SUM(s.stock_quantity) AS total_stock,
-    SUM(s.stock_free_quantity) AS free_stock
+    SUM(s.stock_free_quantity) AS free_stock,
+    SUM(COALESCE(s.stock_advance_quantity, 0)) AS advance_stock
   FROM `tiast-data-platform.raw_nextengine.stock` s
   GROUP BY s.goods_id
 ),
@@ -417,6 +420,7 @@ SELECT
   END AS season,
   COALESCE(ps.total_stock, 0) AS total_stock,
   COALESCE(ps.free_stock, 0) AS free_stock,
+  COALESCE(ps.advance_stock, 0) AS advance_stock,
   COALESCE(zs.zozo_stock, 0) AS zozo_stock,
   COALESCE(ps.total_stock, 0) - COALESCE(zs.zozo_stock, 0) AS own_stock,
   COALESCE(ps.total_stock, 0) * COALESCE(p.goods_selling_price, 0) AS stock_retail_value,

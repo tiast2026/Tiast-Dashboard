@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS `tiast-data-platform.raw_nextengine.stock` (
   warehouse_id                 INT64,                -- 倉庫ID
   stock_quantity               INT64,                -- 在庫数
   stock_free_quantity          INT64,                -- フリー在庫数（出荷可能）
+  stock_advance_quantity       INT64,                -- 予約在庫数
 
   _loaded_at                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
