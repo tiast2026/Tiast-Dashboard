@@ -82,19 +82,39 @@ export async function GET(
         ORDER BY month
       `
 
-      // Channel breakdown for the current period
+      // Channel breakdown for the current period (NE + ZOZO)
+      const neFilterCol = level === 'sku' ? 'o.goods_id' : 'p.goods_representation_id'
+      const zozoFilterCol = level === 'sku' ? 'z.ne_goods_id' : 'zp.goods_representation_id'
       const channelQuery = `
-        SELECT
-          ${SHOP_NAME_CASE} AS channel,
-          SUM(o.quantity) AS quantity,
-          SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount
-        FROM \`tiast-data-platform.raw_nextengine.orders\` o
-        JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
-        WHERE ${filterCol} = @${paramName}
-          AND CAST(o.cancel_type_id AS STRING) = '0'
-          AND CAST(o.row_cancel_flag AS STRING) = '0'
-          AND o.receive_order_date IS NOT NULL
-          AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+        WITH ne_channels AS (
+          SELECT
+            ${SHOP_NAME_CASE} AS channel,
+            SUM(o.quantity) AS quantity,
+            SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount
+          FROM \`tiast-data-platform.raw_nextengine.orders\` o
+          JOIN \`tiast-data-platform.raw_nextengine.products\` p ON o.goods_id = p.goods_id
+          WHERE ${neFilterCol} = @${paramName}
+            AND CAST(o.cancel_type_id AS STRING) = '0'
+            AND CAST(o.row_cancel_flag AS STRING) = '0'
+            AND o.receive_order_date IS NOT NULL
+            AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+          GROUP BY channel
+        ),
+        zozo_channels AS (
+          SELECT
+            'ZOZO' AS channel,
+            SUM(z.order_quantity) AS quantity,
+            SUM(z.selling_price * z.order_quantity) AS sales_amount
+          FROM \`tiast-data-platform.raw_zozo.zozo_orders\` z
+          JOIN \`tiast-data-platform.raw_nextengine.products\` zp ON z.ne_goods_id = zp.goods_id
+          WHERE ${zozoFilterCol} = @${paramName}
+            AND (z.cancel_flag = '' OR z.cancel_flag IS NULL)
+            AND z.order_date IS NOT NULL
+            AND PARSE_DATE('%Y/%m/%d', LEFT(z.order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+          GROUP BY channel
+        )
+        SELECT channel, SUM(quantity) AS quantity, SUM(sales_amount) AS sales_amount
+        FROM (SELECT * FROM ne_channels UNION ALL SELECT * FROM zozo_channels)
         GROUP BY channel
         ORDER BY sales_amount DESC
       `
