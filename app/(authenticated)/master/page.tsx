@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { getCached, setCache, isFresh, buildClientCacheKey } from '@/lib/client-cache'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, getBrandDisplayName } from '@/lib/constants'
 import { ExternalLink, Image as ImageIcon, RefreshCw, AlertCircle, Loader2 } from 'lucide-react'
 import type { ProductMaster } from '@/types/master'
@@ -127,9 +128,24 @@ export default function MasterPage() {
       params.set('page', String(page))
       params.set('per_page', String(perPage))
 
+      const cacheKey = buildClientCacheKey('master', Object.fromEntries(params))
+      const cached = getCached<typeof result>(cacheKey)
+      if (cached && isFresh(cacheKey)) {
+        setResult(cached)
+        setLoading(false)
+        return
+      }
+      // Show cached data immediately while fetching fresh data
+      if (cached) {
+        setResult(cached)
+        setLoading(false)
+      }
+
       const res = await fetch(`/api/master?${params}`)
       if (res.ok) {
-        setResult(await res.json())
+        const data = await res.json()
+        setCache(cacheKey, data)
+        setResult(data)
       } else {
         const body = await res.json().catch(() => ({}))
         setError(body.error || `データの取得に失敗しました (${res.status})`)
@@ -153,10 +169,20 @@ export default function MasterPage() {
     setSkuImages([])
 
     try {
+      const skuCacheKey = `sku-images:${row.product_code}`
+      const cachedSku = getCached<SkuImageItem[]>(skuCacheKey)
+      if (cachedSku && isFresh(skuCacheKey)) {
+        setSkuImages(cachedSku)
+        setSkuLoading(false)
+        return
+      }
+
       const res = await fetch(`/api/master/sku-images?product_code=${encodeURIComponent(row.product_code)}`)
       if (res.ok) {
         const data = await res.json()
-        setSkuImages(data.data || [])
+        const items = data.data || []
+        setCache(skuCacheKey, items)
+        setSkuImages(items)
       }
     } catch (e) {
       console.error('Failed to fetch SKU images:', e)
