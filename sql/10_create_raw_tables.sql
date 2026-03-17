@@ -82,13 +82,19 @@ OPTIONS(description = 'NE商品マスタ');
 -- ソース: NE API「在庫一括取得」
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `tiast-data-platform.raw_nextengine.stock` (
-  goods_id                     STRING    NOT NULL,   -- 商品コード（SKU）
-  warehouse_id                 INT64,                -- 倉庫ID
-  stock_quantity               INT64,                -- 在庫数
-  stock_free_quantity          INT64,                -- フリー在庫数（出荷可能）
-  stock_advance_quantity       INT64,                -- 予約在庫数
+  goods_id                              STRING    NOT NULL,   -- 商品コード（SKU）
+  warehouse_id                          INT64,                -- 倉庫ID
+  stock_quantity                        INT64,                -- 在庫数
+  stock_allocation_quantity             INT64,                -- 引当数
+  stock_free_quantity                   INT64,                -- フリー在庫数（出荷可能）
+  stock_defective_quantity              INT64,                -- 不良在庫数
+  stock_remaining_order_quantity        INT64,                -- 発注残数
+  stock_out_quantity                    INT64,                -- 欠品数
+  stock_advance_order_quantity          INT64,                -- 予約在庫数
+  stock_advance_order_allocation_quantity INT64,              -- 予約引当数
+  stock_advance_order_free_quantity     INT64,                -- 予約フリー数
 
-  _loaded_at                   TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+  loaded_at                    TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
 CLUSTER BY goods_id
 OPTIONS(description = 'NE在庫データ');
