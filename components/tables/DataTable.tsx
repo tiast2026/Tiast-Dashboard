@@ -67,7 +67,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   return (
     <div>
       <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="overflow-x-auto max-h-[calc(100vh-220px)] overflow-y-auto">
+        <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
         <Table style={{ tableLayout: 'fixed' }}>
           <colgroup>
             {columns.map((col) => (
