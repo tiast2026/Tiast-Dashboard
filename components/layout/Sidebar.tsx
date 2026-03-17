@@ -178,7 +178,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/8">
+      <div className="px-4 py-2 border-t border-white/8">
         <div className="flex items-center gap-2 px-2">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#C4A882] to-[#8FAE8B] flex items-center justify-center">
             <span className="text-[10px] font-bold text-white">TI</span>
