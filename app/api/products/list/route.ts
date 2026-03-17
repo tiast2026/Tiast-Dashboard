@@ -311,6 +311,7 @@ export async function GET(request: NextRequest) {
             ps.product_code,
             COALESCE(ps.total_stock, 0) AS total_stock,
             COALESCE(ps.free_stock, 0) AS free_stock,
+            COALESCE(ps.advance_stock, 0) AS advance_stock,
             COALESCE(pz.zozo_stock, 0) AS zozo_stock,
             COALESCE(pd.daily_qty, 0) AS daily_sales,
             CASE WHEN COALESCE(pd.daily_qty, 0) > 0
