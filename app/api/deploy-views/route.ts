@@ -22,13 +22,21 @@ CREATE OR REPLACE VIEW \`tiast-data-platform.analytics_mart.mart_sales_by_shop_m
 WITH ne_sales AS (
   SELECT
     FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS order_month,
-    CASE
-      WHEN o.receive_order_shop_id = 1 THEN '自社EC'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\\d{5,6}-\\d{8}-') THEN '楽天市場'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^[Yy]') THEN 'Yahoo!'
-      WHEN REGEXP_CONTAINS(COALESCE(o.receive_order_shop_cut_form_id, ''), r'^\\d{3}-\\d{7}-') THEN 'Amazon'
-      WHEN LOWER(COALESCE(o.receive_order_shop_cut_form_id, '')) LIKE '%qoo10%' THEN 'Qoo10'
-      ELSE CONCAT('EC_', CAST(o.receive_order_shop_id AS STRING))
+    CASE o.receive_order_shop_id
+      WHEN 1 THEN '公式'
+      WHEN 7 THEN '公式'
+      WHEN 2 THEN '楽天市場'
+      WHEN 4 THEN '楽天市場'
+      WHEN 10 THEN '楽天市場'
+      WHEN 3 THEN 'SHOPLIST'
+      WHEN 5 THEN 'Amazon'
+      WHEN 6 THEN 'aupay'
+      WHEN 8 THEN 'サステナ'
+      WHEN 9 THEN 'Yahoo!'
+      WHEN 11 THEN 'RakutenFashion'
+      WHEN 12 THEN 'TikTok'
+      WHEN 13 THEN 'TikTok'
+      ELSE CONCAT('その他(', CAST(o.receive_order_shop_id AS STRING), ')')
     END AS shop_name,
     CASE
       WHEN LEFT(o.goods_id, 1) = 'n' THEN 'NOAHL'
