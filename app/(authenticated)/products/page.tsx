@@ -214,19 +214,19 @@ function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDay
         </div>
       )
     case 'total_quantity':
-      return <span className="text-sm text-[#3D352F]">{sku.total_quantity > 0 ? formatNumber(sku.total_quantity) : '-'}</span>
+      return <span className="text-xs text-[#3D352F]">{sku.total_quantity > 0 ? formatNumber(sku.total_quantity) : '-'}</span>
     case 'sales_amount':
-      return <span className="text-sm text-[#3D352F]">{sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}</span>
+      return <span className="text-xs text-[#3D352F]">{sku.sales_amount > 0 ? formatCurrency(sku.sales_amount) : '-'}</span>
     case 'gross_profit_rate':
       return sku.gross_profit_rate > 0 ? <ProfitRateBar rate={sku.gross_profit_rate} /> : <span className="text-gray-300">-</span>
     case 'free_stock':
-      return <span className="text-sm text-[#3D352F]">{formatNumber(sku.free_stock)}</span>
+      return <span className="text-xs text-[#3D352F]">{formatNumber(sku.free_stock)}</span>
     case 'reserved_stock': {
       const reserved = sku.total_stock - sku.free_stock
-      return reserved > 0 ? <span className="text-sm text-[#3D352F]">{formatNumber(reserved)}</span> : <span className="text-gray-300">-</span>
+      return reserved > 0 ? <span className="text-xs text-[#3D352F]">{formatNumber(reserved)}</span> : <span className="text-gray-300">-</span>
     }
     case 'zozo_stock':
-      return sku.zozo_stock > 0 ? <span className="text-sm text-[#3D352F]">{formatNumber(sku.zozo_stock)}</span> : <span className="text-gray-300">-</span>
+      return sku.zozo_stock > 0 ? <span className="text-xs text-[#3D352F]">{formatNumber(sku.zozo_stock)}</span> : <span className="text-gray-300">-</span>
     case 'stock_days':
       return <span className={`text-xs font-medium ${stockDayColor}`}>{stockDays > 0 ? `${stockDays}日` : '-'}</span>
     case 'inventory_status':
@@ -438,6 +438,7 @@ function ProductsPageContent() {
     {
       key: 'expand',
       label: '',
+      width: 40,
       className: 'w-[40px] !px-1',
       stickyLeft: sl.expand,
       render: (row) => {
@@ -457,6 +458,7 @@ function ProductsPageContent() {
     {
       key: 'image_url',
       label: '',
+      width: 68,
       className: 'w-[68px] !px-1',
       stickyLeft: sl.image_url,
       render: (row) =>
@@ -471,11 +473,12 @@ function ProductsPageContent() {
     {
       key: 'product_name',
       label: '商品名',
+      width: 240,
       className: 'w-[240px] min-w-[180px] max-w-[240px]',
       stickyLeft: sl.product_name,
       render: (row) => (
         <div className="max-w-[220px]">
-          <div className="truncate font-medium text-sm" title={row.product_name}>
+          <div className="truncate font-medium text-xs" title={row.product_name}>
             {row.product_name}
           </div>
           <div className="text-xs text-gray-400 truncate">{row.product_code}</div>
@@ -485,18 +488,21 @@ function ProductsPageContent() {
     ...(!urlBrand ? [{
       key: 'brand' as const,
       label: 'ブランド',
+      width: 80,
       className: 'whitespace-nowrap',
       stickyLeft: sl.brand,
       headerRender: () => colHelp('ブランド', '商品マスタ（Googleスプレッドシート）'),
     }] : []),
     {
       key: 'category', label: 'カテゴリ',
+      width: 80,
       className: 'whitespace-nowrap',
       stickyLeft: sl.category,
       headerRender: () => colHelp('カテゴリ', '商品マスタ（Googleスプレッドシート）'),
     },
     {
       key: 'season', label: 'シーズン',
+      width: 64,
       className: 'whitespace-nowrap',
       stickyLeft: sl.season,
       headerRender: () => colHelp('シーズン', '商品マスタ（Googleスプレッドシート）'),
@@ -504,6 +510,7 @@ function ProductsPageContent() {
     {
       key: 'collaborator',
       label: 'コラボ',
+      width: 80,
       className: 'whitespace-nowrap shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]',
       stickyLeft: sl.collaborator,
       headerRender: () => colHelp('コラボ', '商品マスタ（Googleスプレッドシート）'),
@@ -514,6 +521,7 @@ function ProductsPageContent() {
     {
       key: 'size',
       label: '配送',
+      width: 50,
       className: 'w-[50px]',
       headerRender: () => colHelp('配送', '商品マスタ「サイズ」列\nメール便=✉ ¥330 / 宅配便=🚚 ¥660'),
       render: (row: ProductRow) => {
@@ -530,6 +538,7 @@ function ProductsPageContent() {
     {
       key: 'selling_price',
       label: '販売価格',
+      width: 90,
       align: 'right',
       headerRender: () => colHelp('販売価格', '商品マスタ「上代」列'),
       render: (row) => formatCurrency(row.selling_price),
@@ -537,6 +546,7 @@ function ProductsPageContent() {
     {
       key: 'cost_price',
       label: '原価',
+      width: 80,
       align: 'right',
       headerRender: () => colHelp('原価', '商品マスタ「下代」列'),
       render: (row) => formatCurrency(row.cost_price),
@@ -544,6 +554,7 @@ function ProductsPageContent() {
     {
       key: 'total_quantity',
       label: '販売数',
+      width: 72,
       align: 'right',
       sortable: true,
       headerRender: () => colHelp('販売数', 'BigQuery受注データ NE+ZOZO合算の販売個数'),
@@ -552,6 +563,7 @@ function ProductsPageContent() {
     {
       key: 'sales_amount',
       label: '売上金額',
+      width: 110,
       align: 'right',
       sortable: true,
       headerRender: () => colHelp('売上金額', 'BigQuery受注データ NE+ZOZO合算の売上合計'),
@@ -560,6 +572,7 @@ function ProductsPageContent() {
     {
       key: 'gross_profit_rate',
       label: '粗利率',
+      width: 110,
       headerRender: () => colHelp('粗利率', '(売上 - 仕入原価 - 送料) / 売上'),
       align: 'right',
       sortable: true,
@@ -568,6 +581,7 @@ function ProductsPageContent() {
     {
       key: 'free_stock',
       label: 'NE(フリー)',
+      width: 90,
       align: 'right',
       sortable: true,
       headerRender: () => colHelp('NE(フリー)', 'NextEngine フリー在庫'),
@@ -575,14 +589,16 @@ function ProductsPageContent() {
     },
     {
       key: 'reserved_stock',
-      label: 'NE(予約)',
+      label: 'NE(引当)',
+      width: 80,
       align: 'right',
-      headerRender: () => colHelp('NE(予約)', 'NextEngine 総在庫 - フリー在庫'),
+      headerRender: () => colHelp('NE(引当)', 'NextEngine 総在庫 - フリー在庫（注文引当済み数）'),
       render: (row) => row.reserved_stock > 0 ? formatNumber(row.reserved_stock) : <span className="text-gray-300">-</span>,
     },
     {
       key: 'zozo_stock',
       label: 'ZOZO在庫',
+      width: 90,
       align: 'right',
       sortable: true,
       headerRender: () => colHelp('ZOZO在庫', 'ZOZO預け在庫'),
@@ -591,6 +607,7 @@ function ProductsPageContent() {
     {
       key: 'stock_days',
       label: '在庫日数',
+      width: 80,
       align: 'right',
       sortable: true,
       headerRender: () => colHelp('在庫日数', '在庫数 ÷ 30日間平均日販'),
@@ -603,6 +620,7 @@ function ProductsPageContent() {
     {
       key: 'inventory_status',
       label: '在庫状態',
+      width: 80,
       headerRender: () => colHelp('在庫状態', '適正 / 過剰（>90日）/ 在庫なし'),
       render: (row) => {
         const s = row.inventory_status
