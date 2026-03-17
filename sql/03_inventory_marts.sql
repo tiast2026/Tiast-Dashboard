@@ -11,7 +11,7 @@ WITH ne_stock AS (
     s.goods_id,
     SUM(s.stock_quantity) AS total_stock,
     SUM(s.stock_free_quantity) AS free_stock,
-    SUM(COALESCE(s.stock_advance_quantity, 0)) AS advance_stock
+    SUM(COALESCE(s.stock_advance_order_quantity, 0)) AS advance_stock
   FROM `tiast-data-platform.raw_nextengine.stock` s
   GROUP BY s.goods_id
 ),
@@ -111,7 +111,7 @@ WITH product_stock AS (
     s.goods_id,
     SUM(s.stock_quantity) AS total_stock,
     SUM(s.stock_free_quantity) AS free_stock,
-    SUM(COALESCE(s.stock_advance_quantity, 0)) AS advance_stock
+    SUM(COALESCE(s.stock_advance_order_quantity, 0)) AS advance_stock
   FROM `tiast-data-platform.raw_nextengine.stock` s
   GROUP BY s.goods_id
 ),
