@@ -109,3 +109,28 @@ http://localhost:3000 にアクセス。
 | NOAHL | `#C4A882`（ベージュ/ラテカラー） |
 | BLACKQUEEN | `#1A1A1A`（ブラック） |
 | MYRTH | `#8FAE8B`（セージグリーン） |
+
+## NextEngine 店舗マスタ（shop_id マッピング）
+
+BigQueryの `receive_order_shop_id` とダッシュボード上のチャネル名の対応表。
+SQL内のCASE文（`01_sales_marts.sql`, `04_customer_marts.sql`, `setup_all_views.sql` 等）で使用。
+
+| shop_id | NE店舗名 | ブランド | チャネル名（SQL上） |
+|---------|---------|---------|-------------------|
+| 1 | 【公式】BLACKQUEEN | BLACKQUEEN | 公式 |
+| 2 | 【楽天】BLACKQUEEN | BLACKQUEEN | 楽天市場 |
+| 3 | 【SHOPLIST】BLACKQUEEN | BLACKQUEEN | SHOPLIST |
+| 4 | 【楽天】NOAHL | NOAHL | 楽天市場 |
+| 5 | 【Amazon】BLACKQUEEN | BLACKQUEEN | Amazon |
+| 6 | 【aupay】BLACKQUEEN | BLACKQUEEN | aupay |
+| 7 | 【公式】NOAHL | NOAHL | 公式 |
+| 8 | 【サステナ】BLACKQUEEN | BLACKQUEEN | サステナ |
+| 9 | 【YAHOO】BLACKQUEEN | BLACKQUEEN | Yahoo! |
+| 10 | 【楽天】MYRTH | MYRTH | 楽天市場 |
+| 11 | 【RakutenFashion】NOAHL | NOAHL | RakutenFashion |
+| 12 | 【TIKTOK】BLACKQUEEN | BLACKQUEEN | TikTok |
+| 13 | 【TIKTOK】NOAHL | NOAHL | TikTok |
+
+> **注意**: ZOZOは別テーブル（`raw_zozo.orders`）から取得。NE店舗マスタには含まれない。
+>
+> 店舗が追加された場合は、上記SQLファイルのCASE文と `lib/constants.ts` の `CHANNEL_COLORS` / `getChannelKey()` を更新すること。
