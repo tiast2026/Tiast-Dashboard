@@ -704,6 +704,7 @@ function ProductsPageContent() {
             daily_sales: selectedProduct.daily_sales,
             stock_days: selectedProduct.stock_days,
             inventory_status: selectedProduct.inventory_status,
+            sales_start_date: selectedProduct.sales_start_date,
           } : null}
           period={period}
           month={month}
