@@ -246,7 +246,7 @@ function TrendChart({ trend }: { trend: TrendData }) {
           yAxisId="amount"
           type="monotone"
           dataKey="prev_year_amount"
-          name="前年売上"
+          name="前年売上金額"
           stroke="#9CA3AF"
           strokeWidth={1.5}
           dot={false}
