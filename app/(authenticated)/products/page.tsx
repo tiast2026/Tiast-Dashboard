@@ -266,6 +266,7 @@ function ProductsPageContent() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(50)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null)
   const [alerts, setAlerts] = useState<{ overstock: { count: number; amount: number }; season_ending: { count: number; amount: number }; season_exceeded: { count: number; amount: number } } | null>(null)
   const mountedRef = useRef(true)
 
@@ -670,6 +671,7 @@ function ProductsPageContent() {
             onSort={handleSort}
             sortKey={sortBy}
             sortOrder={sortOrder}
+            onRowClick={(row) => setSelectedProduct(row)}
             expandedRowKeys={expandedRows}
             renderExpandedRows={(row, cols) => (
               <SkuExpansionRows
@@ -683,6 +685,29 @@ function ProductsPageContent() {
           />
         ) : null}
         </div>
+        {/* Product detail dialog (代表品番 → SKU drill-down) */}
+        <ProductDetailDialog
+          open={!!selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          mode="product"
+          productCode={selectedProduct?.product_code || ''}
+          product={selectedProduct ? {
+            product_code: selectedProduct.product_code,
+            product_name: selectedProduct.product_name,
+            image_url: selectedProduct.image_url,
+            total_quantity: selectedProduct.total_quantity,
+            sales_amount: selectedProduct.sales_amount,
+            gross_profit_rate: selectedProduct.gross_profit_rate,
+            total_stock: selectedProduct.total_stock,
+            free_stock: selectedProduct.free_stock,
+            zozo_stock: selectedProduct.zozo_stock ?? 0,
+            daily_sales: selectedProduct.daily_sales,
+            stock_days: selectedProduct.stock_days,
+            inventory_status: selectedProduct.inventory_status,
+          } : null}
+          period={period}
+          month={month}
+        />
       </div>
     </>
   )
