@@ -151,7 +151,7 @@ function getColor(channel: string): string {
 
 function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
   if (channels.length === 0) return null
-  const totalAmount = channels.reduce((s, c) => s + c.sales_amount, 0)
+  const totalAmount = channels.reduce((s, c) => s + Number(c.sales_amount), 0)
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
@@ -159,7 +159,7 @@ function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
       {/* Stacked bar */}
       <div className="flex h-3 rounded-full overflow-hidden mb-3">
         {channels.map((c) => {
-          const pct = totalAmount > 0 ? (c.sales_amount / totalAmount) * 100 : 0
+          const pct = totalAmount > 0 ? (Number(c.sales_amount) / totalAmount) * 100 : 0
           if (pct < 0.5) return null
           return (
             <div
@@ -173,7 +173,7 @@ function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
       {/* Channel list */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {channels.map((c) => {
-          const pct = totalAmount > 0 ? (c.sales_amount / totalAmount) * 100 : 0
+          const pct = totalAmount > 0 ? (Number(c.sales_amount) / totalAmount) * 100 : 0
           return (
             <div key={c.channel} className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: getColor(c.channel) }} />
