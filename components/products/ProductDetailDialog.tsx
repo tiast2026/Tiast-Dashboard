@@ -56,6 +56,7 @@ interface ProductData {
   daily_sales: number
   stock_days: number
   inventory_status: string
+  sales_start_date?: string | null
 }
 
 interface TrendPoint {
@@ -398,9 +399,14 @@ export default function ProductDetailDialog({
             <div className="flex-1 min-w-0">
               <DialogTitle className="text-base">{title}</DialogTitle>
               <DialogDescription className="truncate text-sm">{subtitle}</DialogDescription>
-              {isSkuView && (
-                <div className="text-xs text-blue-500 mt-0.5">SKU詳細</div>
-              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                {isSkuView && (
+                  <span className="text-xs text-blue-500">SKU詳細</span>
+                )}
+                {prodData?.sales_start_date && (
+                  <span className="text-xs text-gray-400">販売開始: {prodData.sales_start_date}</span>
+                )}
+              </div>
             </div>
           </div>
         </DialogHeader>
