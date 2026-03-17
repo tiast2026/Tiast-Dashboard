@@ -271,8 +271,8 @@ function ProductsPageContent() {
   const mountedRef = useRef(true)
 
   const buildCacheKey = useCallback(() => {
-    return `products:${search}:${brand}:${category}:${season}:${priceTier}:${period}:${month}:${sortBy}:${sortOrder}:${page}`
-  }, [search, brand, category, season, priceTier, period, month, sortBy, sortOrder, page])
+    return `products:${search}:${brand}:${category}:${season}:${priceTier}:${period}:${month}:${sortBy}:${sortOrder}:${page}:${perPage}`
+  }, [search, brand, category, season, priceTier, period, month, sortBy, sortOrder, page, perPage])
 
   const cached = getCached<ProductListResponse>(buildCacheKey())
   const [loading, setLoading] = useState(!cached)
