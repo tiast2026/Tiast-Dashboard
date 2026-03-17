@@ -21,6 +21,7 @@ interface SkuInventoryRow {
   goods_id: string
   total_stock: number
   free_stock: number
+  advance_stock: number
   zozo_stock: number
   own_stock: number
   daily_sales: number
@@ -240,6 +241,7 @@ export async function GET(
           gross_profit_rate: Number(sales?.gross_profit_rate ?? 0),
           total_stock: Number(inv?.total_stock ?? 0),
           free_stock: Number(inv?.free_stock ?? 0),
+          advance_stock: Number(inv?.advance_stock ?? 0),
           zozo_stock: Number(inv?.zozo_stock ?? 0),
           own_stock: Number(inv?.own_stock ?? 0),
           daily_sales: Number(inv?.daily_sales ?? 0),
