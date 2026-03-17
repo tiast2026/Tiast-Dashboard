@@ -331,7 +331,7 @@ function ProductsPageContent() {
   const [sortBy, setSortBy] = useState('sales_amount')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
-  const [perPage] = useState(50)
+  const [perPage, setPerPage] = useState(50)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [alerts, setAlerts] = useState<{ overstock: { count: number; amount: number }; season_ending: { count: number; amount: number }; season_exceeded: { count: number; amount: number } } | null>(null)
   const mountedRef = useRef(true)
@@ -399,7 +399,7 @@ function ProductsPageContent() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [search, brand, category, season, priceTier, period, month])
+  }, [search, brand, category, season, priceTier, period, month, perPage])
 
   const handleSort = (key: string, order: 'asc' | 'desc') => {
     setSortBy(key)
@@ -707,6 +707,15 @@ function ProductsPageContent() {
               </SelectContent>
             </Select>
           )}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <span className="text-sm text-gray-500">表示</span>
+            <Select value={String(perPage)} onValueChange={(v) => setPerPage(Number(v))}>
+              <SelectTrigger className="w-20 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[30, 50, 100, 200].map((n) => (<SelectItem key={n} value={String(n)}>{n}件</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Data Table */}
