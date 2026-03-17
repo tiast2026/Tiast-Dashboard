@@ -154,29 +154,29 @@ export default function DataTable<T extends Record<string, unknown>>({
         </div>
       </div>
       {totalPages > 1 && onPageChange && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <span className="text-[13px] text-[#A99D93]">
+        <div className="flex items-center justify-between mt-1.5 px-1">
+          <span className="text-[11px] text-[#A99D93]">
             全{total.toLocaleString()}件中 {((currentPage - 1) * pageSize + 1).toLocaleString()}-{Math.min(currentPage * pageSize, total).toLocaleString()}件
           </span>
           <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
-              className="h-8 w-8 p-0 rounded-lg border-black/[0.08]"
+              className="h-6 w-6 p-0 rounded border-black/[0.08]"
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage <= 1}
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3.5 h-3.5" />
             </Button>
-            <span className="text-[13px] px-3 text-[#5A524B]">{currentPage} / {totalPages}</span>
+            <span className="text-[11px] px-2 text-[#5A524B]">{currentPage} / {totalPages}</span>
             <Button
               variant="outline"
               size="sm"
-              className="h-8 w-8 p-0 rounded-lg border-black/[0.08]"
+              className="h-6 w-6 p-0 rounded border-black/[0.08]"
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
