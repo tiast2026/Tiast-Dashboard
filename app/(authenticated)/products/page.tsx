@@ -643,7 +643,7 @@ function ProductsPageContent() {
   return (
     <>
       <Header title={urlBrand ? `${urlBrand} 商品分析` : '商品分析'} />
-      <div className="p-6 space-y-4">
+      <div className="p-6 pb-2 space-y-4">
         {/* Inventory Alerts */}
         {alerts && (
           <div className="grid grid-cols-3 gap-4">
