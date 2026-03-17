@@ -13,6 +13,8 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode
   headerRender?: () => React.ReactNode
   className?: string
+  /** Fixed width in pixels for table-layout:fixed */
+  width?: number
   /** Make this column sticky from the left. Value is the left offset in pixels. */
   stickyLeft?: number
 }
@@ -66,7 +68,12 @@ export default function DataTable<T extends Record<string, unknown>>({
     <div>
       <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <div className="overflow-x-auto max-h-[calc(100vh-220px)] overflow-y-auto">
-        <Table>
+        <Table style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            {columns.map((col) => (
+              <col key={col.key} style={col.width ? { width: col.width } : undefined} />
+            ))}
+          </colgroup>
           <TableHeader className="sticky top-0 z-10">
             <TableRow className="bg-[#FAFAF8] border-b border-black/[0.06]">
               {columns.map((col) => {
@@ -122,7 +129,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                         return (
                           <TableCell
                             key={col.key}
-                            className={`text-sm text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? (isExpanded ? 'bg-[#FAFAF8]' : 'bg-white group-hover/row:bg-[#FDFCFA]') : ''} ${col.className || ''}`}
+                            className={`text-xs text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? (isExpanded ? 'bg-[#FAFAF8]' : 'bg-white group-hover/row:bg-[#FDFCFA]') : ''} ${col.className || ''}`}
                             style={stickyStyle}
                           >
                             {col.render ? col.render(row) : String(row[col.key] ?? '-')}
