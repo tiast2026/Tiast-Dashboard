@@ -8,11 +8,11 @@ import { TableRow, TableCell } from '@/components/ui/table'
 import AlertCard from '@/components/cards/AlertCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatPercent, formatNumber, formatDate, getCurrentMonth } from '@/lib/format'
+import { formatCurrency, formatPercent, formatNumber, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Mail, Truck, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PROFIT_RATE_COLORS } from '@/lib/constants'
+import ProductDetailDialog from '@/components/products/ProductDetailDialog'
 
 interface ProductRow {
   [key: string]: unknown
@@ -127,76 +127,6 @@ function colHelp(label: string, tooltip: string) {
   )
 }
 
-// SKU detail dialog - shown when clicking a SKU row
-function SkuDetailDialog({ sku, open, onClose }: { sku: SkuRow | null; open: boolean; onClose: () => void }) {
-  if (!sku) return null
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            {sku.sku_image_url ? (
-              <img src={sku.sku_image_url} alt="" className="w-14 h-14 object-cover rounded" />
-            ) : null}
-            <div>
-              <DialogTitle className="text-sm">{sku.goods_id}</DialogTitle>
-              <DialogDescription>
-                {[sku.color, sku.size].filter(Boolean).join(' / ') || '-'}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          {/* Channel breakdown */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">チャネル別在庫</div>
-            <div className="space-y-1">
-              <div className="flex justify-between"><span>自社(NE)</span><span className="font-medium">{formatNumber(sku.own_stock)}</span></div>
-              <div className="flex justify-between"><span>フリー</span><span className="font-medium">{formatNumber(sku.free_stock)}</span></div>
-              <div className="flex justify-between"><span>ZOZO</span><span className="font-medium">{formatNumber(sku.zozo_stock)}</span></div>
-            </div>
-          </div>
-          {/* Sales velocity */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">販売速度</div>
-            <div className="space-y-1">
-              <div className="flex justify-between"><span>日販</span><span className="font-medium">{sku.daily_sales > 0 ? sku.daily_sales.toFixed(1) : '-'}</span></div>
-              <div className="flex justify-between"><span>在庫日数</span><span className="font-medium">{sku.stock_days > 0 ? `${Math.round(sku.stock_days)}日` : '-'}</span></div>
-              <div className="flex justify-between"><span>回転率(年)</span><span className="font-medium">{sku.turnover_rate_annual > 0 ? sku.turnover_rate_annual.toFixed(1) : '-'}</span></div>
-            </div>
-          </div>
-          {/* Lifecycle */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">ライフサイクル</div>
-            <div className="space-y-1">
-              <div className="flex justify-between"><span>ステージ</span><span className="font-medium">{sku.lifecycle_stance || '-'}</span></div>
-              <div className="flex justify-between"><span>回転日数</span><span className="font-medium">{sku.turnover_days > 0 ? `${Math.round(sku.turnover_days)}日` : '-'}</span></div>
-              <div className="flex justify-between"><span>最終入出庫</span><span className="font-medium">{sku.last_io_date ? formatDate(sku.last_io_date) : '-'}</span></div>
-            </div>
-          </div>
-          {/* Alerts & Actions */}
-          <div className="bg-gray-50 rounded-lg p-2.5">
-            <div className="text-gray-500 mb-1 font-medium">アラート</div>
-            <div className="space-y-1">
-              {sku.stagnation_alert && (
-                <div className="text-red-600 font-medium">滞留アラート</div>
-              )}
-              {sku.lifecycle_action && (
-                <div className="text-amber-700">{sku.lifecycle_action}</div>
-              )}
-              {sku.days_since_last_io > 0 && (
-                <div className="flex justify-between"><span>入出庫なし</span><span className="font-medium">{sku.days_since_last_io}日</span></div>
-              )}
-              {!sku.stagnation_alert && !sku.lifecycle_action && !sku.days_since_last_io && (
-                <div className="text-green-600">問題なし</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 // SKU cell renderer — maps a column key to the SKU cell content
 function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDayColor: string, statusCls: string, isSelected: boolean): React.ReactNode {
@@ -309,10 +239,13 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
         )
       })}
       {/* SKU detail dialog */}
-      <SkuDetailDialog
-        sku={skus.find(s => s.goods_id === selectedSku) || null}
+      <ProductDetailDialog
         open={!!selectedSku}
         onClose={() => setSelectedSku(null)}
+        mode="sku"
+        sku={skus.find(s => s.goods_id === selectedSku) || null}
+        productCode={productCode}
+        allSkus={skus}
       />
     </>
   )
