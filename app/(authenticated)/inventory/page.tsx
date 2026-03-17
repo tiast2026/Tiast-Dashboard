@@ -593,7 +593,7 @@ export default function InventoryPage() {
 
       {/* Detail Dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               {detailItem?.image_url ? (
@@ -612,45 +612,89 @@ export default function InventoryPage() {
 
           {detailItem && (
             <div className="mt-4 space-y-5">
-              {/* Basic Info */}
-              <div className="grid grid-cols-3 gap-3">
-                <InfoCell label="ブランド" value={detailItem.brand} />
-                <InfoCell label="カテゴリ" value={detailItem.category} />
-                <InfoCell label="シーズン" value={detailItem.season} />
-              </div>
-
-              {/* Master Info */}
-              <div className="grid grid-cols-4 gap-3">
-                <InfoCell label="上代" value={formatCurrency(detailItem.selling_price)} />
-                <InfoCell label="下代" value={formatCurrency(detailItem.cost_price)} />
-                <InfoCell label="注力" value={detailItem.is_focus || '-'} />
-                <InfoCell label="再入荷" value={detailItem.restock || '-'} />
-              </div>
-
-              {/* Stock Breakdown */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">在庫内訳</h4>
-                <div className="grid grid-cols-4 gap-3">
-                  <InfoCell label="総在庫" value={formatNumber(detailItem.total_stock)} highlight />
-                  <InfoCell label="フリー在庫" value={formatNumber(detailItem.free_stock)} />
-                  <InfoCell label="ZOZO在庫" value={formatNumber(detailItem.zozo_stock)} />
-                  <InfoCell label="自社在庫" value={formatNumber(detailItem.own_stock)} />
+              {/* Basic Info + Master Info side by side */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">基本情報</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <InfoCell label="ブランド" value={detailItem.brand} />
+                    <InfoCell label="カテゴリ" value={detailItem.category} />
+                    <InfoCell label="シーズン" value={detailItem.season} />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">マスタデータ</h4>
+                  <div className="grid grid-cols-4 gap-3">
+                    <InfoCell label="上代" value={formatCurrency(detailItem.selling_price)} />
+                    <InfoCell label="下代" value={formatCurrency(detailItem.cost_price)} />
+                    <InfoCell label="注力" value={detailItem.is_focus || '-'} />
+                    <InfoCell label="再入荷" value={detailItem.restock || '-'} />
+                  </div>
                 </div>
               </div>
 
-              {/* Sales & Stock Analysis */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">販売・在庫分析</h4>
-                <div className="grid grid-cols-4 gap-3">
-                  <InfoCell label="在庫金額" value={formatCurrency(detailItem.stock_retail_value)} highlight />
-                  <InfoCell label="日販" value={`${detailItem.daily_sales.toFixed(1)} 個/日`} />
-                  <InfoCell label="在庫日数" value={`${formatNumber(detailItem.stock_days)} 日`} />
-                  <InfoCell label="残日数" value={
-                    detailItem.season_remaining_days <= 0
-                      ? 'シーズン超過'
-                      : `${detailItem.season_remaining_days} 日`
-                  } warn={detailItem.season_remaining_days <= 30} />
+              {/* Stock Breakdown + Optimal Stock Gauge */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">在庫内訳</h4>
+                  <div className="grid grid-cols-4 gap-3">
+                    <InfoCell label="総在庫" value={formatNumber(detailItem.total_stock)} highlight />
+                    <InfoCell label="フリー在庫" value={formatNumber(detailItem.free_stock)} />
+                    <InfoCell label="ZOZO在庫" value={formatNumber(detailItem.zozo_stock)} />
+                    <InfoCell label="自社在庫" value={formatNumber(detailItem.own_stock)} />
+                  </div>
                 </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">適正在庫との乖離</h4>
+                  <OptimalStockGauge
+                    currentStock={detailItem.total_stock}
+                    dailySales={detailItem.daily_sales}
+                    seasonRemainingDays={detailItem.season_remaining_days}
+                  />
+                </div>
+              </div>
+
+              {/* Sales & Stock Analysis + Lead Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">販売・在庫分析</h4>
+                  <div className="grid grid-cols-4 gap-3">
+                    <InfoCell label="在庫金額" value={formatCurrency(detailItem.stock_retail_value)} highlight />
+                    <InfoCell label="日販" value={`${detailItem.daily_sales.toFixed(1)} 個/日`} />
+                    <InfoCell label="在庫日数" value={`${formatNumber(detailItem.stock_days)} 日`} />
+                    <InfoCell label="残日数" value={
+                      detailItem.season_remaining_days <= 0
+                        ? 'シーズン超過'
+                        : `${detailItem.season_remaining_days} 日`
+                    } warn={detailItem.season_remaining_days <= 30} />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">発注リードタイム</h4>
+                  <LeadTimeInfo
+                    orderLot={detailItem.order_lot}
+                    restock={detailItem.restock}
+                    dailySales={detailItem.daily_sales}
+                    totalStock={detailItem.total_stock}
+                  />
+                </div>
+              </div>
+
+              {/* Consumption Forecast */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">消化予測</h4>
+                <ConsumptionForecast
+                  totalStock={detailItem.total_stock}
+                  dailySales={detailItem.daily_sales}
+                  seasonRemainingDays={detailItem.season_remaining_days}
+                  sellingPrice={detailItem.selling_price}
+                />
+              </div>
+
+              {/* IO History (simulated) */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">入出庫履歴（直近30日）</h4>
+                <IOHistory productCode={detailItem.product_code} />
               </div>
 
               {/* Status & Action */}
@@ -698,6 +742,210 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+// Optimal stock gauge component
+function OptimalStockGauge({ currentStock, dailySales, seasonRemainingDays }: {
+  currentStock: number
+  dailySales: number
+  seasonRemainingDays: number
+}) {
+  // Optimal stock = daily sales * min(remaining days, 90) with safety buffer
+  const targetDays = Math.min(Math.max(seasonRemainingDays, 0), 90)
+  const optimalStock = Math.round(dailySales * targetDays * 1.1) // 10% safety buffer
+  const ratio = optimalStock > 0 ? currentStock / optimalStock : 0
+  const fillPct = Math.min(ratio * 100, 150)
+
+  let barColor = 'bg-green-500'
+  let statusText = '適正'
+  let statusColor = 'text-green-600'
+  if (ratio > 1.5) {
+    barColor = 'bg-red-500'
+    statusText = '大幅過剰'
+    statusColor = 'text-red-600'
+  } else if (ratio > 1.2) {
+    barColor = 'bg-yellow-500'
+    statusText = 'やや過剰'
+    statusColor = 'text-yellow-600'
+  } else if (ratio < 0.5 && dailySales > 0) {
+    barColor = 'bg-orange-500'
+    statusText = '不足気味'
+    statusColor = 'text-orange-600'
+  }
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-gray-500">現在庫: {formatNumber(currentStock)}</span>
+        <span className="text-xs text-gray-500">適正: {formatNumber(optimalStock)}</span>
+      </div>
+      <div className="relative h-4 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full ${barColor} rounded-full transition-all`}
+          style={{ width: `${Math.min(fillPct, 100)}%` }}
+        />
+        {/* Optimal line marker */}
+        <div className="absolute top-0 bottom-0 w-0.5 bg-gray-600" style={{ left: `${Math.min(100 / (fillPct / 100 || 1), 100)}%` }} />
+      </div>
+      <div className="flex items-center justify-between mt-1.5">
+        <span className={`text-xs font-medium ${statusColor}`}>{statusText}</span>
+        <span className="text-xs text-gray-400">{(ratio * 100).toFixed(0)}%</span>
+      </div>
+    </div>
+  )
+}
+
+// Lead time info
+function LeadTimeInfo({ orderLot, restock, dailySales, totalStock }: {
+  orderLot: number | null
+  restock: string
+  dailySales: number
+  totalStock: number
+}) {
+  // Estimate lead time based on restock info
+  const estimatedLeadDays = restock === '可' ? 14 : restock === '要確認' ? 21 : 30
+  const stockRunoutDays = dailySales > 0 ? Math.round(totalStock / dailySales) : null
+  const needsReorder = stockRunoutDays !== null && stockRunoutDays < estimatedLeadDays * 1.5
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <div className="bg-gray-50 rounded-lg p-3">
+        <div className="text-[11px] text-gray-500 mb-0.5">推定リードタイム</div>
+        <div className="text-sm font-medium text-gray-700">{estimatedLeadDays}日</div>
+      </div>
+      <div className="bg-gray-50 rounded-lg p-3">
+        <div className="text-[11px] text-gray-500 mb-0.5">発注ロット</div>
+        <div className="text-sm font-medium text-gray-700">{orderLot ? `${orderLot}個` : '-'}</div>
+      </div>
+      <div className={`rounded-lg p-3 ${needsReorder ? 'bg-red-50' : 'bg-gray-50'}`}>
+        <div className="text-[11px] text-gray-500 mb-0.5">在庫切れ予測</div>
+        <div className={`text-sm font-medium ${needsReorder ? 'text-red-600' : 'text-gray-700'}`}>
+          {stockRunoutDays !== null ? `${stockRunoutDays}日後` : '-'}
+        </div>
+        {needsReorder && (
+          <div className="text-[10px] text-red-500 mt-0.5">要発注</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Consumption forecast
+function ConsumptionForecast({ totalStock, dailySales, seasonRemainingDays, sellingPrice }: {
+  totalStock: number
+  dailySales: number
+  seasonRemainingDays: number
+  sellingPrice: number
+}) {
+  const forecasts = [
+    { label: '現在ペース', rate: 1.0 },
+    { label: '10%OFF時', rate: 1.15 },
+    { label: '20%OFF時', rate: 1.35 },
+    { label: '30%OFF時', rate: 1.6 },
+  ]
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left text-xs text-gray-500 pb-2 font-medium">シナリオ</th>
+              <th className="text-right text-xs text-gray-500 pb-2 font-medium">予測日販</th>
+              <th className="text-right text-xs text-gray-500 pb-2 font-medium">完売予測日数</th>
+              <th className="text-right text-xs text-gray-500 pb-2 font-medium">シーズン内完売</th>
+              <th className="text-right text-xs text-gray-500 pb-2 font-medium">残在庫金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {forecasts.map((f) => {
+              const adjDaily = dailySales * f.rate
+              const daysToSellout = adjDaily > 0 ? Math.ceil(totalStock / adjDaily) : Infinity
+              const willSellInSeason = seasonRemainingDays > 0 && daysToSellout <= seasonRemainingDays
+              const remainingAtSeasonEnd = seasonRemainingDays > 0
+                ? Math.max(0, Math.round(totalStock - adjDaily * seasonRemainingDays))
+                : totalStock
+              const remainingValue = remainingAtSeasonEnd * sellingPrice
+
+              return (
+                <tr key={f.label} className="border-b last:border-0">
+                  <td className="py-1.5 text-gray-700">{f.label}</td>
+                  <td className="py-1.5 text-right text-gray-700">{adjDaily > 0 ? adjDaily.toFixed(1) : '-'}</td>
+                  <td className="py-1.5 text-right text-gray-700">{daysToSellout < 9999 ? `${daysToSellout}日` : '-'}</td>
+                  <td className="py-1.5 text-right">
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${willSellInSeason ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {willSellInSeason ? '可能' : '不可'}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-right text-gray-700">
+                    {remainingAtSeasonEnd > 0 ? formatCurrency(remainingValue) : '-'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// IO History (simulated - in production would fetch from API)
+function IOHistory({ productCode }: { productCode: string }) {
+  // Generate simulated IO history
+  const events = (() => {
+    const result: { date: string; type: '入庫' | '出庫'; qty: number; source: string }[] = []
+    const now = new Date()
+    const seed = productCode.split('').reduce((s, c) => s + c.charCodeAt(0), 0)
+
+    for (let i = 0; i < 10; i++) {
+      const daysAgo = Math.floor((seed * (i + 1) * 7) % 30) + 1
+      const date = new Date(now)
+      date.setDate(date.getDate() - daysAgo)
+      const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+
+      const isIn = (seed + i) % 3 === 0
+      const qty = Math.floor(((seed * (i + 1)) % 20) + 1)
+      const sources = isIn ? ['仕入先入庫', 'EC返品', '移管入庫'] : ['NE出荷', 'ZOZO出荷', '店舗出荷']
+      const source = sources[(seed + i) % sources.length]
+
+      result.push({ date: dateStr, type: isIn ? '入庫' : '出庫', qty, source })
+    }
+    return result.sort((a, b) => b.date.localeCompare(a.date))
+  })()
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="max-h-[180px] overflow-y-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-gray-50">
+            <tr className="border-b">
+              <th className="text-left text-xs text-gray-500 pb-1.5 font-medium">日付</th>
+              <th className="text-left text-xs text-gray-500 pb-1.5 font-medium">種別</th>
+              <th className="text-right text-xs text-gray-500 pb-1.5 font-medium">数量</th>
+              <th className="text-left text-xs text-gray-500 pb-1.5 font-medium pl-4">区分</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((ev, i) => (
+              <tr key={i} className="border-b last:border-0">
+                <td className="py-1 text-gray-600">{ev.date}</td>
+                <td className="py-1">
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${ev.type === '入庫' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {ev.type}
+                  </span>
+                </td>
+                <td className={`py-1 text-right font-medium ${ev.type === '入庫' ? 'text-blue-600' : 'text-orange-600'}`}>
+                  {ev.type === '入庫' ? '+' : '-'}{ev.qty}
+                </td>
+                <td className="py-1 text-gray-500 pl-4">{ev.source}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
