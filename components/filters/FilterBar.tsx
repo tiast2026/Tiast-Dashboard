@@ -1,6 +1,6 @@
 'use client'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BRAND_OPTIONS } from '@/lib/constants'
+import { BRAND_OPTIONS, getBrandDisplayName } from '@/lib/constants'
 
 interface FilterBarProps {
   month: string
@@ -46,7 +46,7 @@ export default function FilterBar({ month, onMonthChange, brand, onBrandChange, 
         </SelectTrigger>
         <SelectContent>
           {BRAND_OPTIONS.map((b) => (
-            <SelectItem key={b} value={b}>{b}</SelectItem>
+            <SelectItem key={b} value={b}>{getBrandDisplayName(b)}</SelectItem>
           ))}
         </SelectContent>
       </Select>

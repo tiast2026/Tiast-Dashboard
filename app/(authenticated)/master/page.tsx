@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS } from '@/lib/constants'
+import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, getBrandDisplayName } from '@/lib/constants'
 import { ExternalLink, Image as ImageIcon, RefreshCw, AlertCircle, Loader2 } from 'lucide-react'
 import type { ProductMaster } from '@/types/master'
 
@@ -251,7 +251,7 @@ export default function MasterPage() {
             <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {BRAND_OPTIONS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                {BRAND_OPTIONS.map((b) => <SelectItem key={b} value={b}>{getBrandDisplayName(b)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

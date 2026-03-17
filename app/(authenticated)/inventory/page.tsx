@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatNumber } from '@/lib/format'
-import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, BRAND_COLORS } from '@/lib/constants'
+import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, BRAND_COLORS, getBrandDisplayName } from '@/lib/constants'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
@@ -395,7 +395,7 @@ export default function InventoryPage() {
             </SelectTrigger>
             <SelectContent>
               {BRAND_OPTIONS.map((b) => (
-                <SelectItem key={b} value={b}>{b}</SelectItem>
+                <SelectItem key={b} value={b}>{getBrandDisplayName(b)}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
+import { getBrandDisplayName } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
 import StackedBarChart from '@/components/charts/StackedBarChart'
@@ -164,7 +165,7 @@ function CustomersPageContent() {
 
   return (
     <>
-      <Header title={urlBrand ? `${urlBrand} 顧客分析` : '顧客分析'} />
+      <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 顧客分析` : '顧客分析'} />
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={setBrand} />
 
