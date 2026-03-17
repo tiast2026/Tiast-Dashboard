@@ -573,12 +573,20 @@ function ProductsPageContent() {
     },
     {
       key: 'gross_profit_rate',
-      label: '粗利率',
-      width: 110,
-      headerRender: () => colHelp('粗利率', '(売上 - 仕入原価 - 送料) / 売上'),
+      label: '粗利',
+      width: 120,
+      headerRender: () => colHelp('粗利', '粗利金額と粗利率'),
       align: 'right',
       sortable: true,
-      render: (row: ProductRow) => <ProfitRateBar rate={row.gross_profit_rate} />,
+      render: (row: ProductRow) => {
+        const grossProfit = Math.round(row.sales_amount * row.gross_profit_rate)
+        return (
+          <div>
+            <div className="text-[11px] text-[#5A524B]">{formatCurrency(grossProfit)}</div>
+            <ProfitRateBar rate={row.gross_profit_rate} />
+          </div>
+        )
+      },
     },
     {
       key: 'free_stock',
