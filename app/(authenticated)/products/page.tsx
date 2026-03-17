@@ -701,6 +701,7 @@ function ProductsPageContent() {
             total_stock: selectedProduct.total_stock,
             free_stock: selectedProduct.free_stock,
             zozo_stock: selectedProduct.zozo_stock ?? 0,
+            reserved_stock: selectedProduct.reserved_stock ?? 0,
             daily_sales: selectedProduct.daily_sales,
             stock_days: selectedProduct.stock_days,
             inventory_status: selectedProduct.inventory_status,

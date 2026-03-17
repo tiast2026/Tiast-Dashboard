@@ -53,6 +53,7 @@ interface ProductData {
   total_stock: number
   free_stock: number
   zozo_stock: number
+  reserved_stock: number
   daily_sales: number
   stock_days: number
   inventory_status: string
@@ -347,6 +348,7 @@ export default function ProductDetailDialog({
     })(),
     total_stock: allSkus.reduce((s, sk) => s + sk.total_stock, 0),
     free_stock: allSkus.reduce((s, sk) => s + sk.free_stock, 0),
+    reserved_stock: allSkus.reduce((s, sk) => s + (sk.advance_stock ?? 0), 0),
     zozo_stock: allSkus.reduce((s, sk) => s + sk.zozo_stock, 0),
     daily_sales: allSkus.reduce((s, sk) => s + sk.daily_sales, 0),
     stock_days: (() => {
@@ -447,27 +449,10 @@ export default function ProductDetailDialog({
           <ChannelBreakdown channels={trend.channels} />
         )}
 
-        {/* Trend chart */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="text-gray-500 text-sm mb-2 font-medium">売上推移（12ヶ月）</div>
-          {trendLoading ? (
-            <div className="h-[260px] flex items-center justify-center">
-              <div className="text-sm text-gray-400">読み込み中...</div>
-            </div>
-          ) : trend ? (
-            <TrendChart trend={trend} />
-          ) : (
-            <div className="h-[260px] flex items-center justify-center">
-              <div className="text-sm text-gray-400">データなし</div>
-            </div>
-          )}
-        </div>
-
-        {/* Inventory & detail cards */}
+        {/* Inventory & Sales velocity */}
         <div className="grid grid-cols-2 gap-3 text-sm">
-          {/* Channel breakdown */}
           <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-gray-500 mb-1.5 font-medium">チャネル別在庫</div>
+            <div className="text-gray-500 mb-1.5 font-medium">在庫数</div>
             <div className="space-y-1">
               {isSkuView ? (
                 <>
@@ -477,9 +462,10 @@ export default function ProductDetailDialog({
                 </>
               ) : prodData ? (
                 <>
-                  <div className="flex justify-between"><span>フリー</span><span className="font-medium">{formatNumber(prodData.free_stock)}</span></div>
+                  <div className="flex justify-between"><span>NE(フリー)</span><span className="font-medium">{formatNumber(prodData.free_stock)}</span></div>
+                  <div className="flex justify-between"><span>NE(予約)</span><span className="font-medium">{formatNumber(prodData.reserved_stock)}</span></div>
                   <div className="flex justify-between"><span>ZOZO</span><span className="font-medium">{formatNumber(prodData.zozo_stock)}</span></div>
-                  <div className="flex justify-between"><span>合計</span><span className="font-medium">{formatNumber(prodData.total_stock)}</span></div>
+                  <div className="flex justify-between border-t pt-1 mt-1"><span>合計</span><span className="font-medium">{formatNumber(prodData.free_stock + prodData.reserved_stock + prodData.zozo_stock)}</span></div>
                 </>
               ) : null}
             </div>
@@ -546,6 +532,22 @@ export default function ProductDetailDialog({
                 <div className="flex justify-between"><span>粗利率</span><span className="font-medium">{prodData.gross_profit_rate > 0 ? `${(prodData.gross_profit_rate * 100).toFixed(1)}%` : '-'}</span></div>
                 <div className="flex justify-between"><span>粗利金額</span><span className="font-medium">{formatCurrency(Math.round(prodData.sales_amount * prodData.gross_profit_rate))}</span></div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Trend chart */}
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="text-gray-500 text-sm mb-2 font-medium">売上推移（12ヶ月）</div>
+          {trendLoading ? (
+            <div className="h-[260px] flex items-center justify-center">
+              <div className="text-sm text-gray-400">読み込み中...</div>
+            </div>
+          ) : trend ? (
+            <TrendChart trend={trend} />
+          ) : (
+            <div className="h-[260px] flex items-center justify-center">
+              <div className="text-sm text-gray-400">データなし</div>
             </div>
           )}
         </div>
