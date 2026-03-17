@@ -213,7 +213,7 @@ export default function MasterPage() {
   return (
     <>
       <Header title="商品マスタ" />
-      <div className="p-6 space-y-4">
+      <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
         {/* Info banner */}
         <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
           <div className="text-sm text-blue-800">
@@ -296,6 +296,7 @@ export default function MasterPage() {
         )}
 
         {/* Table (read-only) */}
+        <div className="flex-1 min-h-0">
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 10 }, (_, i) => (
@@ -313,6 +314,7 @@ export default function MasterPage() {
             onRowClick={handleRowClick}
           />
         ) : null}
+        </div>
       </div>
 
       {/* SKU Images Dialog */}
