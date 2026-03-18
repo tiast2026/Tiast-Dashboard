@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChevronLeft } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
@@ -154,13 +155,13 @@ function getColor(channel: string): string {
   return CHANNEL_COLORS[key] || '#999999'
 }
 
-function ChannelBreakdown({ channels }: { channels: ChannelRow[] }) {
+function ChannelBreakdown({ channels, channelLabel = '当月' }: { channels: ChannelRow[]; channelLabel?: string }) {
   if (channels.length === 0) return null
   const totalAmount = channels.reduce((s, c) => s + Number(c.sales_amount), 0)
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
-      <div className="text-gray-500 text-sm mb-3 font-medium">チャネル別販売実績（当月）</div>
+      <div className="text-gray-500 text-sm mb-3 font-medium">チャネル別販売実績（{channelLabel}）</div>
       {/* Stacked bar */}
       <div className="flex h-3 rounded-full overflow-hidden mb-3">
         {channels.map((c) => {
@@ -206,7 +207,7 @@ function GrossProfitTrendChart({ trend, grossProfitRate }: { trend: TrendData; g
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
-      <div className="text-gray-500 text-sm mb-2 font-medium">粗利推移（12ヶ月）</div>
+      <div className="text-gray-500 text-sm mb-2 font-medium">粗利推移</div>
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -339,6 +340,7 @@ export default function ProductDetailDialog({
   const [trendLoading, setTrendLoading] = useState(false)
   const [fetchedSkus, setFetchedSkus] = useState<SkuData[]>([])
   const [skusLoading, setSkusLoading] = useState(false)
+  const [trendMonths, setTrendMonths] = useState<string>('12')
 
   const allSkus = allSkusProp || fetchedSkus
   const isSkuView = !!selectedSku
@@ -366,25 +368,27 @@ export default function ProductDetailDialog({
   }, [open, productCode, allSkusProp, period, month])
 
   // Fetch trend data
-  const fetchTrend = useCallback((goodsId?: string) => {
+  const fetchTrend = useCallback((goodsId?: string, months?: string) => {
     if (!productCode) return
     setTrend(null)
     setTrendLoading(true)
 
-    const params = new URLSearchParams({ months: '12' })
+    const params = new URLSearchParams({ months: months || '12' })
     if (goodsId) params.set('goods_id', goodsId)
+    if (period) params.set('period', period)
+    if (period === 'month' && month) params.set('month', month)
 
     fetch(`/api/products/${encodeURIComponent(productCode)}/trend?${params}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => setTrend(data))
       .catch(() => {})
       .finally(() => setTrendLoading(false))
-  }, [productCode])
+  }, [productCode, period, month])
 
   useEffect(() => {
     if (!open) return
-    fetchTrend(selectedSku?.goods_id)
-  }, [open, selectedSku?.goods_id, fetchTrend])
+    fetchTrend(selectedSku?.goods_id, trendMonths)
+  }, [open, selectedSku?.goods_id, fetchTrend, trendMonths])
 
   if (!open) return null
 
@@ -417,15 +421,40 @@ export default function ProductDetailDialog({
     })(),
   } : null)
 
+  // Period label helper
+  const periodLabel = (() => {
+    if (period === 'month' && month) {
+      const [y, mo] = month.split('-').map(Number)
+      return `${y}年${mo}月実績`
+    }
+    if (period === '7d') return '直近7日間実績'
+    if (period === '30d') return '直近30日間実績'
+    if (period === '60d') return '直近60日間実績'
+    if (period === 'all') return '全期間実績'
+    return '当月実績'
+  })()
+
+  const channelPeriodLabel = (() => {
+    if (period === 'month' && month) {
+      const [y, mo] = month.split('-').map(Number)
+      return `${y}年${mo}月`
+    }
+    if (period === '7d') return '直近7日間'
+    if (period === '30d') return '直近30日間'
+    if (period === '60d') return '直近60日間'
+    if (period === 'all') return '全期間'
+    return '当月'
+  })()
+
   // Find prev month and prev year totals from trend
   const currentMonthData = trend?.data?.[trend.data.length - 1]
   const prevMonthData = trend?.data?.[trend.data.length - 2]
   const prevYearMap = new Map(trend?.prev_year?.map(r => [r.month, r]) || [])
   const prevYearData = currentMonthData ? prevYearMap.get(currentMonthData.month) : null
 
-  // Current display data
-  const displayQuantity = currentMonthData?.quantity ?? (isSkuView ? selectedSku.total_quantity : prodData?.total_quantity ?? 0)
-  const displayAmount = currentMonthData?.sales_amount ?? (isSkuView ? selectedSku.sales_amount : prodData?.sales_amount ?? 0)
+  // Use product/sku data (already filtered by page period) for display values
+  const displayQuantity = isSkuView ? selectedSku.total_quantity : prodData?.total_quantity ?? 0
+  const displayAmount = isSkuView ? selectedSku.sales_amount : prodData?.sales_amount ?? 0
 
   // Header info
   const title = isSkuView ? selectedSku.goods_id : (prodData?.product_name || productCode)
@@ -475,7 +504,7 @@ export default function ProductDetailDialog({
         {/* Sales summary: 当月 + 前年同月 */}
         <div className="grid grid-cols-2 gap-3">
           <SalesCard
-            label="当月実績"
+            label={periodLabel}
             quantity={displayQuantity}
             amount={displayAmount}
             prevQuantity={prevMonthData?.quantity}
@@ -505,7 +534,7 @@ export default function ProductDetailDialog({
 
         {/* Channel breakdown */}
         {trend?.channels && trend.channels.length > 0 && (
-          <ChannelBreakdown channels={trend.channels} />
+          <ChannelBreakdown channels={trend.channels} channelLabel={channelPeriodLabel} />
         )}
 
         {/* Inventory & Sales velocity & Profit - 2 columns */}
@@ -546,7 +575,7 @@ export default function ProductDetailDialog({
                   <div className="flex justify-between"><span>在庫日数</span><span className="font-medium">{prodData.stock_days > 0 ? `${Math.round(prodData.stock_days)}日` : '-'}</span></div>
                   <div className="flex justify-between"><span>在庫状態</span><span className="font-medium">{prodData.inventory_status || '-'}</span></div>
                   <div className="flex justify-between border-t pt-1 mt-1"><span>粗利率</span><span className="font-medium">{grossProfitRate > 0 ? `${(grossProfitRate * 100).toFixed(1)}%` : '-'}</span></div>
-                  <div className="flex justify-between"><span>粗利金額（当月）</span><span className="font-medium">{formatCurrency(Math.round(displayAmount * grossProfitRate))}</span></div>
+                  <div className="flex justify-between"><span>粗利金額（{channelPeriodLabel}）</span><span className="font-medium">{formatCurrency(Math.round(displayAmount * grossProfitRate))}</span></div>
                 </>
               ) : null}
             </div>
@@ -588,7 +617,19 @@ export default function ProductDetailDialog({
 
         {/* Trend chart */}
         <div className="bg-gray-50 rounded-lg p-4">
-          <div className="text-gray-500 text-sm mb-2 font-medium">売上推移（12ヶ月）</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-gray-500 text-sm font-medium">売上推移（{trendMonths}ヶ月）</div>
+            <Select value={trendMonths} onValueChange={setTrendMonths}>
+              <SelectTrigger className="w-28 h-7 text-xs bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="6">6ヶ月</SelectItem>
+                <SelectItem value="12">12ヶ月</SelectItem>
+                <SelectItem value="24">24ヶ月</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {trendLoading ? (
             <div className="h-[260px] flex items-center justify-center">
               <div className="text-sm text-gray-400">読み込み中...</div>

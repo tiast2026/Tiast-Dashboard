@@ -42,13 +42,15 @@ export async function GET(
     const { searchParams } = request.nextUrl
     const goods_id = searchParams.get('goods_id') || null
     const months = Math.min(Number(searchParams.get('months') || '12'), 24)
+    const period = searchParams.get('period') || null
+    const channelMonth = searchParams.get('month') || null
 
     if (!isBigQueryConfigured()) {
       return NextResponse.json({ data: [], prev_year: [], channels: [] })
     }
 
     const level = goods_id ? 'sku' : 'product'
-    const cacheKey = buildCacheKey('product-trend', { product_code, goods_id: goods_id || '', months: String(months) })
+    const cacheKey = buildCacheKey('product-trend', { product_code, goods_id: goods_id || '', months: String(months), period: period || '', channelMonth: channelMonth || '' })
 
     const data = await cachedQuery(cacheKey, async () => {
       const filterCol = level === 'sku' ? 'o.goods_id' : 'p.goods_representation_id'
@@ -90,9 +92,33 @@ export async function GET(
         ORDER BY month
       `
 
-      // Channel breakdown for the CURRENT MONTH only (NE + ZOZO)
+      // Channel breakdown filtered by period (NE + ZOZO)
       const neFilterCol = level === 'sku' ? 'o.goods_id' : 'p.goods_representation_id'
       const zozoFilterCol = level === 'sku' ? 'z.ne_goods_id' : 'zp.goods_representation_id'
+
+      // Build date filter conditions based on period
+      let neDateFilter: string
+      let zozoDateFilter: string
+      if (period === 'month' && channelMonth) {
+        const [y, mo] = channelMonth.split('-').map(Number)
+        const lastDay = new Date(y, mo, 0).getDate()
+        const start = `${y}-${String(mo).padStart(2, '0')}-01`
+        const end = `${y}-${String(mo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+        neDateFilter = `AND LEFT(o.receive_order_date, 10) >= '${start}' AND LEFT(o.receive_order_date, 10) <= '${end}'`
+        zozoDateFilter = `AND LEFT(z.order_date, 10) >= '${start.replace(/-/g, '/')}' AND LEFT(z.order_date, 10) <= '${end.replace(/-/g, '/')}'`
+      } else if (period === '7d' || period === '30d' || period === '60d') {
+        const days = period === '7d' ? 7 : period === '30d' ? 30 : 60
+        neDateFilter = `AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${days} DAY)`
+        zozoDateFilter = `AND PARSE_DATE('%Y/%m/%d', LEFT(z.order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${days} DAY)`
+      } else if (period === 'all') {
+        neDateFilter = ''
+        zozoDateFilter = ''
+      } else {
+        // Default: current month
+        neDateFilter = `AND FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) = FORMAT_DATE('%Y-%m', CURRENT_DATE())`
+        zozoDateFilter = `AND FORMAT_DATE('%Y-%m', PARSE_DATE('%Y/%m/%d', LEFT(z.order_date, 10))) = FORMAT_DATE('%Y-%m', CURRENT_DATE())`
+      }
+
       const channelQuery = `
         WITH ne_channels AS (
           SELECT
@@ -105,7 +131,7 @@ export async function GET(
             AND CAST(o.cancel_type_id AS STRING) = '0'
             AND CAST(o.row_cancel_flag AS STRING) = '0'
             AND o.receive_order_date IS NOT NULL
-            AND FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) = FORMAT_DATE('%Y-%m', CURRENT_DATE())
+            ${neDateFilter}
           GROUP BY channel
         ),
         zozo_channels AS (
@@ -118,7 +144,7 @@ export async function GET(
           WHERE ${zozoFilterCol} = @${paramName}
             AND (z.cancel_flag = '' OR z.cancel_flag IS NULL)
             AND z.order_date IS NOT NULL
-            AND FORMAT_DATE('%Y-%m', PARSE_DATE('%Y/%m/%d', LEFT(z.order_date, 10))) = FORMAT_DATE('%Y-%m', CURRENT_DATE())
+            ${zozoDateFilter}
           GROUP BY channel
         )
         SELECT channel, SUM(quantity) AS quantity, SUM(sales_amount) AS sales_amount
