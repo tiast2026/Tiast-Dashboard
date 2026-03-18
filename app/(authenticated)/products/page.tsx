@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Mail, Truck, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, PROFIT_RATE_COLORS, getBrandDisplayName } from '@/lib/constants'
 import ProductDetailDialog from '@/components/products/ProductDetailDialog'
 
@@ -136,9 +137,7 @@ function skuCellContent(sku: SkuRow, colKey: string, stockDays: number, stockDay
         ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
         : <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
     case 'image_url':
-      return sku.sku_image_url
-        ? <img src={sku.sku_image_url} alt="" className="w-[40px] aspect-square object-cover rounded" />
-        : <div className="w-[40px] aspect-square bg-gray-100 rounded" />
+      return <ProductImage src={sku.sku_image_url} size={40} />
     case 'product_name':
       return (
         <div className="max-w-[220px]">
@@ -395,14 +394,7 @@ function ProductsPageContent() {
       width: 68,
       className: 'w-[68px] !px-1',
       stickyLeft: sl.image_url,
-      render: (row) =>
-        row.image_url ? (
-          <img src={row.image_url} alt="" className="w-[50px] aspect-square object-cover rounded" />
-        ) : (
-          <div className="w-[50px] aspect-square bg-gray-100 rounded flex items-center justify-center text-gray-400 text-[10px]">
-            No Img
-          </div>
-        ),
+      render: (row) => <ProductImage src={row.image_url} size={50} />,
     },
     {
       key: 'product_name',

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ChevronLeft } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
 import { getChannelKey, CHANNEL_COLORS } from '@/lib/constants'
 import {
@@ -454,7 +455,7 @@ export default function ProductDetailDialog({
               </button>
             )}
             {imageUrl ? (
-              <img src={imageUrl} alt="" className="w-20 h-20 object-cover rounded" />
+              <ProductImage src={imageUrl} size={80} />
             ) : null}
             <div className="flex-1 min-w-0">
               <DialogTitle className="text-base">{title}</DialogTitle>
@@ -622,11 +623,7 @@ export default function ProductDetailDialog({
                     onClick={() => setSelectedSku(s)}
                     className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white hover:shadow-sm transition-all text-left group"
                   >
-                    {s.sku_image_url ? (
-                      <img src={s.sku_image_url} alt="" className="w-10 h-10 object-cover rounded flex-shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 bg-gray-200 rounded flex-shrink-0" />
-                    )}
+                    <ProductImage src={s.sku_image_url} size={40} />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-gray-700 truncate">{[s.color, s.size].filter(Boolean).join(' / ') || s.goods_id}</div>
                       <div className="text-xs text-gray-400 font-mono">{s.goods_id}</div>

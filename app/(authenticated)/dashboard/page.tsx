@@ -1,17 +1,16 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { getBrandDisplayName } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
-import DailySalesChart from '@/components/charts/DailySalesChart'
-import BarChart from '@/components/charts/BarChart'
+import { LazyDailySalesChart as DailySalesChart, LazyBarChart as BarChart } from '@/components/charts/LazyCharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth, getPreviousMonth, getLastYearMonth, formatMonth } from '@/lib/format'
-import { getCached, setCache, isFresh } from '@/lib/client-cache'
+import { getCached, setCache, isFresh, fetchWithDedup } from '@/lib/client-cache'
 import type { SalesSummaryResponse, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
 
 interface DashboardData {
@@ -38,32 +37,31 @@ function DashboardPageContent() {
   const mountedRef = useRef(true)
 
   const fetchData = useCallback(async () => {
-    // Skip fetch if cache is fresh (< 5 min)
     if (isFresh(cacheKey)) return
-
-    // Only show loading if no cached data
     if (!getCached(cacheKey)) setLoading(true)
 
     try {
-      const [summaryRes, rankRes, yoyRes, dailyRes] = await Promise.all([
-        fetch(`/api/sales/summary?month=${month}${brandParam}`),
-        fetch(`/api/sales/category-ranking?month=${month}${brandParam}`),
-        fetch(`/api/sales/yoy-comparison?month=${month}`),
-        fetch(`/api/sales/daily-trend?month=${month}${brandParam}`),
-      ])
-      const [summaryData, rankData, yoyData, dailyData] = await Promise.all([
-        summaryRes.ok ? summaryRes.json() : null,
-        rankRes.ok ? rankRes.json() : [],
-        yoyRes.ok ? yoyRes.json() : [],
-        dailyRes.ok ? dailyRes.json() : [],
-      ])
+      const data = await fetchWithDedup<DashboardData>(cacheKey, async () => {
+        const [summaryRes, rankRes, yoyRes, dailyRes] = await Promise.all([
+          fetch(`/api/sales/summary?month=${month}${brandParam}`),
+          fetch(`/api/sales/category-ranking?month=${month}${brandParam}`),
+          fetch(`/api/sales/yoy-comparison?month=${month}`),
+          fetch(`/api/sales/daily-trend?month=${month}${brandParam}`),
+        ])
+        const [summaryData, rankData, yoyData, dailyData] = await Promise.all([
+          summaryRes.ok ? summaryRes.json() : null,
+          rankRes.ok ? rankRes.json() : [],
+          yoyRes.ok ? yoyRes.json() : [],
+          dailyRes.ok ? dailyRes.json() : [],
+        ])
+        return {
+          summary: summaryData,
+          ranking: Array.isArray(rankData) ? rankData : [],
+          yoy: Array.isArray(yoyData) ? yoyData : [],
+          dailyTrend: Array.isArray(dailyData) ? dailyData : [],
+        }
+      })
       if (!mountedRef.current) return
-      const data: DashboardData = {
-        summary: summaryData,
-        ranking: Array.isArray(rankData) ? rankData : [],
-        yoy: Array.isArray(yoyData) ? yoyData : [],
-        dailyTrend: Array.isArray(dailyData) ? dailyData : [],
-      }
       setSummary(data.summary)
       setRanking(data.ranking)
       setYoy(data.yoy)
@@ -91,8 +89,8 @@ function DashboardPageContent() {
     return () => { mountedRef.current = false }
   }, [fetchData, cacheKey])
 
-  // Build brand-grouped channel sales from YoY data
-  const { brandGroups, grandTotal } = (() => {
+  // Build brand-grouped channel sales from YoY data (memoized)
+  const { brandGroups, grandTotal } = useMemo(() => {
     // Extract pure channel name from patterns like 【楽天】NOAHL
     function extractChannel(raw: string): string {
       const m = raw.match(/【(.+?)】/)
@@ -164,12 +162,12 @@ function DashboardPageContent() {
       .sort((a, b) => b.subtotal.current - a.subtotal.current)
 
     return { brandGroups, grandTotal: { current: gCurrent, prev: gPrev, orders: gOrders, prevOrders: gPrevOrders, profit: gProfit, prevProfit: gPrevProfit } }
-  })()
+  }, [yoy])
 
-  const barData = ranking.map((r) => ({
+  const barData = useMemo(() => ranking.map((r) => ({
     name: r.category,
     value: r.sales_amount,
-  }))
+  })), [ranking])
 
   return (
     <>
