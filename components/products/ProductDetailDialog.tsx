@@ -233,7 +233,12 @@ function SkuComparisonChart({ data, metric, allSkus }: { data: SkuTrendRow[]; me
   const months = Array.from(new Set(data.map(r => r.month))).sort()
 
   // Build chart data: { month, "SKU1 label": value, ... }
-  const skuEntries = Array.from(skuMap.entries())
+  // Sort SKU entries by total value descending
+  const skuEntries = Array.from(skuMap.entries()).sort((a, b) => {
+    const totalA = Array.from(a[1].data.values()).reduce((s, v) => s + v, 0)
+    const totalB = Array.from(b[1].data.values()).reduce((s, v) => s + v, 0)
+    return totalB - totalA
+  })
 
   const chartData = months.map(month => {
     const point: Record<string, string | number | null> = { month }
@@ -243,42 +248,74 @@ function SkuComparisonChart({ data, metric, allSkus }: { data: SkuTrendRow[]; me
     return point
   })
 
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 11 }} />
-        <YAxis
-          tickFormatter={metric === 'sales_amount' ? fmtYAxis : (v: number) => String(Math.round(v))}
-          tick={{ fontSize: 11 }}
-          width={55}
-        />
-        <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any) =>
-            metric === 'sales_amount'
-              ? `¥${Math.round(Number(value)).toLocaleString()}`
-              : `${Math.round(Number(value))}点`
-          }
-          labelFormatter={(l) => {
-            const parts = String(l).split('-')
-            return `${parts[0]}年${parseInt(parts[1])}月`
-          }}
-        />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        {skuEntries.map(([, sku], i) => (
-          <Line
-            key={sku.label}
-            type="monotone"
-            dataKey={sku.label}
-            stroke={SKU_COLORS[i % SKU_COLORS.length]}
-            strokeWidth={2}
-            dot={{ r: 2.5 }}
-            connectNulls
-          />
+  // Build color map for consistent lookup
+  const skuColorMap = new Map<string, string>()
+  skuEntries.forEach(([, sku], i) => {
+    skuColorMap.set(sku.label, SKU_COLORS[i % SKU_COLORS.length])
+  })
+
+  // Custom tooltip sorted by value descending
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const CustomSkuTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null
+    const sorted = [...payload].sort((a: { value: number }, b: { value: number }) => (b.value ?? 0) - (a.value ?? 0))
+    const parts = String(label).split('-')
+    const monthLabel = `${parts[0]}年${parseInt(parts[1])}月`
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs max-w-xs">
+        <div className="font-medium text-gray-700 mb-1.5">{monthLabel}</div>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {sorted.map((entry: any) => (
+          <div key={entry.dataKey} className="flex items-center gap-1.5 py-0.5">
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+            <span className="text-gray-600 truncate flex-1">{entry.dataKey}</span>
+            <span className="font-medium text-gray-800 ml-2 tabular-nums">
+              {metric === 'sales_amount'
+                ? `¥${Math.round(Number(entry.value)).toLocaleString()}`
+                : `${Math.round(Number(entry.value))}点`
+              }
+            </span>
+          </div>
         ))}
-      </LineChart>
-    </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 11 }} />
+          <YAxis
+            tickFormatter={metric === 'sales_amount' ? fmtYAxis : (v: number) => String(Math.round(v))}
+            tick={{ fontSize: 11 }}
+            width={55}
+          />
+          <Tooltip content={<CustomSkuTooltip />} />
+          {skuEntries.map(([, sku], i) => (
+            <Line
+              key={sku.label}
+              type="monotone"
+              dataKey={sku.label}
+              stroke={SKU_COLORS[i % SKU_COLORS.length]}
+              strokeWidth={2}
+              dot={{ r: 2.5 }}
+              connectNulls
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+      {/* Custom legend outside chart to avoid overlap */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 px-1">
+        {skuEntries.map(([, sku], i) => (
+          <div key={sku.label} className="flex items-center gap-1">
+            <div className="w-2.5 h-0.5 rounded flex-shrink-0" style={{ backgroundColor: SKU_COLORS[i % SKU_COLORS.length] }} />
+            <span className="text-[10px] text-gray-500 whitespace-nowrap">{sku.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
