@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { getBrandDisplayName } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
-import StackedBarChart from '@/components/charts/StackedBarChart'
-import BarChart from '@/components/charts/BarChart'
+import { LazyStackedBarChart as StackedBarChart, LazyBarChart as BarChart } from '@/components/charts/LazyCharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatPercent, formatNumber, formatChangeRate, getCurrentMonth } from '@/lib/format'
+import { getCached, setCache, isFresh, fetchWithDedup } from '@/lib/client-cache'
 
 interface SummaryData {
   new_customers: number
@@ -65,56 +65,88 @@ function extractBrand(shopName: string): string {
   return match ? match[1] : shopName
 }
 
+interface CustomerData {
+  summary: SummaryData | null
+  trend: TrendItem[]
+  channelRepeat: ChannelRepeatItem[]
+  channelDetail: ChannelDetailItem[]
+}
+
 function CustomersPageContent() {
   const searchParams = useSearchParams()
   const urlBrand = searchParams.get('brand')
   const [month, setMonth] = useState(getCurrentMonth())
   const [brand, setBrand] = useState(urlBrand || '全て')
-  const [summary, setSummary] = useState<SummaryData | null>(null)
-  const [trend, setTrend] = useState<TrendItem[]>([])
-  const [channelRepeat, setChannelRepeat] = useState<ChannelRepeatItem[]>([])
-  const [channelDetail, setChannelDetail] = useState<ChannelDetailItem[]>([])
-  const [loading, setLoading] = useState(true)
-
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
+  const cacheKey = `customers:${month}:${brandParam}`
+
+  const cached = getCached<CustomerData>(cacheKey)
+  const [summary, setSummary] = useState<SummaryData | null>(cached?.summary ?? null)
+  const [trend, setTrend] = useState<TrendItem[]>(cached?.trend ?? [])
+  const [channelRepeat, setChannelRepeat] = useState<ChannelRepeatItem[]>(cached?.channelRepeat ?? [])
+  const [channelDetail, setChannelDetail] = useState<ChannelDetailItem[]>(cached?.channelDetail ?? [])
+  const [loading, setLoading] = useState(!cached)
+  const mountedRef = useRef(true)
 
   const fetchData = useCallback(async () => {
-    setLoading(true)
+    if (isFresh(cacheKey)) return
+    if (!getCached(cacheKey)) setLoading(true)
+
     try {
-      const [summaryRes, trendRes, repeatRes, detailRes] = await Promise.all([
-        fetch(`/api/customers/summary?month=${month}${brandParam}`),
-        fetch(`/api/customers/monthly-trend?months=24${brandParam}`),
-        fetch(`/api/customers/channel-repeat-rate?month=${month}${brandParam}`),
-        fetch(`/api/customers/channel-detail?month=${month}${brandParam}`),
-      ])
-      const [summaryData, trendData, repeatData, detailData] = await Promise.all([
-        summaryRes.ok ? summaryRes.json() : null,
-        trendRes.ok ? trendRes.json() : [],
-        repeatRes.ok ? repeatRes.json() : [],
-        detailRes.ok ? detailRes.json() : [],
-      ])
-      setSummary(summaryData)
-      setTrend(Array.isArray(trendData) ? trendData : [])
-      setChannelRepeat(Array.isArray(repeatData) ? repeatData : [])
-      setChannelDetail(Array.isArray(detailData) ? detailData : [])
+      const data = await fetchWithDedup<CustomerData>(cacheKey, async () => {
+        const [summaryRes, trendRes, repeatRes, detailRes] = await Promise.all([
+          fetch(`/api/customers/summary?month=${month}${brandParam}`),
+          fetch(`/api/customers/monthly-trend?months=24${brandParam}`),
+          fetch(`/api/customers/channel-repeat-rate?month=${month}${brandParam}`),
+          fetch(`/api/customers/channel-detail?month=${month}${brandParam}`),
+        ])
+        const [summaryData, trendData, repeatData, detailData] = await Promise.all([
+          summaryRes.ok ? summaryRes.json() : null,
+          trendRes.ok ? trendRes.json() : [],
+          repeatRes.ok ? repeatRes.json() : [],
+          detailRes.ok ? detailRes.json() : [],
+        ])
+        return {
+          summary: summaryData,
+          trend: Array.isArray(trendData) ? trendData : [],
+          channelRepeat: Array.isArray(repeatData) ? repeatData : [],
+          channelDetail: Array.isArray(detailData) ? detailData : [],
+        }
+      })
+      if (!mountedRef.current) return
+      setSummary(data.summary)
+      setTrend(data.trend)
+      setChannelRepeat(data.channelRepeat)
+      setChannelDetail(data.channelDetail)
+      setCache(cacheKey, data)
     } catch (e) {
       console.error('Failed to fetch customer data:', e)
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
-  }, [month, brandParam])
+  }, [month, brandParam, cacheKey])
 
   useEffect(() => {
+    mountedRef.current = true
+    const c = getCached<CustomerData>(cacheKey)
+    if (c) {
+      setSummary(c.summary)
+      setTrend(c.trend)
+      setChannelRepeat(c.channelRepeat)
+      setChannelDetail(c.channelDetail)
+      setLoading(false)
+    }
     fetchData()
-  }, [fetchData])
+    return () => { mountedRef.current = false }
+  }, [fetchData, cacheKey])
 
-  // Transform trend data for StackedBarChart
-  const trendChartData = trend.map((item) => ({
+  // Transform trend data for StackedBarChart (memoized)
+  const trendChartData = useMemo(() => trend.map((item) => ({
     month: item.month,
     '新規': item.new_count,
     'リピート': item.repeat_count,
     'リピート率': item.repeat_rate,
-  }))
+  })), [trend])
 
   const trendKeys = ['新規', 'リピート']
   const trendColors: Record<string, string> = {
@@ -122,14 +154,14 @@ function CustomersPageContent() {
     'リピート': '#1E40AF',
   }
 
-  // Transform channel repeat data for horizontal BarChart
-  const repeatBarData = channelRepeat.map((item) => ({
+  // Transform channel repeat data for horizontal BarChart (memoized)
+  const repeatBarData = useMemo(() => channelRepeat.map((item) => ({
     name: item.shop_name,
     value: item.repeat_rate,
-  }))
+  })), [channelRepeat])
 
-  // Brand summary: aggregate channel detail by brand
-  const brandSummary: BrandSummary[] = (() => {
+  // Brand summary: aggregate channel detail by brand (memoized)
+  const brandSummary: BrandSummary[] = useMemo(() => {
     const brandMap: Record<string, { newCust: number; newSales: number; newOrders: number; repCust: number; repSales: number; repOrders: number }> = {}
     for (const ch of channelDetail) {
       const b = extractBrand(ch.shop_name)
@@ -140,7 +172,6 @@ function CustomersPageContent() {
       brandMap[b].newSales += ch.new_sales
       brandMap[b].repCust += ch.repeat_customers
       brandMap[b].repSales += ch.repeat_sales
-      // Reconstruct order counts from avg and customer counts
       if (ch.new_avg_order_value > 0) {
         brandMap[b].newOrders += Math.round(ch.new_sales / ch.new_avg_order_value)
       }
@@ -161,7 +192,7 @@ function CustomersPageContent() {
         repeat_rate: totalCust > 0 ? d.repCust / totalCust : 0,
       }
     })
-  })()
+  }, [channelDetail])
 
   return (
     <>

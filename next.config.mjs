@@ -12,6 +12,14 @@ const nextConfig = {
       },
     ],
   },
+  // Compress responses for faster transfer
+  compress: true,
+  // Optimize package imports - tree-shake heavy libraries
+  experimental: {
+    optimizePackageImports: ['recharts', 'lucide-react', '@radix-ui/react-icons'],
+  },
+  // Enable strict mode for better dev performance insights
+  reactStrictMode: true,
 }
 
 export default nextConfig

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Header from '@/components/layout/Header'
 import AlertCard from '@/components/cards/AlertCard'
 import DataTable, { Column } from '@/components/tables/DataTable'
@@ -13,10 +13,19 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatNumber } from '@/lib/format'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, BRAND_COLORS, getBrandDisplayName } from '@/lib/constants'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts'
-import { Package, Image as ImageIcon, Search, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { getCached, setCache, isFresh, fetchWithDedup } from '@/lib/client-cache'
+import dynamic from 'next/dynamic'
+import { Package, Search, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
+
+const LazySeasonBarChart = dynamic(
+  () => import('@/components/charts/InventoryCharts').then(m => ({ default: m.SeasonBarChart })),
+  { loading: () => <Skeleton className="h-[250px]" />, ssr: false }
+)
+const LazyCategoryBarChart = dynamic(
+  () => import('@/components/charts/InventoryCharts').then(m => ({ default: m.CategoryBarChart })),
+  { loading: () => <Skeleton className="h-[250px]" />, ssr: false }
+)
 
 // Types
 interface AlertData {
@@ -84,12 +93,6 @@ const ALERT_TYPE_OPTIONS = [
   { value: 'season_exceeded', label: 'シーズン超過' },
 ] as const
 
-// Currency formatter for Recharts tooltip
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function currencyFormatter(value: any) {
-  return formatCurrency(Number(value))
-}
-
 export default function InventoryPage() {
   // Filter state
   const [search, setSearch] = useState('')
@@ -107,12 +110,15 @@ export default function InventoryPage() {
   const perPage = 50
 
   // Data state
-  const [alerts, setAlerts] = useState<AlertData | null>(null)
-  const [seasonSummary, setSeasonSummary] = useState<SeasonSummary[]>([])
-  const [categorySummary, setCategorySummary] = useState<CategorySummary[]>([])
+  const summaryCacheKey = `inv-summary:${brand}`
+  const cachedSummary = getCached<{ alerts: AlertData | null; seasonSummary: SeasonSummary[]; categorySummary: CategorySummary[] }>(summaryCacheKey)
+  const [alerts, setAlerts] = useState<AlertData | null>(cachedSummary?.alerts ?? null)
+  const [seasonSummary, setSeasonSummary] = useState<SeasonSummary[]>(cachedSummary?.seasonSummary ?? [])
+  const [categorySummary, setCategorySummary] = useState<CategorySummary[]>(cachedSummary?.categorySummary ?? [])
   const [inventoryList, setInventoryList] = useState<InventoryListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!cachedSummary)
   const [listLoading, setListLoading] = useState(true)
+  const mountedRef = useRef(true)
 
   // Detail dialog
   const [detailItem, setDetailItem] = useState<InventoryItem | null>(null)
@@ -135,30 +141,41 @@ export default function InventoryPage() {
     return params.toString()
   }, [search, brand, category, season, status, lifecycle, alertType, sortBy, sortOrder, page, perPage])
 
-  // Fetch summary data (alerts, season, category)
+  // Fetch summary data (alerts, season, category) with cache
   const fetchSummaryData = useCallback(async () => {
-    setLoading(true)
+    if (isFresh(summaryCacheKey)) return
+    if (!getCached(summaryCacheKey)) setLoading(true)
+
     try {
-      const brandParam = brand !== '全て' ? `?brand=${brand}` : ''
-      const [alertsRes, seasonRes, categoryRes] = await Promise.all([
-        fetch('/api/inventory/alerts'),
-        fetch('/api/inventory/season-summary'),
-        fetch(`/api/inventory/category-summary${brandParam}`),
-      ])
-      const [alertsData, seasonData, categoryData] = await Promise.all([
-        alertsRes.ok ? alertsRes.json() : null,
-        seasonRes.ok ? seasonRes.json() : [],
-        categoryRes.ok ? categoryRes.json() : [],
-      ])
-      setAlerts(alertsData)
-      setSeasonSummary(Array.isArray(seasonData) ? seasonData : [])
-      setCategorySummary(Array.isArray(categoryData) ? categoryData : [])
+      const result = await fetchWithDedup(summaryCacheKey, async () => {
+        const brandParam = brand !== '全て' ? `?brand=${brand}` : ''
+        const [alertsRes, seasonRes, categoryRes] = await Promise.all([
+          fetch('/api/inventory/alerts'),
+          fetch('/api/inventory/season-summary'),
+          fetch(`/api/inventory/category-summary${brandParam}`),
+        ])
+        const [alertsData, seasonData, categoryData] = await Promise.all([
+          alertsRes.ok ? alertsRes.json() : null,
+          seasonRes.ok ? seasonRes.json() : [],
+          categoryRes.ok ? categoryRes.json() : [],
+        ])
+        return {
+          alerts: alertsData as AlertData | null,
+          seasonSummary: Array.isArray(seasonData) ? seasonData as SeasonSummary[] : [],
+          categorySummary: Array.isArray(categoryData) ? categoryData as CategorySummary[] : [],
+        }
+      })
+      if (!mountedRef.current) return
+      setAlerts(result.alerts)
+      setSeasonSummary(result.seasonSummary)
+      setCategorySummary(result.categorySummary)
+      setCache(summaryCacheKey, result)
     } catch (e) {
       console.error('Failed to fetch inventory summary:', e)
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
-  }, [brand])
+  }, [brand, summaryCacheKey])
 
   // Fetch list data
   const fetchListData = useCallback(async () => {
@@ -175,8 +192,17 @@ export default function InventoryPage() {
   }, [buildListParams])
 
   useEffect(() => {
+    mountedRef.current = true
+    const c = getCached<{ alerts: AlertData | null; seasonSummary: SeasonSummary[]; categorySummary: CategorySummary[] }>(summaryCacheKey)
+    if (c) {
+      setAlerts(c.alerts)
+      setSeasonSummary(c.seasonSummary)
+      setCategorySummary(c.categorySummary)
+      setLoading(false)
+    }
     fetchSummaryData()
-  }, [fetchSummaryData])
+    return () => { mountedRef.current = false }
+  }, [fetchSummaryData, summaryCacheKey])
 
   useEffect(() => {
     fetchListData()
@@ -214,9 +240,9 @@ export default function InventoryPage() {
     return ''
   }
 
-  // Transform category summary for stacked bar chart
-  const brands = Array.from(new Set(categorySummary.map((c) => c.brand)))
-  const categoryChartData = (() => {
+  // Transform category summary for stacked bar chart (memoized)
+  const brands = useMemo(() => Array.from(new Set(categorySummary.map((c) => c.brand))), [categorySummary])
+  const categoryChartData = useMemo(() => {
     const grouped: Record<string, Record<string, number>> = {}
     for (const item of categorySummary) {
       if (!grouped[item.category]) grouped[item.category] = {}
@@ -232,7 +258,7 @@ export default function InventoryPage() {
         const totalB = brands.reduce((sum, br) => sum + ((b as Record<string, unknown>)[br] as number || 0), 0)
         return totalB - totalA
       })
-  })()
+  }, [categorySummary, brands])
 
   // Table columns
   const columns: Column<Record<string, unknown>>[] = [
@@ -240,16 +266,7 @@ export default function InventoryPage() {
       key: 'image_url',
       label: '',
       className: 'w-[52px]',
-      render: (row) => {
-        const url = row.image_url as string | null
-        return url ? (
-          <img src={url} alt="" className="w-[40px] min-w-[40px] h-[40px] min-h-[40px] object-cover rounded shrink-0" />
-        ) : (
-          <div className="w-[40px] min-w-[40px] h-[40px] min-h-[40px] bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
-            <ImageIcon className="w-4 h-4" />
-          </div>
-        )
-      },
+      render: (row) => <ProductImage src={row.image_url as string | null} size={40} />,
     },
     {
       key: 'product_code',
@@ -495,17 +512,7 @@ export default function InventoryPage() {
               {loading ? (
                 <Skeleton className="h-[250px]" />
               ) : seasonSummary.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={seasonSummary} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={currencyFormatter} />
-                    <YAxis type="category" dataKey="season" width={50} />
-                    <Tooltip formatter={currencyFormatter} />
-                    <Legend />
-                    <Bar dataKey="in_season_amount" name="シーズン内" stackId="a" fill="#3B82F6" />
-                    <Bar dataKey="exceeded_amount" name="シーズン超過" stackId="a" fill="#EF4444" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <LazySeasonBarChart data={seasonSummary} />
               ) : (
                 <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
@@ -521,24 +528,7 @@ export default function InventoryPage() {
               {loading ? (
                 <Skeleton className="h-[250px]" />
               ) : categoryChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={categoryChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-                    <YAxis tickFormatter={currencyFormatter} />
-                    <Tooltip formatter={currencyFormatter} />
-                    <Legend />
-                    {brands.map((b) => (
-                      <Bar
-                        key={b}
-                        dataKey={b}
-                        name={b}
-                        stackId="a"
-                        fill={BRAND_COLORS[b] || '#6B7280'}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
+                <LazyCategoryBarChart data={categoryChartData} brands={brands} brandColors={BRAND_COLORS} />
               ) : (
                 <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
               )}
@@ -596,13 +586,7 @@ export default function InventoryPage() {
         <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              {detailItem?.image_url ? (
-                <img src={detailItem.image_url} alt="" className="w-14 h-14 object-cover rounded" />
-              ) : (
-                <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
-                  <ImageIcon className="w-6 h-6" />
-                </div>
-              )}
+              <ProductImage src={detailItem?.image_url} size={56} />
               <div>
                 <div className="font-mono text-base">{detailItem?.product_code}</div>
                 <div className="text-sm text-gray-500 font-normal">{detailItem?.goods_name}</div>

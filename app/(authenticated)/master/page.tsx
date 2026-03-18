@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { formatCurrency, formatDate } from '@/lib/format'
 import { getCached, setCache, isFresh, buildClientCacheKey } from '@/lib/client-cache'
 import { BRAND_OPTIONS, CATEGORY_OPTIONS, SEASON_OPTIONS, getBrandDisplayName } from '@/lib/constants'
-import { ExternalLink, Image as ImageIcon, RefreshCw, AlertCircle, Loader2 } from 'lucide-react'
+import { ExternalLink, RefreshCw, AlertCircle, Loader2 } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
 import type { ProductMaster } from '@/types/master'
 
 const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1m_slCKW-k_pcEDW7goMDc7Mt3-gTQBL75mchKU-GOv8/edit?gid=1735499737#gid=1735499737'
@@ -53,14 +54,7 @@ interface SkuImageItem {
 function getKnownColumnRenderer(key: string): ((row: MasterRow) => React.ReactNode) | null {
   switch (key) {
     case 'image_url':
-      return (row) =>
-        row.image_url ? (
-          <img src={row.image_url} alt="" className="w-[44px] min-w-[44px] h-[44px] min-h-[44px] object-cover rounded shrink-0" />
-        ) : (
-          <div className="w-[44px] min-w-[44px] h-[44px] min-h-[44px] bg-gray-100 rounded flex items-center justify-center text-gray-300 shrink-0">
-            <ImageIcon className="w-4 h-4" />
-          </div>
-        )
+      return (row) => <ProductImage src={row.image_url} size={44} />
     case 'product_code':
       return (row) => <span className="font-mono font-medium">{row.product_code}</span>
     case 'zozo_product_code':
@@ -349,7 +343,7 @@ export default function MasterPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               {skuDialogProduct?.image_url && (
-                <img src={skuDialogProduct.image_url} alt="" className="w-12 h-12 object-cover rounded" />
+                <ProductImage src={skuDialogProduct.image_url} size={48} />
               )}
               <div>
                 <div className="font-mono text-base">{skuDialogProduct?.product_code}</div>
@@ -422,13 +416,7 @@ export default function MasterPage() {
                       {skuImages.map((sku, i) => (
                         <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                           <td className="px-3 py-2">
-                            {sku.sku_image_url ? (
-                              <img src={sku.sku_image_url} alt={sku.sku_code} className="w-14 h-14 object-cover rounded" />
-                            ) : (
-                              <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center text-gray-300">
-                                <ImageIcon className="w-5 h-5" />
-                              </div>
-                            )}
+                            <ProductImage src={sku.sku_image_url} size={56} />
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">{sku.color || '-'}</td>
                           <td className="px-3 py-2 whitespace-nowrap">{sku.size || '-'}</td>
