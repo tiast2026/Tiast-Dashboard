@@ -17,8 +17,6 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  AreaChart,
-  Area,
   LineChart,
 } from 'recharts'
 
@@ -192,57 +190,6 @@ function ChannelBreakdown({ channels, channelLabel = '当月' }: { channels: Cha
           )
         })}
       </div>
-    </div>
-  )
-}
-
-// Gross profit trend chart (stacked area: sales + gross profit)
-function GrossProfitTrendChart({ trend, grossProfitRate }: { trend: TrendData; grossProfitRate: number }) {
-  const chartData = trend.data.map(row => ({
-    month: row.month,
-    sales_amount: Math.round(row.sales_amount),
-    gross_profit: Math.round(row.sales_amount * grossProfitRate),
-  }))
-
-  if (chartData.length === 0) return null
-
-  return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <div className="text-gray-500 text-sm mb-2 font-medium">粗利推移</div>
-      <ResponsiveContainer width="100%" height={240}>
-        <AreaChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 12 }} />
-          <YAxis tickFormatter={fmtYAxis} tick={{ fontSize: 12 }} width={55} />
-          <Tooltip
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any) => formatCurrency(Number(value))}
-            labelFormatter={(l) => {
-              const parts = String(l).split('-')
-              return `${parts[0]}年${parseInt(parts[1])}月`
-            }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Area
-            type="monotone"
-            dataKey="sales_amount"
-            name="売上金額"
-            fill="#4A90D9"
-            fillOpacity={0.15}
-            stroke="#4A90D9"
-            strokeWidth={1.5}
-          />
-          <Area
-            type="monotone"
-            dataKey="gross_profit"
-            name="粗利金額"
-            fill="#10B981"
-            fillOpacity={0.25}
-            stroke="#10B981"
-            strokeWidth={1.5}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   )
 }
@@ -745,11 +692,6 @@ export default function ProductDetailDialog({
             </div>
           )}
         </div>
-
-        {/* Gross profit trend chart (only when data exists and profit rate > 0) */}
-        {trend && grossProfitRate > 0 && trend.data.length > 1 && (
-          <GrossProfitTrendChart trend={trend} grossProfitRate={grossProfitRate} />
-        )}
 
         {/* SKU comparison trend chart (product view only) */}
         {!isSkuView && allSkus.length > 1 && (
