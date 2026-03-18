@@ -40,24 +40,19 @@ interface RakutenApiResponse {
 }
 
 /**
- * 楽天ランキングAPIからランキングを取得
+ * 楽天ランキングAPIから1ページ分を取得
  */
-export async function fetchRakutenRanking(
-  rankingType: 'realtime' | 'daily' | 'weekly' = 'daily',
-  genreId: string = GENRE_LADIES_FASHION,
+async function fetchRakutenRankingPage(
+  appId: string,
+  rankingType: 'realtime' | 'daily' | 'weekly',
+  genreId: string,
+  page: number,
 ): Promise<RakutenRankingItem[]> {
-  const appId = process.env.RAKUTEN_APP_ID
-  if (!appId) {
-    throw new Error('RAKUTEN_APP_ID is not configured')
-  }
-
   const url = new URL(RAKUTEN_RANKING_API)
   url.searchParams.set('applicationId', appId)
   url.searchParams.set('genreId', genreId)
-  // carrier=0: PC, page=1 (default 30 items)
   url.searchParams.set('carrier', '0')
-  // 楽天APIのperiodパラメータ: 1=リアルタイム(default)
-  // ※ 現在のAPIバージョンではperiod指定不可のためrankingTypeはラベル用途
+  url.searchParams.set('page', String(page))
   if (rankingType === 'weekly') {
     url.searchParams.set('period', '2')
   }
@@ -83,6 +78,41 @@ export async function fetchRakutenRanking(
       review_average: item.reviewAverage || 0,
     }
   })
+}
+
+/**
+ * 楽天ランキングAPIからランキングを取得（最大100位まで、4ページ分）
+ * 楽天APIは1ページ30件×最大4ページ=120件まで取得可能
+ */
+export async function fetchRakutenRanking(
+  rankingType: 'realtime' | 'daily' | 'weekly' = 'daily',
+  genreId: string = GENRE_LADIES_FASHION,
+  maxRank: number = 100,
+): Promise<RakutenRankingItem[]> {
+  const appId = process.env.RAKUTEN_APP_ID
+  if (!appId) {
+    throw new Error('RAKUTEN_APP_ID is not configured')
+  }
+
+  // 必要ページ数を計算（1ページ30件、最大4ページ）
+  const pagesNeeded = Math.min(Math.ceil(maxRank / 30), 4)
+  const allItems: RakutenRankingItem[] = []
+
+  for (let page = 1; page <= pagesNeeded; page++) {
+    const items = await fetchRakutenRankingPage(appId, rankingType, genreId, page)
+    allItems.push(...items)
+
+    // 取得件数がmaxRankに達したら終了
+    if (allItems.length >= maxRank) break
+
+    // ページ間で少し待つ（APIレート制限対策）
+    if (page < pagesNeeded) {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    }
+  }
+
+  // maxRank以内のアイテムのみ返す
+  return allItems.filter((item) => item.rank <= maxRank)
 }
 
 /**
