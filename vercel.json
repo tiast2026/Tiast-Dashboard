@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/rakuten-ranking/collect?type=daily",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
