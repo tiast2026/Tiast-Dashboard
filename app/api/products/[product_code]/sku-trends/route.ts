@@ -4,8 +4,6 @@ import { buildCacheKey, cachedQuery } from '@/lib/cache'
 
 interface SkuTrendRow {
   goods_id: string
-  color: string
-  size: string
   month: string
   quantity: number
   sales_amount: number
@@ -30,8 +28,6 @@ export async function GET(
       const query = `
         SELECT
           o.goods_id,
-          COALESCE(p.goods_option1, '') AS color,
-          COALESCE(p.goods_option2, '') AS size,
           FORMAT_DATE('%Y-%m', PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10))) AS month,
           SUM(o.quantity) AS quantity,
           SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount
@@ -42,7 +38,7 @@ export async function GET(
           AND CAST(o.row_cancel_flag AS STRING) = '0'
           AND o.receive_order_date IS NOT NULL
           AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
-        GROUP BY o.goods_id, color, size, month
+        GROUP BY o.goods_id, month
         ORDER BY o.goods_id, month
       `
 

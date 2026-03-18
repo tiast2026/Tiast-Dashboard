@@ -249,8 +249,6 @@ function GrossProfitTrendChart({ trend, grossProfitRate }: { trend: TrendData; g
 
 interface SkuTrendRow {
   goods_id: string
-  color: string
-  size: string
   month: string
   quantity: number
   sales_amount: number
@@ -262,16 +260,23 @@ const SKU_COLORS = [
   '#14B8A6', '#EF4444', '#A855F7', '#0EA5E9', '#D946EF',
 ]
 
-function SkuComparisonChart({ data, metric }: { data: SkuTrendRow[]; metric: 'sales_amount' | 'quantity' }) {
+function SkuComparisonChart({ data, metric, allSkus }: { data: SkuTrendRow[]; metric: 'sales_amount' | 'quantity'; allSkus: SkuData[] }) {
   if (data.length === 0) {
     return <div className="text-sm text-gray-400 text-center py-8">データなし</div>
+  }
+
+  // Build a label map from allSkus (color/size from Sheets data)
+  const skuLabelMap = new Map<string, string>()
+  for (const sku of allSkus) {
+    const label = [sku.color, sku.size].filter(Boolean).join('/') || sku.goods_id
+    skuLabelMap.set(sku.goods_id, label)
   }
 
   // Group by goods_id
   const skuMap = new Map<string, { label: string; data: Map<string, number> }>()
   for (const row of data) {
     if (!skuMap.has(row.goods_id)) {
-      const label = [row.color, row.size].filter(Boolean).join('/') || row.goods_id
+      const label = skuLabelMap.get(row.goods_id) || row.goods_id
       skuMap.set(row.goods_id, { label, data: new Map() })
     }
     skuMap.get(row.goods_id)!.data.set(row.month, Number(row[metric]))
@@ -769,7 +774,7 @@ export default function ProductDetailDialog({
                 <div className="text-sm text-gray-400">読み込み中...</div>
               </div>
             ) : (
-              <SkuComparisonChart data={skuTrends} metric={skuTrendMetric} />
+              <SkuComparisonChart data={skuTrends} metric={skuTrendMetric} allSkus={allSkus} />
             )}
           </div>
         )}
