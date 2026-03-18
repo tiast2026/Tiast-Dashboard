@@ -245,6 +245,8 @@ function SkuExpansionRows({ productCode, period, month, columns }: { productCode
         sku={skus.find(s => s.goods_id === selectedSku) || null}
         productCode={productCode}
         allSkus={skus}
+        period={period}
+        month={month}
       />
     </>
   )
