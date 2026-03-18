@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, BarChart3 } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
 import { getChannelKey, CHANNEL_COLORS } from '@/lib/constants'
@@ -19,6 +19,7 @@ import {
   Legend,
   AreaChart,
   Area,
+  LineChart,
 } from 'recharts'
 
 interface SkuData {
@@ -246,6 +247,89 @@ function GrossProfitTrendChart({ trend, grossProfitRate }: { trend: TrendData; g
   )
 }
 
+interface SkuTrendRow {
+  goods_id: string
+  color: string
+  size: string
+  month: string
+  quantity: number
+  sales_amount: number
+}
+
+const SKU_COLORS = [
+  '#4A90D9', '#E5684E', '#10B981', '#F59E0B', '#8B5CF6',
+  '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
+  '#14B8A6', '#EF4444', '#A855F7', '#0EA5E9', '#D946EF',
+]
+
+function SkuComparisonChart({ data, metric }: { data: SkuTrendRow[]; metric: 'sales_amount' | 'quantity' }) {
+  if (data.length === 0) {
+    return <div className="text-sm text-gray-400 text-center py-8">データなし</div>
+  }
+
+  // Group by goods_id
+  const skuMap = new Map<string, { label: string; data: Map<string, number> }>()
+  for (const row of data) {
+    if (!skuMap.has(row.goods_id)) {
+      const label = [row.color, row.size].filter(Boolean).join('/') || row.goods_id
+      skuMap.set(row.goods_id, { label, data: new Map() })
+    }
+    skuMap.get(row.goods_id)!.data.set(row.month, Number(row[metric]))
+  }
+
+  // Collect all months
+  const months = Array.from(new Set(data.map(r => r.month))).sort()
+
+  // Build chart data: { month, "SKU1 label": value, ... }
+  const skuEntries = Array.from(skuMap.entries())
+
+  const chartData = months.map(month => {
+    const point: Record<string, string | number | null> = { month }
+    skuEntries.forEach(([, sku]) => {
+      point[sku.label] = sku.data.get(month) ?? null
+    })
+    return point
+  })
+
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <XAxis dataKey="month" tickFormatter={fmtMonth} tick={{ fontSize: 11 }} />
+        <YAxis
+          tickFormatter={metric === 'sales_amount' ? fmtYAxis : (v: number) => String(Math.round(v))}
+          tick={{ fontSize: 11 }}
+          width={55}
+        />
+        <Tooltip
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(value: any) =>
+            metric === 'sales_amount'
+              ? `¥${Math.round(Number(value)).toLocaleString()}`
+              : `${Math.round(Number(value))}点`
+          }
+          labelFormatter={(l) => {
+            const parts = String(l).split('-')
+            return `${parts[0]}年${parseInt(parts[1])}月`
+          }}
+        />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        {skuEntries.map(([, sku], i) => (
+          <Line
+            key={sku.label}
+            type="monotone"
+            dataKey={sku.label}
+            stroke={SKU_COLORS[i % SKU_COLORS.length]}
+            strokeWidth={2}
+            dot={{ r: 2.5 }}
+            connectNulls
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fmtTooltip = (value: any) => `¥${Math.round(Number(value)).toLocaleString()}`
 const fmtTooltipQty = (value: number) => `${Math.round(value).toLocaleString()}点`
@@ -341,6 +425,9 @@ export default function ProductDetailDialog({
   const [fetchedSkus, setFetchedSkus] = useState<SkuData[]>([])
   const [skusLoading, setSkusLoading] = useState(false)
   const [trendMonths, setTrendMonths] = useState<string>('12')
+  const [skuTrends, setSkuTrends] = useState<SkuTrendRow[]>([])
+  const [skuTrendsLoading, setSkuTrendsLoading] = useState(false)
+  const [skuTrendMetric, setSkuTrendMetric] = useState<'sales_amount' | 'quantity'>('sales_amount')
 
   const allSkus = allSkusProp || fetchedSkus
   const isSkuView = !!selectedSku
@@ -389,6 +476,17 @@ export default function ProductDetailDialog({
     if (!open) return
     fetchTrend(selectedSku?.goods_id, trendMonths)
   }, [open, selectedSku?.goods_id, fetchTrend, trendMonths])
+
+  // Fetch SKU comparison trends (product view only)
+  useEffect(() => {
+    if (!open || !productCode || isSkuView) return
+    setSkuTrendsLoading(true)
+    fetch(`/api/products/${encodeURIComponent(productCode)}/sku-trends?months=${trendMonths}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setSkuTrends(data?.data || []))
+      .catch(() => setSkuTrends([]))
+      .finally(() => setSkuTrendsLoading(false))
+  }, [open, productCode, isSkuView, trendMonths])
 
   if (!open) return null
 
@@ -646,6 +744,34 @@ export default function ProductDetailDialog({
         {/* Gross profit trend chart (only when data exists and profit rate > 0) */}
         {trend && grossProfitRate > 0 && trend.data.length > 1 && (
           <GrossProfitTrendChart trend={trend} grossProfitRate={grossProfitRate} />
+        )}
+
+        {/* SKU comparison trend chart (product view only) */}
+        {!isSkuView && allSkus.length > 1 && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-500 text-sm font-medium">SKU別売上比較（{trendMonths}ヶ月）</span>
+              </div>
+              <Select value={skuTrendMetric} onValueChange={(v) => setSkuTrendMetric(v as 'sales_amount' | 'quantity')}>
+                <SelectTrigger className="w-24 h-7 text-xs bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sales_amount">売上金額</SelectItem>
+                  <SelectItem value="quantity">販売数</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {skuTrendsLoading ? (
+              <div className="h-[280px] flex items-center justify-center">
+                <div className="text-sm text-gray-400">読み込み中...</div>
+              </div>
+            ) : (
+              <SkuComparisonChart data={skuTrends} metric={skuTrendMetric} />
+            )}
+          </div>
         )}
 
         {/* SKU list (product view only) */}
