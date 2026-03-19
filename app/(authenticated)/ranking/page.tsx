@@ -385,16 +385,26 @@ export default function RankingPage() {
       const res = await fetch('/api/rakuten-ranking/collect?genre=all')
       const data = await res.json()
       if (res.ok) {
-        const genreDetail = data.genre_results
-          ?.map((g: { genre_name: string; items: number; own: number }) =>
-            `${g.genre_name}: ${g.items}件(自社${g.own}件)`
-          ).join('、')
-        setCollectResult(
-          `全${data.genre_results?.length ?? 0}カテゴリ ${data.total_items}件取得、自社商品 ${data.own_items}件検出` +
-          (genreDetail ? `\n${genreDetail}` : '')
-        )
-        setCache(cacheKey, null as unknown)
-        fetchHistory()
+        const skipped = data.skipped_genres ?? 0
+        const totalGenres = data.genre_results?.length ?? 0
+
+        if (skipped > 0 && data.total_items === 0) {
+          // 全カテゴリが既に取得済み
+          setCollectResult('本日のランキングは既に取得済みです。次回更新後に再取得してください。')
+        } else {
+          const genreDetail = data.genre_results
+            ?.filter((g: { skipped?: boolean }) => !g.skipped)
+            ?.map((g: { genre_name: string; items: number; own: number }) =>
+              `${g.genre_name}: ${g.items}件(自社${g.own}件)`
+            ).join('、')
+          setCollectResult(
+            `全${totalGenres}カテゴリ ${data.total_items}件取得、自社商品 ${data.own_items}件検出` +
+            (skipped > 0 ? `（${skipped}カテゴリは取得済みのためスキップ）` : '') +
+            (genreDetail ? `\n${genreDetail}` : '')
+          )
+          setCache(cacheKey, null as unknown)
+          fetchHistory()
+        }
       } else {
         setCollectResult(`エラー: ${data.error}`)
       }

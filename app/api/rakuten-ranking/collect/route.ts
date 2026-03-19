@@ -52,8 +52,9 @@ export async function GET(request: NextRequest) {
 
     let totalItems = 0
     let totalOwn = 0
+    let skippedGenres = 0
     const allOwnProducts: RankingCollectResult['own_products'] = []
-    const genreResults: { genre_id: string; genre_name: string; items: number; own: number }[] = []
+    const genreResults: { genre_id: string; genre_name: string; items: number; own: number; skipped?: boolean }[] = []
 
     for (const genre of targetGenres) {
       try {
@@ -76,8 +77,24 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // BigQueryに保存（ランキング発表日時を渡す）
-        await saveRankingToBigQuery(items, 'daily', genre.id, matchResults, lastBuildDate)
+        // BigQueryに保存（ランキング発表日時を渡す）重複時は0件が返る
+        const savedCount = await saveRankingToBigQuery(items, 'daily', genre.id, matchResults, lastBuildDate)
+
+        if (savedCount === 0 && items.length > 0) {
+          // 既に保存済みのためスキップ
+          skippedGenres++
+          genreResults.push({
+            genre_id: genre.id,
+            genre_name: genre.name,
+            items: items.length,
+            own: ownProducts.length,
+            skipped: true,
+          })
+          console.log(
+            `[楽天ランキング] ${genre.name}(${genre.id}): ${items.length}件取得済み（スキップ）`
+          )
+          continue
+        }
 
         totalItems += items.length
         totalOwn += ownProducts.length
@@ -116,7 +133,7 @@ export async function GET(request: NextRequest) {
       `[楽天ランキング] 全体: ${targetGenres.length}ジャンル、${totalItems}件取得、自社商品${totalOwn}件`
     )
 
-    return NextResponse.json({ ...result, genre_results: genreResults })
+    return NextResponse.json({ ...result, genre_results: genreResults, skipped_genres: skippedGenres })
   } catch (e) {
     console.error('楽天ランキング取得エラー:', e)
     const message = e instanceof Error ? e.message : 'ランキング取得に失敗しました'
