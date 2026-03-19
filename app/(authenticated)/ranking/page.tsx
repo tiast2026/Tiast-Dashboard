@@ -105,6 +105,7 @@ export default function RankingPage() {
   const [loading, setLoading] = useState(true)
   const [collecting, setCollecting] = useState(false)
   const [collectResult, setCollectResult] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
   const cacheKey = `ranking:${rankingType}:${days}`
@@ -117,14 +118,21 @@ export default function RankingPage() {
     try {
       const params = new URLSearchParams({ type: rankingType, days, limit: '500' })
       const res = await fetch(`/api/rakuten-ranking/history?${params}`)
-      if (!res.ok) throw new Error('Failed to fetch')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errData.error || `HTTP ${res.status}`)
+      }
       const data = await res.json()
       if (mountedRef.current) {
         setRecords(Array.isArray(data) ? data : [])
         setCache(cacheKey, data)
+        setHistoryError(null)
       }
     } catch (e) {
       console.error('Failed to fetch ranking history:', e)
+      if (mountedRef.current) {
+        setHistoryError(e instanceof Error ? e.message : 'データの取得に失敗しました')
+      }
     } finally {
       if (mountedRef.current) setLoading(false)
     }
@@ -198,6 +206,12 @@ export default function RankingPage() {
             {collecting ? '取得中...' : '今すぐ取得'}
           </button>
         </div>
+
+        {historyError && (
+          <div className="px-4 py-3 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200">
+            <span className="font-medium">エラー:</span> {historyError}
+          </div>
+        )}
 
         {collectResult && (
           <div className={`px-4 py-2 rounded-lg text-sm ${

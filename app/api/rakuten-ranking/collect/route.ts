@@ -81,9 +81,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (e) {
     console.error('Rakuten ranking collect error:', e)
+    const message = e instanceof Error ? e.message : 'Failed to collect ranking'
+    // BigQuery権限エラーをわかりやすく変換
+    const isPermissionError = message.includes('Access Denied') || message.includes('permission') || message.includes('updateData')
+    const userMessage = isPermissionError
+      ? 'BigQueryへの書き込み権限がありません。GCPコンソールでサービスアカウントに「BigQuery データ編集者」ロールを付与してください。'
+      : message
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to collect ranking' },
-      { status: 500 }
+      { error: userMessage },
+      { status: isPermissionError ? 403 : 500 }
     )
   }
 }
