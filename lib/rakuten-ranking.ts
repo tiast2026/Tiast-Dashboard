@@ -41,7 +41,14 @@ interface RakutenApiResponse {
 }
 
 /**
- * 楽天ランキングAPIから1ページ分を取得
+ * 指数バックオフ付きスリープ
+ */
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * 楽天ランキングAPIから1ページ分を取得（429エラー時リトライ付き）
  */
 async function fetchRakutenRankingPage(
   appId: string,
@@ -60,37 +67,60 @@ async function fetchRakutenRankingPage(
     url.searchParams.set('period', 'realtime')
   }
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
-      'Origin': 'https://tiast2026.github.io',
-    },
-  })
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const body = await res.text()
-      detail = body.slice(0, 300)
-    } catch { /* ignore */ }
-    throw new Error(`Rakuten Ranking API error: ${res.status}${detail ? ` - ${detail}` : ''}`)
+  const maxRetries = 3
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
+        'Origin': 'https://tiast2026.github.io',
+      },
+    })
+
+    if (res.status === 429) {
+      if (attempt < maxRetries) {
+        // Retry-Afterヘッダーがあればその秒数待つ、なければ指数バックオフ
+        const retryAfter = res.headers.get('Retry-After')
+        const waitMs = retryAfter
+          ? parseInt(retryAfter, 10) * 1000
+          : Math.min(2000 * Math.pow(2, attempt), 16000) // 2s, 4s, 8s
+        console.warn(
+          `[Rakuten API] Rate limited (429) on page ${page}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`
+        )
+        await sleep(waitMs)
+        continue
+      }
+      throw new Error('楽天APIのレート制限に達しました。しばらく待ってから再度お試しください。')
+    }
+
+    if (!res.ok) {
+      let detail = ''
+      try {
+        const body = await res.text()
+        detail = body.slice(0, 300)
+      } catch { /* ignore */ }
+      throw new Error(`Rakuten Ranking API error: ${res.status}${detail ? ` - ${detail}` : ''}`)
+    }
+
+    const data: RakutenApiResponse = await res.json()
+    return (data.Items || []).map((wrapper) => {
+      const item = wrapper.Item
+      const images = item.mediumImageUrls || []
+      return {
+        rank: item.rank,
+        item_name: item.itemName || '',
+        item_code: item.itemCode || '',
+        item_price: item.itemPrice || 0,
+        item_url: item.itemUrl || '',
+        image_url: images[0]?.imageUrl?.replace('?_ex=128x128', '?_ex=300x300') || '',
+        shop_name: item.shopName || '',
+        review_count: item.reviewCount || 0,
+        review_average: item.reviewAverage || 0,
+      }
+    })
   }
 
-  const data: RakutenApiResponse = await res.json()
-  return (data.Items || []).map((wrapper) => {
-    const item = wrapper.Item
-    const images = item.mediumImageUrls || []
-    return {
-      rank: item.rank,
-      item_name: item.itemName || '',
-      item_code: item.itemCode || '',
-      item_price: item.itemPrice || 0,
-      item_url: item.itemUrl || '',
-      image_url: images[0]?.imageUrl?.replace('?_ex=128x128', '?_ex=300x300') || '',
-      shop_name: item.shopName || '',
-      review_count: item.reviewCount || 0,
-      review_average: item.reviewAverage || 0,
-    }
-  })
+  // TypeScript: unreachable but needed for type safety
+  throw new Error('Unexpected: all retries exhausted')
 }
 
 /**
@@ -119,9 +149,9 @@ export async function fetchRakutenRanking(
     // 取得件数がmaxRankに達したら終了
     if (allItems.length >= maxRank) break
 
-    // ページ間で少し待つ（APIレート制限対策）
+    // ページ間で待つ（APIレート制限対策）
     if (page < pagesNeeded) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await sleep(1000)
     }
   }
 
