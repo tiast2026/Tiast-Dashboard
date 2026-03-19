@@ -11,6 +11,27 @@ const RAKUTEN_RANKING_API = 'https://openapi.rakuten.co.jp/ichibaranking/api/Ich
 // レディースファッション ジャンルID
 const GENRE_LADIES_FASHION = '100371'
 
+// レディースファッション サブジャンル一覧
+export const RAKUTEN_GENRES: { id: string; name: string }[] = [
+  { id: '100371', name: 'レディースファッション（全体）' },
+  { id: '110729', name: 'ワンピース' },
+  { id: '555086', name: 'トップス' },
+  { id: '555089', name: 'ボトムス' },
+  { id: '555087', name: 'コート・ジャケット' },
+  { id: '555091', name: 'スーツ・セットアップ' },
+  { id: '555083', name: 'オールインワン・サロペット' },
+  { id: '553029', name: 'チュニック' },
+  { id: '555084', name: 'ドレス' },
+  { id: '568279', name: 'パンツドレス' },
+  { id: '409365', name: '水着' },
+  { id: '101801', name: 'その他' },
+]
+
+/** ジャンルIDからジャンル名を取得 */
+export function getGenreName(genreId: string): string {
+  return RAKUTEN_GENRES.find((g) => g.id === genreId)?.name ?? genreId
+}
+
 // 自社ショップ名パターン（楽天市場での店舗名）
 const OWN_SHOP_PATTERNS = [
   'noahl', 'ノアール', 'NOAHL',

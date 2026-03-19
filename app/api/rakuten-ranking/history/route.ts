@@ -9,6 +9,7 @@ import type { OwnProductRanking } from '@/types/ranking'
  * GET /api/rakuten-ranking/history
  *   ?product_code=nl-tp01 (optional: 特定商品のみ)
  *   &type=daily (optional: ranking種別)
+ *   &genre=100371 (optional: ジャンルID)
  *   &days=30 (optional: 直近N日分, default=90)
  *   &limit=100 (optional)
  */
@@ -17,12 +18,14 @@ export async function GET(request: NextRequest) {
     const sp = request.nextUrl.searchParams
     const productCode = sp.get('product_code')
     const rankingType = sp.get('type')
+    const genreId = sp.get('genre')
     const days = parseInt(sp.get('days') || '90', 10)
     const limit = parseInt(sp.get('limit') || '200', 10)
 
     const cacheKey = buildCacheKey('rakuten-ranking-history', {
       product_code: productCode || undefined,
       type: rankingType || undefined,
+      genre: genreId || undefined,
       days: String(days),
       limit: String(limit),
     })
@@ -41,6 +44,10 @@ export async function GET(request: NextRequest) {
       if (rankingType) {
         conditions.push('ranking_type = @ranking_type')
         params.ranking_type = rankingType
+      }
+      if (genreId) {
+        conditions.push('genre_id = @genre_id')
+        params.genre_id = genreId
       }
 
       const query = `
