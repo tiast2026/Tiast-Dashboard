@@ -66,7 +66,7 @@ export default function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col flex-1 min-h-0">
+      <div className="border border-black/[0.06] rounded-xl overflow-hidden bg-white shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col flex-1 min-h-0">
         <div className="overflow-x-auto flex-1 min-h-0 overflow-y-auto">
         <Table style={{ tableLayout: 'fixed' }}>
           <colgroup>
@@ -75,7 +75,7 @@ export default function DataTable<T extends Record<string, unknown>>({
             ))}
           </colgroup>
           <TableHeader className="sticky top-0 z-10">
-            <TableRow className="bg-[#FAFAF8] border-b border-black/[0.06]">
+            <TableRow className="bg-gradient-to-b from-[#FAFAF8] to-[#F6F4F1] border-b border-black/[0.08]">
               {columns.map((col) => {
                 const stickyStyle = col.stickyLeft != null
                   ? { position: 'sticky' as const, left: col.stickyLeft, zIndex: 20 }
@@ -83,15 +83,17 @@ export default function DataTable<T extends Record<string, unknown>>({
                 return (
                 <TableHead
                   key={col.key}
-                  className={`text-xs font-semibold text-[#8A7D72] tracking-wider whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-black/[0.02] transition-colors' : ''} ${col.stickyLeft != null ? 'bg-[#FAFAF8]' : ''} ${col.className || ''}`}
+                  className={`text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.sortable ? 'cursor-pointer select-none hover:text-[#5A524B] transition-colors' : ''} ${col.stickyLeft != null ? 'bg-[#FAFAF8]' : ''} ${col.className || ''}`}
                   style={stickyStyle}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
-                  <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : ''}`}>
+                  <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : ''}`}>
                     {col.headerRender ? col.headerRender() : col.label}
                     {col.sortable && (
                       sortKey === col.key
-                        ? (sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)
+                        ? (sortOrder === 'asc'
+                          ? <ChevronUp className="w-3.5 h-3.5 text-[#5A524B]" />
+                          : <ChevronDown className="w-3.5 h-3.5 text-[#5A524B]" />)
                         : <ChevronsUpDown className="w-3.5 h-3.5 text-[#C4B8AC]" />
                     )}
                   </div>
@@ -103,12 +105,12 @@ export default function DataTable<T extends Record<string, unknown>>({
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-12 text-[#A99D93]">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 rounded-full bg-[#F3F0ED] flex items-center justify-center">
-                      <span className="text-lg">-</span>
+                <TableCell colSpan={columns.length} className="text-center py-16 text-[#A99D93]">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-b from-[#F3F0ED] to-[#EBE7E3] flex items-center justify-center">
+                      <span className="text-lg text-[#B5A99D]">-</span>
                     </div>
-                    <span className="text-sm">データがありません</span>
+                    <span className="text-sm font-medium">データがありません</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -119,7 +121,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                 return (
                   <React.Fragment key={rowKey}>
                     <TableRow
-                      className={`group/row border-b border-black/[0.08] ${onRowClick ? 'cursor-pointer hover:bg-[#FDFCFA] transition-colors duration-150' : ''} ${rowClassName ? rowClassName(row) : ''} ${isExpanded ? 'bg-[#FAFAF8]' : ''}`}
+                      className={`group/row border-b border-black/[0.05] ${i % 2 === 1 ? 'bg-[#FDFCFB]' : ''} ${onRowClick ? 'cursor-pointer hover:bg-[#F7F5F2] transition-colors duration-150' : 'hover:bg-[#FAFAF8] transition-colors duration-150'} ${rowClassName ? rowClassName(row) : ''} ${isExpanded ? 'bg-[#F5F3F0]' : ''}`}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                     >
                       {columns.map((col) => {
@@ -129,7 +131,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                         return (
                           <TableCell
                             key={col.key}
-                            className={`text-xs text-[#3D352F] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? (isExpanded ? 'bg-[#FAFAF8]' : 'bg-white group-hover/row:bg-[#FDFCFA]') : ''} ${col.className || ''}`}
+                            className={`text-[13px] text-[#3D352F] ${col.align === 'right' ? 'text-right tabular-nums' : col.align === 'center' ? 'text-center' : ''} ${col.stickyLeft != null ? (isExpanded ? 'bg-[#F5F3F0]' : i % 2 === 1 ? 'bg-[#FDFCFB] group-hover/row:bg-[#F7F5F2]' : 'bg-white group-hover/row:bg-[#FAFAF8]') : ''} ${col.className || ''}`}
                             style={stickyStyle}
                           >
                             {col.render ? col.render(row) : String(row[col.key] ?? '-')}
@@ -139,7 +141,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                     </TableRow>
                     {isExpanded && renderExpandedRows && renderExpandedRows(row, columns)}
                     {isExpanded && !renderExpandedRows && renderExpandedRow && (
-                      <TableRow className="bg-[#FAFAF8] border-b border-black/[0.08]">
+                      <TableRow className="bg-[#F5F3F0] border-b border-black/[0.05]">
                         <TableCell colSpan={columns.length} className="p-0">
                           {renderExpandedRow(row)}
                         </TableCell>
@@ -153,25 +155,25 @@ export default function DataTable<T extends Record<string, unknown>>({
         </Table>
         </div>
         {totalPages > 1 && onPageChange && (
-          <div className="flex items-center justify-between px-3 py-1.5 border-t border-black/[0.06]">
-            <span className="text-[11px] text-[#A99D93]">
+          <div className="flex items-center justify-between px-4 py-2 border-t border-black/[0.06] bg-[#FAFAF8]">
+            <span className="text-[11px] text-[#8A7D72] font-medium">
               全{total.toLocaleString()}件中 {((currentPage - 1) * pageSize + 1).toLocaleString()}-{Math.min(currentPage * pageSize, total).toLocaleString()}件
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 w-6 p-0 rounded border-black/[0.08]"
+                className="h-7 w-7 p-0 rounded-md border-black/[0.08] hover:bg-white transition-colors"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </Button>
-              <span className="text-[11px] px-2 text-[#5A524B]">{currentPage} / {totalPages}</span>
+              <span className="text-[11px] px-2.5 text-[#5A524B] font-medium tabular-nums">{currentPage} / {totalPages}</span>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 w-6 p-0 rounded border-black/[0.08]"
+                className="h-7 w-7 p-0 rounded-md border-black/[0.08] hover:bg-white transition-colors"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
               >

@@ -405,17 +405,17 @@ function DashboardPageContent() {
             {loading ? (
               <Skeleton className="h-[200px]" />
             ) : brandGroups.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto border border-black/[0.06] rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left p-2 font-medium text-gray-600 w-[160px]"></th>
-                      <th className="text-right p-2 font-medium text-gray-600">売上金額</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[70px]">受注件数</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[90px]">粗利額</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">粗利率</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">構成比</th>
-                      <th className="text-right p-2 font-medium text-gray-600 w-[60px]">前年比</th>
+                    <tr className="bg-gradient-to-b from-[#FAFAF8] to-[#F6F4F1] border-b border-black/[0.08]">
+                      <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[160px]"></th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider">売上金額</th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[80px]">受注件数</th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[100px]">粗利額</th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[70px]">粗利率</th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[70px]">構成比</th>
+                      <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] uppercase tracking-wider w-[70px]">前年比</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -424,33 +424,33 @@ function DashboardPageContent() {
                       const brandYoy = group.subtotal.prev > 0 ? group.subtotal.current / group.subtotal.prev : null
                       return (
                         <React.Fragment key={group.brand}>
-                          <tr className="border-b bg-gray-50/80">
-                            <td className="p-2 font-semibold text-gray-800">{group.brand}</td>
-                            <td className="p-2 text-right font-semibold tabular-nums">{formatCurrency(group.subtotal.current)}</td>
-                            <td className="p-2 text-right font-semibold tabular-nums">{formatNumber(group.subtotal.orders)}</td>
-                            <td className="p-2 text-right font-semibold tabular-nums">{formatCurrency(group.subtotal.profit)}</td>
-                            <td className="p-2 text-right font-semibold tabular-nums text-gray-500">
+                          <tr className="border-b border-black/[0.06] bg-[#F8F6F3]">
+                            <td className="px-3 py-2 font-semibold text-[13px] text-[#3D352F]">{group.brand}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-[13px] tabular-nums text-[#3D352F]">{formatCurrency(group.subtotal.current)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-[13px] tabular-nums text-[#3D352F]">{formatNumber(group.subtotal.orders)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-[13px] tabular-nums text-[#3D352F]">{formatCurrency(group.subtotal.profit)}</td>
+                            <td className="px-3 py-2 text-right font-medium text-[13px] tabular-nums text-[#8A7D72]">
                               {group.subtotal.current > 0 ? formatPercent(group.subtotal.profit / group.subtotal.current) : '-'}
                             </td>
-                            <td className="p-2 text-right tabular-nums text-gray-500 font-medium">{(brandRatio * 100).toFixed(1)}%</td>
-                            <td className={`p-2 text-right text-sm font-semibold ${brandYoy == null ? '' : brandYoy >= 1 ? 'text-green-700' : 'text-red-600'}`}>
+                            <td className="px-3 py-2 text-right tabular-nums text-[13px] text-[#8A7D72] font-medium">{(brandRatio * 100).toFixed(1)}%</td>
+                            <td className={`px-3 py-2 text-right text-[13px] font-semibold tabular-nums ${brandYoy == null ? 'text-[#8A7D72]' : brandYoy >= 1 ? 'text-emerald-600' : 'text-rose-500'}`}>
                               {brandYoy != null ? `${(brandYoy * 100).toFixed(1)}%` : '-'}
                             </td>
                           </tr>
-                          {group.channels.map((ch) => {
+                          {group.channels.map((ch, ci) => {
                             const chRatio = grandTotal.current > 0 ? ch.current / grandTotal.current : 0
                             const chYoy = ch.prev > 0 ? ch.current / ch.prev : null
                             return (
-                              <tr key={`${group.brand}-${ch.channel}`} className="border-b hover:bg-gray-50/50">
-                                <td className="p-2 pl-6 text-gray-600">{ch.channel}</td>
-                                <td className="p-2 text-right tabular-nums">{formatCurrency(ch.current)}</td>
-                                <td className="p-2 text-right tabular-nums text-gray-500 text-xs">{formatNumber(ch.orders)}</td>
-                                <td className="p-2 text-right tabular-nums text-xs">{formatCurrency(ch.profit)}</td>
-                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
+                              <tr key={`${group.brand}-${ch.channel}`} className={`border-b border-black/[0.04] hover:bg-[#FAFAF8] transition-colors ${ci % 2 === 1 ? 'bg-[#FDFCFB]' : ''}`}>
+                                <td className="px-3 py-1.5 pl-7 text-[12px] text-[#5A524B]">{ch.channel}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#3D352F]">{formatCurrency(ch.current)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#8A7D72]">{formatNumber(ch.orders)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#5A524B]">{formatCurrency(ch.profit)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#A99D93]">
                                   {ch.current > 0 ? formatPercent(ch.profit / ch.current) : '-'}
                                 </td>
-                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">{(chRatio * 100).toFixed(1)}%</td>
-                                <td className={`p-2 text-right text-xs font-medium ${chYoy == null ? '' : chYoy >= 1 ? 'text-green-700' : 'text-red-600'}`}>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#A99D93]">{(chRatio * 100).toFixed(1)}%</td>
+                                <td className={`px-3 py-1.5 text-right text-[12px] font-medium tabular-nums ${chYoy == null ? 'text-[#A99D93]' : chYoy >= 1 ? 'text-emerald-600' : 'text-rose-500'}`}>
                                   {chYoy != null ? `${(chYoy * 100).toFixed(1)}%` : '-'}
                                 </td>
                               </tr>
@@ -461,16 +461,16 @@ function DashboardPageContent() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 bg-gray-100 font-semibold">
-                      <td className="p-2">合計</td>
-                      <td className="p-2 text-right tabular-nums">{formatCurrency(grandTotal.current)}</td>
-                      <td className="p-2 text-right tabular-nums">{formatNumber(grandTotal.orders)}</td>
-                      <td className="p-2 text-right tabular-nums">{formatCurrency(grandTotal.profit)}</td>
-                      <td className="p-2 text-right tabular-nums text-gray-500">
+                    <tr className="border-t-2 border-black/[0.1] bg-gradient-to-b from-[#F3F0ED] to-[#EDE9E5] font-semibold">
+                      <td className="px-3 py-2.5 text-[13px] text-[#3D352F]">合計</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-[#3D352F]">{formatCurrency(grandTotal.current)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-[#3D352F]">{formatNumber(grandTotal.orders)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-[#3D352F]">{formatCurrency(grandTotal.profit)}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-[#8A7D72]">
                         {grandTotal.current > 0 ? formatPercent(grandTotal.profit / grandTotal.current) : '-'}
                       </td>
-                      <td className="p-2 text-right tabular-nums text-gray-500">100.0%</td>
-                      <td className={`p-2 text-right text-sm font-semibold ${grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''}`}>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-[#8A7D72]">100.0%</td>
+                      <td className={`px-3 py-2.5 text-right text-[13px] font-semibold tabular-nums ${grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-emerald-600' : 'text-rose-500') : ''}`}>
                         {grandTotal.prev > 0 ? `${((grandTotal.current / grandTotal.prev) * 100).toFixed(1)}%` : '-'}
                       </td>
                     </tr>
