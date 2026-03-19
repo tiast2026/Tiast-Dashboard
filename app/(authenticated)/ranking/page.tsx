@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Trophy, TrendingUp, Star, Clock, RefreshCw, Info } from 'lucide-react'
+import { Trophy, TrendingUp, Star, Clock, RefreshCw, Info, Trash2 } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 
 interface RankingRecord {
@@ -85,6 +85,13 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   return Array.from(map.values()).sort((a, b) => a.best_rank - b.best_rank)
 }
 
+function formatDateTime(date: string | null | undefined): string {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function RankBadge({ rank }: { rank: number }) {
   if (rank <= 3) {
     const colors = ['', 'text-yellow-500', 'text-gray-400', 'text-amber-600']
@@ -149,6 +156,23 @@ export default function RankingPage() {
     return () => { mountedRef.current = false }
   }, [fetchHistory, cacheKey])
 
+  const handleClear = async () => {
+    if (!confirm('楽天ランキング履歴データを全削除します。よろしいですか？')) return
+    try {
+      const res = await fetch('/api/rakuten-ranking/clear', { method: 'DELETE' })
+      if (res.ok) {
+        setRecords([])
+        setCache(cacheKey, null as unknown)
+        setCollectResult('履歴データを全削除しました。「今すぐ取得」で再取得してください。')
+      } else {
+        const data = await res.json()
+        setCollectResult(`削除エラー: ${data.error}`)
+      }
+    } catch {
+      setCollectResult('削除に失敗しました')
+    }
+  }
+
   const handleCollect = async () => {
     setCollecting(true)
     setCollectResult(null)
@@ -189,14 +213,23 @@ export default function RankingPage() {
               <SelectItem value="180">直近180日</SelectItem>
             </SelectContent>
           </Select>
-          <button
-            onClick={handleCollect}
-            disabled={collecting}
-            className="ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#BF0000] hover:bg-[#A00000] rounded-lg transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
-            {collecting ? '取得中...' : '今すぐ取得'}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              履歴クリア
+            </button>
+            <button
+              onClick={handleCollect}
+              disabled={collecting}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#BF0000] hover:bg-[#A00000] rounded-lg transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
+              {collecting ? '取得中...' : '今すぐ取得'}
+            </button>
+          </div>
         </div>
 
         {/* ランキングの説明 */}
@@ -262,7 +295,7 @@ export default function RankingPage() {
                   最終取得
                 </div>
                 <div className="text-lg font-bold text-gray-800">
-                  {records.length > 0 ? formatDate(records[0].fetched_at) : '-'}
+                  {records.length > 0 ? formatDateTime(records[0].fetched_at) : '-'}
                 </div>
               </CardContent>
             </Card>
@@ -306,7 +339,7 @@ export default function RankingPage() {
                     </div>
 
                     {/* Product Info */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 max-w-md">
                       <div className="font-medium text-sm truncate" title={product.item_name}>
                         {product.item_name}
                       </div>
