@@ -1,38 +1,70 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
-import { getBrandDisplayName } from '@/lib/constants'
+import { getBrandDisplayName, BRAND_COLORS, CHANNEL_GROUP_COLORS } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
-import { LazyDailySalesChart as DailySalesChart, LazyBarChart as BarChart } from '@/components/charts/LazyCharts'
+import AlertCard from '@/components/cards/AlertCard'
+import {
+  LazyDailySalesChart as DailySalesChart,
+  LazyBarChart as BarChart,
+  LazyStackedBarChart as StackedBarChart,
+  LazyDonutChart as DonutChart,
+} from '@/components/charts/LazyCharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatPercent, formatNumber, formatChangeRate, formatYoY, getCurrentMonth, getPreviousMonth, getLastYearMonth, formatMonth } from '@/lib/format'
+import {
+  formatCurrency,
+  formatPercent,
+  formatNumber,
+  formatChangeRate,
+  formatYoY,
+  getCurrentMonth,
+  getPreviousMonth,
+  getLastYearMonth,
+  formatMonth,
+} from '@/lib/format'
 import { getCached, setCache, isFresh, fetchWithDedup } from '@/lib/client-cache'
-import type { SalesSummaryResponse, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
+import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, CategoryRankingItem, YoYComparisonItem, DailySalesItem } from '@/types/sales'
+import type { CustomerSummary } from '@/types/customer'
+import type { InventoryAlerts } from '@/types/inventory'
+import { Users, UserPlus, Repeat, TrendingUp, ShoppingCart, Percent, CreditCard } from 'lucide-react'
 
 interface DashboardData {
   summary: SalesSummaryResponse | null
   ranking: CategoryRankingItem[]
   yoy: YoYComparisonItem[]
   dailyTrend: DailySalesItem[]
+  monthlyTrend: MonthlyTrendItem[]
+  brandComposition: BrandCompositionItem[]
+  customerSummary: CustomerSummary | null
+  inventoryAlerts: InventoryAlerts | null
 }
 
 function DashboardPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const urlBrand = searchParams.get('brand')
   const [month, setMonth] = useState(getCurrentMonth())
   const [brand, setBrand] = useState(urlBrand || '全て')
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
-  const cacheKey = `dashboard:${month}:${brandParam}`
+  const cacheKey = `dashboard-v2:${month}:${brandParam}`
 
   const cached = getCached<DashboardData>(cacheKey)
-  const [summary, setSummary] = useState<SalesSummaryResponse | null>(cached?.summary ?? null)
-  const [ranking, setRanking] = useState<CategoryRankingItem[]>(cached?.ranking ?? [])
-  const [yoy, setYoy] = useState<YoYComparisonItem[]>(cached?.yoy ?? [])
-  const [dailyTrend, setDailyTrend] = useState<DailySalesItem[]>(cached?.dailyTrend ?? [])
+  const [data, setData] = useState<DashboardData>(
+    cached ?? {
+      summary: null,
+      ranking: [],
+      yoy: [],
+      dailyTrend: [],
+      monthlyTrend: [],
+      brandComposition: [],
+      customerSummary: null,
+      inventoryAlerts: null,
+    }
+  )
   const [loading, setLoading] = useState(!cached)
   const mountedRef = useRef(true)
 
@@ -41,32 +73,41 @@ function DashboardPageContent() {
     if (!getCached(cacheKey)) setLoading(true)
 
     try {
-      const data = await fetchWithDedup<DashboardData>(cacheKey, async () => {
-        const [summaryRes, rankRes, yoyRes, dailyRes] = await Promise.all([
+      const result = await fetchWithDedup<DashboardData>(cacheKey, async () => {
+        const [summaryRes, rankRes, yoyRes, dailyRes, trendRes, brandRes, custRes, invRes] = await Promise.all([
           fetch(`/api/sales/summary?month=${month}${brandParam}`),
           fetch(`/api/sales/category-ranking?month=${month}${brandParam}`),
           fetch(`/api/sales/yoy-comparison?month=${month}`),
           fetch(`/api/sales/daily-trend?month=${month}${brandParam}`),
+          fetch(`/api/sales/monthly-trend?months=12${brandParam}`),
+          fetch(`/api/sales/brand-composition?month=${month}`),
+          fetch(`/api/customers/summary?month=${month}${brandParam}`),
+          fetch(`/api/inventory/alerts`),
         ])
-        const [summaryData, rankData, yoyData, dailyData] = await Promise.all([
+        const [summaryData, rankData, yoyData, dailyData, trendData, brandData, custData, invData] = await Promise.all([
           summaryRes.ok ? summaryRes.json() : null,
           rankRes.ok ? rankRes.json() : [],
           yoyRes.ok ? yoyRes.json() : [],
           dailyRes.ok ? dailyRes.json() : [],
+          trendRes.ok ? trendRes.json() : [],
+          brandRes.ok ? brandRes.json() : [],
+          custRes.ok ? custRes.json() : null,
+          invRes.ok ? invRes.json() : null,
         ])
         return {
           summary: summaryData,
           ranking: Array.isArray(rankData) ? rankData : [],
           yoy: Array.isArray(yoyData) ? yoyData : [],
           dailyTrend: Array.isArray(dailyData) ? dailyData : [],
+          monthlyTrend: Array.isArray(trendData) ? trendData : [],
+          brandComposition: Array.isArray(brandData) ? brandData : [],
+          customerSummary: custData && !custData.error ? custData : null,
+          inventoryAlerts: invData && !invData.error ? invData : null,
         }
       })
       if (!mountedRef.current) return
-      setSummary(data.summary)
-      setRanking(data.ranking)
-      setYoy(data.yoy)
-      setDailyTrend(data.dailyTrend)
-      setCache(cacheKey, data)
+      setData(result)
+      setCache(cacheKey, result)
     } catch (e) {
       console.error('Failed to fetch dashboard data:', e)
     } finally {
@@ -76,43 +117,33 @@ function DashboardPageContent() {
 
   useEffect(() => {
     mountedRef.current = true
-    // Restore from cache immediately
     const c = getCached<DashboardData>(cacheKey)
     if (c) {
-      setSummary(c.summary)
-      setRanking(c.ranking)
-      setYoy(c.yoy)
-      setDailyTrend(c.dailyTrend)
+      setData(c)
       setLoading(false)
     }
     fetchData()
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [fetchData, cacheKey])
 
-  // Build brand-grouped channel sales from YoY data (memoized)
+  const { summary, ranking, yoy, dailyTrend, monthlyTrend, brandComposition, customerSummary, inventoryAlerts } = data
+
+  // --- Brand × Channel Table ---
   const { brandGroups, grandTotal } = useMemo(() => {
-    // Extract pure channel name from patterns like 【楽天】NOAHL
     function extractChannel(raw: string): string {
       const m = raw.match(/【(.+?)】/)
-      if (m) return m[1]
-      return raw
+      return m ? m[1] : raw
     }
-
-    // Ensure numeric values (BigQuery NUMERIC can come as strings)
     function num(v: unknown): number {
       if (typeof v === 'number') return v
       if (typeof v === 'string') return Number(v) || 0
       return 0
     }
 
-    // Group: brand → channel → { current, prev, orders, profit }
     const brandMap: Record<string, { channel: string; current: number; prev: number; orders: number; prevOrders: number; profit: number; prevProfit: number }[]> = {}
-    let gCurrent = 0
-    let gPrev = 0
-    let gOrders = 0
-    let gPrevOrders = 0
-    let gProfit = 0
-    let gPrevProfit = 0
+    let gCurrent = 0, gPrev = 0, gOrders = 0, gPrevOrders = 0, gProfit = 0, gPrevProfit = 0
 
     for (const item of yoy) {
       const b = item.brand
@@ -125,7 +156,6 @@ function DashboardPageContent() {
       const prevProfit = num(item.previous_year_gross_profit)
 
       if (!brandMap[b]) brandMap[b] = []
-      // Merge if same channel exists for same brand
       const existing = brandMap[b].find((x) => x.channel === ch)
       if (existing) {
         existing.current += cur
@@ -145,7 +175,6 @@ function DashboardPageContent() {
       gPrevProfit += prevProfit
     }
 
-    // Sort channels within each brand by current sales desc
     const brandGroups = Object.entries(brandMap)
       .map(([brand, channels]) => {
         channels.sort((a, b) => b.current - a.current)
@@ -164,10 +193,36 @@ function DashboardPageContent() {
     return { brandGroups, grandTotal: { current: gCurrent, prev: gPrev, orders: gOrders, prevOrders: gPrevOrders, profit: gProfit, prevProfit: gPrevProfit } }
   }, [yoy])
 
-  const barData = useMemo(() => ranking.map((r) => ({
-    name: r.category,
-    value: r.sales_amount,
-  })), [ranking])
+  // --- Monthly Trend Chart Data ---
+  const { trendChartData, trendKeys } = useMemo(() => {
+    const channelGroups = ['楽天系', '公式系', 'TikTok系', 'その他']
+    const monthMap: Record<string, Record<string, number>> = {}
+    for (const item of monthlyTrend) {
+      if (!monthMap[item.month]) monthMap[item.month] = {}
+      monthMap[item.month][item.channel_group] = Number(item.sales_amount) || 0
+    }
+    const trendChartData = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, groups]) => ({ month, ...groups }))
+    return { trendChartData, trendKeys: channelGroups }
+  }, [monthlyTrend])
+
+  // --- Brand Composition Donut ---
+  const donutData = useMemo(() => {
+    return brandComposition.map((b) => ({
+      name: b.brand,
+      value: Number(b.sales_amount) || 0,
+      color: BRAND_COLORS[b.brand] || '#999',
+    }))
+  }, [brandComposition])
+
+  // --- Category Ranking Bar Data ---
+  const barData = useMemo(
+    () => ranking.map((r) => ({ name: r.category, value: r.sales_amount })),
+    [ranking]
+  )
+
+  const SkeletonCard = () => <Skeleton className="h-28 rounded-lg" />
 
   return (
     <>
@@ -175,46 +230,176 @@ function DashboardPageContent() {
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={setBrand} />
 
-        {/* KPI Cards */}
-        {loading ? (
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-lg" />
-            ))}
-          </div>
-        ) : summary ? (
-          <div className="grid grid-cols-4 gap-4">
-            <KPICard
-              title="今月売上合計"
-              value={formatCurrency(summary.current.sales_amount)}
-              change={formatChangeRate(summary.current.sales_amount, summary.previous_month.sales_amount)}
-              yoyText={formatYoY(summary.current.sales_amount, summary.previous_year.sales_amount)}
-            />
-            <KPICard
-              title="今月受注件数"
-              value={`${formatNumber(summary.current.order_count)}件`}
-              change={formatChangeRate(summary.current.order_count, summary.previous_month.order_count)}
-              yoyText={formatYoY(summary.current.order_count, summary.previous_year.order_count)}
-            />
-            <KPICard
-              title="今月粗利率"
-              value={formatPercent(summary.current.gross_profit_rate)}
-              change={formatChangeRate(summary.current.gross_profit_rate, summary.previous_month.gross_profit_rate)}
-              yoyText={formatPercent(summary.previous_year.gross_profit_rate)}
-            />
-            <KPICard
-              title="今月客単価"
-              value={formatCurrency(summary.current.avg_order_value)}
-              change={formatChangeRate(summary.current.avg_order_value, summary.previous_month.avg_order_value)}
-              yoyText={formatYoY(summary.current.avg_order_value, summary.previous_year.avg_order_value)}
-            />
-          </div>
-        ) : null}
+        {/* ===== Section 1: 売上 KPI ===== */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">売上サマリー</h2>
+          {loading ? (
+            <div className="grid grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : summary ? (
+            <div className="grid grid-cols-4 gap-4">
+              <KPICard
+                title="売上合計"
+                value={formatCurrency(summary.current.sales_amount)}
+                change={formatChangeRate(summary.current.sales_amount, summary.previous_month.sales_amount)}
+                yoyText={formatYoY(summary.current.sales_amount, summary.previous_year.sales_amount)}
+                icon={<TrendingUp className="w-5 h-5" />}
+              />
+              <KPICard
+                title="受注件数"
+                value={`${formatNumber(summary.current.order_count)}件`}
+                change={formatChangeRate(summary.current.order_count, summary.previous_month.order_count)}
+                yoyText={formatYoY(summary.current.order_count, summary.previous_year.order_count)}
+                icon={<ShoppingCart className="w-5 h-5" />}
+              />
+              <KPICard
+                title="粗利率"
+                value={formatPercent(summary.current.gross_profit_rate)}
+                change={formatChangeRate(summary.current.gross_profit_rate, summary.previous_month.gross_profit_rate)}
+                yoyText={formatPercent(summary.previous_year.gross_profit_rate)}
+                icon={<Percent className="w-5 h-5" />}
+              />
+              <KPICard
+                title="客単価"
+                value={formatCurrency(summary.current.avg_order_value)}
+                change={formatChangeRate(summary.current.avg_order_value, summary.previous_month.avg_order_value)}
+                yoyText={formatYoY(summary.current.avg_order_value, summary.previous_year.avg_order_value)}
+                icon={<CreditCard className="w-5 h-5" />}
+              />
+            </div>
+          ) : null}
+        </div>
 
-        {/* Brand × Channel Sales Table */}
+        {/* ===== Section 2: 顧客 KPI ===== */}
+        <div>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">顧客サマリー</h2>
+          {loading ? (
+            <div className="grid grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
+          ) : customerSummary ? (
+            <div className="grid grid-cols-3 gap-4">
+              <KPICard
+                title="新規顧客数"
+                value={`${formatNumber(customerSummary.new_customers)}人`}
+                change={formatChangeRate(customerSummary.new_customers, customerSummary.prev_new_customers)}
+                icon={<UserPlus className="w-5 h-5" />}
+              />
+              <KPICard
+                title="リピート顧客数"
+                value={`${formatNumber(customerSummary.repeat_customers)}人`}
+                change={formatChangeRate(customerSummary.repeat_customers, customerSummary.prev_repeat_customers)}
+                icon={<Repeat className="w-5 h-5" />}
+              />
+              <KPICard
+                title="リピート率"
+                value={formatPercent(customerSummary.repeat_rate)}
+                change={formatChangeRate(customerSummary.repeat_rate, customerSummary.prev_repeat_rate)}
+                icon={<Users className="w-5 h-5" />}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => (
+                <Card key={i}><CardContent className="p-5 text-center text-gray-400 text-sm">データなし</CardContent></Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ===== Section 3: 在庫アラート ===== */}
+        {inventoryAlerts && (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">在庫アラート</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <AlertCard
+                title="過剰在庫"
+                count={inventoryAlerts.overstock.count}
+                amount={formatCurrency(inventoryAlerts.overstock.amount)}
+                color="red"
+                onClick={() => router.push('/inventory?alert=overstock')}
+              />
+              <AlertCard
+                title="シーズン終了間近"
+                count={inventoryAlerts.season_ending.count}
+                amount={formatCurrency(inventoryAlerts.season_ending.amount)}
+                color="yellow"
+                onClick={() => router.push('/inventory?alert=season_ending')}
+              />
+              <AlertCard
+                title="シーズン超過"
+                count={inventoryAlerts.season_exceeded.count}
+                amount={formatCurrency(inventoryAlerts.season_exceeded.amount)}
+                color="red"
+                onClick={() => router.push('/inventory?alert=season_exceeded')}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ===== Section 4: 月別売上推移 + ブランド構成比 ===== */}
+        <div className="grid grid-cols-3 gap-6">
+          <Card className="col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">月別売上推移（直近12ヶ月）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[350px]" />
+              ) : trendChartData.length > 0 ? (
+                <StackedBarChart
+                  data={trendChartData}
+                  keys={trendKeys}
+                  colors={CHANNEL_GROUP_COLORS}
+                />
+              ) : (
+                <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">ブランド構成比</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[300px]" />
+              ) : donutData.length > 0 ? (
+                <DonutChart data={donutData} centerLabel={formatMonth(month)} />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ===== Section 5: 日別売上推移 ===== */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">ブランド×チャネル売上</CardTitle>
+            <CardTitle className="text-base">日別売上推移</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[350px]" />
+            ) : dailyTrend.length > 0 ? (
+              <DailySalesChart
+                data={dailyTrend}
+                currentLabel={formatMonth(month)}
+                prevMonthLabel={formatMonth(getPreviousMonth(month))}
+                prevYearLabel={formatMonth(getLastYearMonth(month))}
+              />
+            ) : (
+              <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ===== Section 6: ブランド×チャネル売上テーブル ===== */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">ブランド × チャネル売上</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -239,31 +424,19 @@ function DashboardPageContent() {
                       const brandYoy = group.subtotal.prev > 0 ? group.subtotal.current / group.subtotal.prev : null
                       return (
                         <React.Fragment key={group.brand}>
-                          {/* Brand header row */}
                           <tr className="border-b bg-gray-50/80">
                             <td className="p-2 font-semibold text-gray-800">{group.brand}</td>
-                            <td className="p-2 text-right font-semibold tabular-nums">
-                              {formatCurrency(group.subtotal.current)}
-                            </td>
-                            <td className="p-2 text-right font-semibold tabular-nums">
-                              {formatNumber(group.subtotal.orders)}
-                            </td>
-                            <td className="p-2 text-right font-semibold tabular-nums">
-                              {formatCurrency(group.subtotal.profit)}
-                            </td>
+                            <td className="p-2 text-right font-semibold tabular-nums">{formatCurrency(group.subtotal.current)}</td>
+                            <td className="p-2 text-right font-semibold tabular-nums">{formatNumber(group.subtotal.orders)}</td>
+                            <td className="p-2 text-right font-semibold tabular-nums">{formatCurrency(group.subtotal.profit)}</td>
                             <td className="p-2 text-right font-semibold tabular-nums text-gray-500">
                               {group.subtotal.current > 0 ? formatPercent(group.subtotal.profit / group.subtotal.current) : '-'}
                             </td>
-                            <td className="p-2 text-right tabular-nums text-gray-500 font-medium">
-                              {(brandRatio * 100).toFixed(1)}%
-                            </td>
-                            <td className={`p-2 text-right text-sm font-semibold ${
-                              brandYoy == null ? '' : brandYoy >= 1 ? 'text-green-700' : 'text-red-600'
-                            }`}>
+                            <td className="p-2 text-right tabular-nums text-gray-500 font-medium">{(brandRatio * 100).toFixed(1)}%</td>
+                            <td className={`p-2 text-right text-sm font-semibold ${brandYoy == null ? '' : brandYoy >= 1 ? 'text-green-700' : 'text-red-600'}`}>
                               {brandYoy != null ? `${(brandYoy * 100).toFixed(1)}%` : '-'}
                             </td>
                           </tr>
-                          {/* Channel rows */}
                           {group.channels.map((ch) => {
                             const chRatio = grandTotal.current > 0 ? ch.current / grandTotal.current : 0
                             const chYoy = ch.prev > 0 ? ch.current / ch.prev : null
@@ -271,21 +444,13 @@ function DashboardPageContent() {
                               <tr key={`${group.brand}-${ch.channel}`} className="border-b hover:bg-gray-50/50">
                                 <td className="p-2 pl-6 text-gray-600">{ch.channel}</td>
                                 <td className="p-2 text-right tabular-nums">{formatCurrency(ch.current)}</td>
-                                <td className="p-2 text-right tabular-nums text-gray-500 text-xs">
-                                  {formatNumber(ch.orders)}
-                                </td>
-                                <td className="p-2 text-right tabular-nums text-xs">
-                                  {formatCurrency(ch.profit)}
-                                </td>
+                                <td className="p-2 text-right tabular-nums text-gray-500 text-xs">{formatNumber(ch.orders)}</td>
+                                <td className="p-2 text-right tabular-nums text-xs">{formatCurrency(ch.profit)}</td>
                                 <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
                                   {ch.current > 0 ? formatPercent(ch.profit / ch.current) : '-'}
                                 </td>
-                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">
-                                  {(chRatio * 100).toFixed(1)}%
-                                </td>
-                                <td className={`p-2 text-right text-xs font-medium ${
-                                  chYoy == null ? '' : chYoy >= 1 ? 'text-green-700' : 'text-red-600'
-                                }`}>
+                                <td className="p-2 text-right tabular-nums text-gray-400 text-xs">{(chRatio * 100).toFixed(1)}%</td>
+                                <td className={`p-2 text-right text-xs font-medium ${chYoy == null ? '' : chYoy >= 1 ? 'text-green-700' : 'text-red-600'}`}>
                                   {chYoy != null ? `${(chYoy * 100).toFixed(1)}%` : '-'}
                                 </td>
                               </tr>
@@ -305,10 +470,8 @@ function DashboardPageContent() {
                         {grandTotal.current > 0 ? formatPercent(grandTotal.profit / grandTotal.current) : '-'}
                       </td>
                       <td className="p-2 text-right tabular-nums text-gray-500">100.0%</td>
-                      <td className={`p-2 text-right text-sm font-semibold ${
-                        grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''
-                      }`}>
-                        {grandTotal.prev > 0 ? `${(grandTotal.current / grandTotal.prev * 100).toFixed(1)}%` : '-'}
+                      <td className={`p-2 text-right text-sm font-semibold ${grandTotal.prev > 0 ? (grandTotal.current / grandTotal.prev >= 1 ? 'text-green-700' : 'text-red-600') : ''}`}>
+                        {grandTotal.prev > 0 ? `${((grandTotal.current / grandTotal.prev) * 100).toFixed(1)}%` : '-'}
                       </td>
                     </tr>
                   </tfoot>
@@ -320,28 +483,7 @@ function DashboardPageContent() {
           </CardContent>
         </Card>
 
-        {/* Daily Sales Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">日別売上推移</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-[350px]" />
-            ) : dailyTrend.length > 0 ? (
-              <DailySalesChart
-                data={dailyTrend}
-                currentLabel={formatMonth(month)}
-                prevMonthLabel={formatMonth(getPreviousMonth(month))}
-                prevYearLabel={formatMonth(getLastYearMonth(month))}
-              />
-            ) : (
-              <div className="h-[350px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Category Ranking */}
+        {/* ===== Section 7: カテゴリ別売上ランキング ===== */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">カテゴリ別売上ランキング</CardTitle>
