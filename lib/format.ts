@@ -25,9 +25,10 @@ export function formatMonth(month: string): string {
 }
 
 // Format date
-export function formatDate(date: string | Date | null): string {
+export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '-'
   const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 

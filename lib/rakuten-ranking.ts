@@ -164,17 +164,12 @@ export function matchOwnProduct(
   item: RakutenRankingItem,
   masterCodes?: string[],
 ): { isOwn: boolean; matchedCode: string | null } {
-  // 1. ショップ名でマッチ
+  // 1. ショップ名でマッチ（最も信頼性が高い）
   const shopLower = item.shop_name.toLowerCase()
   const isOwnShop = OWN_SHOP_PATTERNS.some((p) => shopLower.includes(p.toLowerCase()))
 
-  // 2. 商品コードでマッチ（楽天の商品コードに自社品番が含まれているか）
+  // 2. マスタデータの品番リストでマッチ
   const codeLower = item.item_code.toLowerCase()
-  const matchedPrefix = OWN_PRODUCT_CODE_PREFIXES.find((prefix) =>
-    codeLower.includes(prefix)
-  )
-
-  // 3. マスタデータの品番リストでマッチ
   let matchedMasterCode: string | null = null
   if (masterCodes) {
     matchedMasterCode = masterCodes.find((mc) =>
@@ -182,11 +177,18 @@ export function matchOwnProduct(
     ) || null
   }
 
-  if (isOwnShop || matchedPrefix || matchedMasterCode) {
-    // 品番を抽出: 商品コードから自社品番パターンを探す
+  // 3. 品番プレフィックスはショップ名が自社の場合のみ使用
+  //    （"bl","nl"等の短いプレフィックスは他社商品にも誤マッチするため）
+  let matchedPrefix: string | null = null
+  if (isOwnShop) {
+    matchedPrefix = OWN_PRODUCT_CODE_PREFIXES.find((prefix) =>
+      codeLower.includes(prefix)
+    ) || null
+  }
+
+  if (isOwnShop || matchedMasterCode) {
     let matched = matchedMasterCode
     if (!matched && matchedPrefix) {
-      // 商品コードから品番部分を抽出 (例: "shop:nl-tp01-bk" → "nl-tp01")
       const regex = new RegExp(`(${matchedPrefix}[a-z0-9-_]+)`, 'i')
       const m = codeLower.match(regex)
       matched = m ? m[1] : codeLower
