@@ -16,13 +16,15 @@ export async function GET(
   try {
     const { product_code } = await params
     const { searchParams } = request.nextUrl
-    const months = Math.min(Number(searchParams.get('months') || '12'), 24)
+    const monthsParam = searchParams.get('months') || '12'
+    const isAllTime = monthsParam === 'all'
+    const months = isAllTime ? 0 : Math.min(Number(monthsParam), 24)
 
     if (!isBigQueryConfigured()) {
       return NextResponse.json({ data: [] })
     }
 
-    const cacheKey = buildCacheKey('sku-trends', { product_code, months: String(months) })
+    const cacheKey = buildCacheKey('sku-trends', { product_code, months: monthsParam })
 
     const data = await cachedQuery(cacheKey, async () => {
       const query = `
@@ -37,7 +39,7 @@ export async function GET(
           AND CAST(o.cancel_type_id AS STRING) = '0'
           AND CAST(o.row_cancel_flag AS STRING) = '0'
           AND o.receive_order_date IS NOT NULL
-          AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+          ${isAllTime ? '' : `AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)`}
         GROUP BY o.goods_id, month
         ORDER BY o.goods_id, month
       `

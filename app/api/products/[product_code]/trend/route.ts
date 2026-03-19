@@ -41,7 +41,9 @@ export async function GET(
     const { product_code } = await params
     const { searchParams } = request.nextUrl
     const goods_id = searchParams.get('goods_id') || null
-    const months = Math.min(Number(searchParams.get('months') || '12'), 24)
+    const monthsParam = searchParams.get('months') || '12'
+    const isAllTime = monthsParam === 'all'
+    const months = isAllTime ? 0 : Math.min(Number(monthsParam), 24)
     const period = searchParams.get('period') || null
     const channelMonth = searchParams.get('month') || null
 
@@ -50,7 +52,7 @@ export async function GET(
     }
 
     const level = goods_id ? 'sku' : 'product'
-    const cacheKey = buildCacheKey('product-trend', { product_code, goods_id: goods_id || '', months: String(months), period: period || '', channelMonth: channelMonth || '' })
+    const cacheKey = buildCacheKey('product-trend', { product_code, goods_id: goods_id || '', months: monthsParam, period: period || '', channelMonth: channelMonth || '' })
 
     const data = await cachedQuery(cacheKey, async () => {
       const filterCol = level === 'sku' ? 'o.goods_id' : 'p.goods_representation_id'
@@ -69,7 +71,7 @@ export async function GET(
           AND CAST(o.cancel_type_id AS STRING) = '0'
           AND CAST(o.row_cancel_flag AS STRING) = '0'
           AND o.receive_order_date IS NOT NULL
-          AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)
+          ${isAllTime ? '' : `AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months} MONTH)`}
         GROUP BY month
         ORDER BY month
       `
@@ -86,7 +88,7 @@ export async function GET(
           AND CAST(o.cancel_type_id AS STRING) = '0'
           AND CAST(o.row_cancel_flag AS STRING) = '0'
           AND o.receive_order_date IS NOT NULL
-          AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months + 12} MONTH)
+          ${isAllTime ? '' : `AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) >= DATE_SUB(CURRENT_DATE(), INTERVAL ${months + 12} MONTH)`}
           AND PARSE_DATE('%Y-%m-%d', LEFT(o.receive_order_date, 10)) < DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
         GROUP BY month
         ORDER BY month
