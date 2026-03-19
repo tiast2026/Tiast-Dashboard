@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Trophy, TrendingUp, Star, Clock, RefreshCw } from 'lucide-react'
+import { Trophy, TrendingUp, Star, Clock, RefreshCw, Info } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 
 interface RankingRecord {
@@ -184,7 +184,6 @@ export default function RankingPage() {
             <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="daily">デイリー</SelectItem>
-              <SelectItem value="weekly">週間</SelectItem>
               <SelectItem value="realtime">リアルタイム</SelectItem>
             </SelectContent>
           </Select>
@@ -205,6 +204,19 @@ export default function RankingPage() {
             <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
             {collecting ? '取得中...' : '今すぐ取得'}
           </button>
+        </div>
+
+        {/* ランキング種別の説明 */}
+        <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
+          <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium mb-1">ランキング種別について</p>
+            <ul className="space-y-0.5 text-blue-600">
+              <li><span className="font-medium">デイリー:</span> 前日の売上に基づくランキング（毎日更新）</li>
+              <li><span className="font-medium">リアルタイム:</span> 直近の売上に基づくランキング（随時更新）</li>
+            </ul>
+            <p className="mt-1 text-blue-500">※ 楽天市場ランキングAPIは「デイリー」と「リアルタイム」のみ提供しており、週間ランキングには対応していません。更新タイミングは楽天側の仕様により非公開です。</p>
+          </div>
         </div>
 
         {historyError && (

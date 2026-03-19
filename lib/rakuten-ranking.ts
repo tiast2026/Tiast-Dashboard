@@ -54,7 +54,7 @@ async function sleep(ms: number): Promise<void> {
 async function fetchRakutenRankingPage(
   appId: string,
   accessKey: string,
-  rankingType: 'realtime' | 'daily' | 'weekly',
+  rankingType: 'realtime' | 'daily',
   genreId: string,
   page: number,
 ): Promise<RakutenRankingItem[]> {
@@ -129,7 +129,7 @@ async function fetchRakutenRankingPage(
  * 楽天APIは1ページ30件×最大4ページ=120件まで取得可能
  */
 export async function fetchRakutenRanking(
-  rankingType: 'realtime' | 'daily' | 'weekly' = 'daily',
+  rankingType: 'realtime' | 'daily' = 'daily',
   genreId: string = GENRE_LADIES_FASHION,
   maxRank: number = 100,
 ): Promise<RakutenRankingItem[]> {
