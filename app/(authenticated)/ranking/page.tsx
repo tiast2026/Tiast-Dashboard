@@ -119,7 +119,7 @@ export default function RankingPage() {
       const params = new URLSearchParams({ type: rankingType, days, limit: '500' })
       const res = await fetch(`/api/rakuten-ranking/history?${params}`)
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Unknown error' }))
+        const errData = await res.json().catch(() => ({ error: '不明なエラー' }))
         throw new Error(errData.error || `HTTP ${res.status}`)
       }
       const data = await res.json()
@@ -129,7 +129,7 @@ export default function RankingPage() {
         setHistoryError(null)
       }
     } catch (e) {
-      console.error('Failed to fetch ranking history:', e)
+      console.error('楽天ランキング履歴取得失敗:', e)
       if (mountedRef.current) {
         setHistoryError(e instanceof Error ? e.message : 'データの取得に失敗しました')
       }

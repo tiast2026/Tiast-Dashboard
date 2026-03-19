@@ -85,7 +85,7 @@ async function fetchRakutenRankingPage(
           ? parseInt(retryAfter, 10) * 1000
           : Math.min(2000 * Math.pow(2, attempt), 16000) // 2s, 4s, 8s
         console.warn(
-          `[Rakuten API] Rate limited (429) on page ${page}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`
+          `[楽天API] レート制限(429) ページ${page}、${waitMs}ms後にリトライ (${attempt + 1}/${maxRetries}回目)`
         )
         await sleep(waitMs)
         continue
@@ -99,7 +99,7 @@ async function fetchRakutenRankingPage(
         const body = await res.text()
         detail = body.slice(0, 300)
       } catch { /* ignore */ }
-      throw new Error(`Rakuten Ranking API error: ${res.status}${detail ? ` - ${detail}` : ''}`)
+      throw new Error(`楽天ランキングAPIエラー: ${res.status}${detail ? ` - ${detail}` : ''}`)
     }
 
     const data: RakutenApiResponse = await res.json()
@@ -120,8 +120,8 @@ async function fetchRakutenRankingPage(
     })
   }
 
-  // TypeScript: unreachable but needed for type safety
-  throw new Error('Unexpected: all retries exhausted')
+  // TypeScript: 到達不能だが型安全性のために必要
+  throw new Error('リトライ回数を超過しました')
 }
 
 /**
@@ -136,7 +136,7 @@ export async function fetchRakutenRanking(
   const appId = process.env.RAKUTEN_APP_ID
   const accessKey = process.env.RAKUTEN_ACCESS_KEY
   if (!appId || !accessKey) {
-    throw new Error('RAKUTEN_APP_ID and RAKUTEN_ACCESS_KEY must be configured')
+    throw new Error('RAKUTEN_APP_ID と RAKUTEN_ACCESS_KEY が設定されていません')
   }
 
   // 必要ページ数を計算（1ページ30件、最大4ページ）
@@ -210,7 +210,7 @@ async function ensureRankingTableExists(bq: ReturnType<typeof getBigQueryClient>
   const [exists] = await table.exists()
   if (exists) return
 
-  console.log('[Rakuten Ranking] Table does not exist, creating...')
+  console.log('[楽天ランキング] テーブルが存在しないため作成します...')
   await table.create({
     schema: {
       fields: [
@@ -238,7 +238,7 @@ async function ensureRankingTableExists(bq: ReturnType<typeof getBigQueryClient>
       fields: ['genre_id', 'is_own_product'],
     },
   })
-  console.log('[Rakuten Ranking] Table created successfully')
+  console.log('[楽天ランキング] テーブル作成完了')
 }
 
 /**
@@ -291,7 +291,7 @@ export async function saveRankingToBigQuery(
   matchResults: Map<number, { isOwn: boolean; matchedCode: string | null }>,
 ): Promise<number> {
   if (!isBigQueryConfigured()) {
-    console.warn('BigQuery not configured, skipping ranking save')
+    console.warn('BigQuery未設定のため、ランキング保存をスキップします')
     return 0
   }
 
@@ -322,7 +322,7 @@ export async function saveRankingToBigQuery(
   try {
     await ensureRankingTableExists(bq)
   } catch (e) {
-    console.warn('[Rakuten Ranking] Could not verify/create table:', e)
+    console.warn('[楽天ランキング] テーブル確認/作成に失敗:', e)
     // テーブル存在確認に失敗しても INSERT を試行する
   }
 
@@ -337,7 +337,7 @@ export async function saveRankingToBigQuery(
 
     // streaming insert の権限エラーの場合、SQL INSERT にフォールバック
     if (errMsg.includes('updateData') || errMsg.includes('Access Denied') || errMsg.includes('permission')) {
-      console.warn('[Rakuten Ranking] Streaming insert denied, falling back to SQL INSERT...')
+      console.warn('[楽天ランキング] Streaming insert権限エラーのため、SQL INSERTにフォールバック...')
       try {
         await insertRankingViaSQL(bq, rows)
         return rows.length

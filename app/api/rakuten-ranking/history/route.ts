@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (e) {
-    console.error('Rakuten ranking history error:', e)
+    console.error('楽天ランキング履歴取得エラー:', e)
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to fetch ranking history' },
+      { error: e instanceof Error ? e.message : 'ランキング履歴の取得に失敗しました' },
       { status: 500 }
     )
   }
