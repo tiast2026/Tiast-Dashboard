@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
     apiUrl.searchParams.set('imageFlag', '1')
     apiUrl.searchParams.set('genreId', '100371') // レディースファッション
 
-    const res = await fetch(apiUrl.toString())
+    const res = await fetch(apiUrl.toString(), {
+      headers: {
+        'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
+      },
+    })
     if (!res.ok) {
       let detail = ''
       try { detail = (await res.text()).slice(0, 300) } catch { /* ignore */ }

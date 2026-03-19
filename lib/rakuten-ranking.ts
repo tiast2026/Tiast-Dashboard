@@ -60,7 +60,11 @@ async function fetchRakutenRankingPage(
     url.searchParams.set('period', 'realtime')
   }
 
-  const res = await fetch(url.toString())
+  const res = await fetch(url.toString(), {
+    headers: {
+      'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
+    },
+  })
   if (!res.ok) {
     let detail = ''
     try {
