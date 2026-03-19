@@ -440,6 +440,29 @@ export async function saveRankingToBigQuery(
     rankingDate = new Date().toISOString()
   }
 
+  // 重複チェック: 同じ fetched_at + genre_id + ranking_type のデータが既に存在するかを確認
+  try {
+    const [dupRows] = await bq.query({
+      query: `
+        SELECT COUNT(*) AS cnt
+        FROM \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
+        WHERE fetched_at = TIMESTAMP('${rankingDate}')
+          AND genre_id = '${genreId}'
+          AND ranking_type = '${rankingType}'
+        LIMIT 1
+      `,
+      location: 'asia-northeast1',
+    })
+    const count = Number((dupRows as { cnt: number }[])[0]?.cnt ?? 0)
+    if (count > 0) {
+      console.log(`[楽天ランキング] ${genreId} の ${rankingDate} は既に保存済みのためスキップ`)
+      return 0
+    }
+  } catch (e) {
+    // テーブルが存在しない場合など、重複チェック失敗時は保存を続行
+    console.warn('[楽天ランキング] 重複チェック失敗（保存を続行）:', e)
+  }
+
   const rows: RankingHistoryRecord[] = items.map((item) => {
     const match = matchResults.get(item.rank) || { isOwn: false, matchedCode: null }
     return {
