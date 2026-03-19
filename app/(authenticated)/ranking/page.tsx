@@ -539,7 +539,7 @@ export default function RankingPage() {
               <CardTitle className="text-base">自社商品ランクイン履歴</CardTitle>
               {!loading && grouped.length > 0 && (
                 <span className="text-xs text-gray-400">
-                  最終取得: {formatDateTime(newestDate)}
+                  最終発表: {formatDateTime(newestDate)}
                 </span>
               )}
             </div>
@@ -749,7 +749,7 @@ export default function RankingPage() {
                             <table className="w-full text-sm">
                               <thead>
                                 <tr className="bg-gray-50 text-gray-500 text-xs">
-                                  <th className="text-left px-4 py-2 font-medium">取得日時</th>
+                                  <th className="text-left px-4 py-2 font-medium">ランキング発表日時</th>
                                   <th className="text-center px-4 py-2 font-medium">順位</th>
                                   <th className="text-center px-4 py-2 font-medium">変動</th>
                                 </tr>

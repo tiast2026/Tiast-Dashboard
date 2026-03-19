@@ -142,6 +142,7 @@ const OWN_PRODUCT_CODE_PREFIXES = [
 ]
 
 interface RakutenApiResponse {
+  lastBuildDate?: string  // ランキング発表日時 (e.g. "Wed, 01 Mar 2026 10:00:00 +0900")
   Items: {
     Item: {
       rank: number
@@ -155,6 +156,12 @@ interface RakutenApiResponse {
       reviewAverage: number
     }
   }[]
+}
+
+/** 楽天ランキング取得結果（lastBuildDate付き） */
+export interface RakutenRankingResult {
+  items: RakutenRankingItem[]
+  lastBuildDate: string | null
 }
 
 /**
@@ -173,7 +180,7 @@ async function fetchRakutenRankingPage(
   rankingType: 'realtime' | 'daily',
   genreId: string,
   page: number,
-): Promise<RakutenRankingItem[]> {
+): Promise<{ items: RakutenRankingItem[]; lastBuildDate: string | null }> {
   const url = new URL(RAKUTEN_RANKING_API)
   url.searchParams.set('applicationId', appId)
   url.searchParams.set('accessKey', accessKey)
@@ -219,7 +226,7 @@ async function fetchRakutenRankingPage(
     }
 
     const data: RakutenApiResponse = await res.json()
-    return (data.Items || []).map((wrapper) => {
+    const items = (data.Items || []).map((wrapper) => {
       const item = wrapper.Item
       const images = item.mediumImageUrls || []
       return {
@@ -234,6 +241,7 @@ async function fetchRakutenRankingPage(
         review_average: item.reviewAverage || 0,
       }
     })
+    return { items, lastBuildDate: data.lastBuildDate || null }
   }
 
   // TypeScript: 到達不能だが型安全性のために必要
@@ -248,7 +256,7 @@ export async function fetchRakutenRanking(
   rankingType: 'realtime' | 'daily' = 'daily',
   genreId: string = GENRE_LADIES_FASHION,
   maxRank: number = 100,
-): Promise<RakutenRankingItem[]> {
+): Promise<RakutenRankingResult> {
   const appId = process.env.RAKUTEN_APP_ID
   const accessKey = process.env.RAKUTEN_ACCESS_KEY
   if (!appId || !accessKey) {
@@ -258,10 +266,15 @@ export async function fetchRakutenRanking(
   // 必要ページ数を計算（1ページ30件、最大4ページ）
   const pagesNeeded = Math.min(Math.ceil(maxRank / 30), 4)
   const allItems: RakutenRankingItem[] = []
+  let lastBuildDate: string | null = null
 
   for (let page = 1; page <= pagesNeeded; page++) {
-    const items = await fetchRakutenRankingPage(appId, accessKey, rankingType, genreId, page)
-    allItems.push(...items)
+    const result = await fetchRakutenRankingPage(appId, accessKey, rankingType, genreId, page)
+    allItems.push(...result.items)
+    // 最初のページの lastBuildDate を使用
+    if (page === 1 && result.lastBuildDate) {
+      lastBuildDate = result.lastBuildDate
+    }
 
     // 取得件数がmaxRankに達したら終了
     if (allItems.length >= maxRank) break
@@ -269,7 +282,10 @@ export async function fetchRakutenRanking(
   }
 
   // maxRank以内のアイテムのみ返す
-  return allItems.filter((item) => item.rank <= maxRank)
+  return {
+    items: allItems.filter((item) => item.rank <= maxRank),
+    lastBuildDate,
+  }
 }
 
 /**
@@ -407,6 +423,7 @@ export async function saveRankingToBigQuery(
   rankingType: string,
   genreId: string,
   matchResults: Map<number, { isOwn: boolean; matchedCode: string | null }>,
+  lastBuildDate?: string | null,
 ): Promise<number> {
   if (!isBigQueryConfigured()) {
     console.warn('BigQuery未設定のため、ランキング保存をスキップします')
@@ -414,12 +431,19 @@ export async function saveRankingToBigQuery(
   }
 
   const bq = getBigQueryClient()
-  const now = new Date().toISOString()
+  // ランキング発表日時（lastBuildDate）を優先、なければ現在時刻にフォールバック
+  let rankingDate: string
+  if (lastBuildDate) {
+    const parsed = new Date(lastBuildDate)
+    rankingDate = isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
+  } else {
+    rankingDate = new Date().toISOString()
+  }
 
   const rows: RankingHistoryRecord[] = items.map((item) => {
     const match = matchResults.get(item.rank) || { isOwn: false, matchedCode: null }
     return {
-      fetched_at: now,
+      fetched_at: rankingDate,
       ranking_type: rankingType,
       genre_id: genreId,
       rank: item.rank,
