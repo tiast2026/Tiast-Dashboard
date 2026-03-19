@@ -9,6 +9,7 @@ import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { Trophy, TrendingUp, Star, RefreshCw, Info, Trash2, ChevronDown, ExternalLink, Calendar, Hash, Package, DollarSign, ShoppingCart, BarChart3, Loader2 } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
+import ProductDetailDialog from '@/components/products/ProductDetailDialog'
 
 interface RankingRecord {
   fetched_at: string
@@ -215,6 +216,7 @@ function getGenreLabel(genreId: string): string {
 interface ProductSalesData {
   product_code: string
   product_name: string
+  image_url?: string | null
   total_quantity: number
   order_count: number
   sales_amount: number
@@ -224,6 +226,14 @@ interface ProductSalesData {
   cost_price: number
   brand: string
   category: string
+  total_stock: number
+  free_stock: number
+  zozo_stock: number
+  reserved_stock: number
+  daily_sales: number
+  stock_days: number
+  inventory_status: string
+  sales_start_date?: string | null
 }
 
 export default function RankingPage() {
@@ -234,6 +244,7 @@ export default function RankingPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectResult, setCollectResult] = useState<string | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [dialogProduct, setDialogProduct] = useState<{ productCode: string; sales: ProductSalesData | null } | null>(null)
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
   const [salesDataMap, setSalesDataMap] = useState<Record<string, ProductSalesData | null>>({})
   const [salesLoadingSet, setSalesLoadingSet] = useState<Set<string>>(new Set())
@@ -635,13 +646,21 @@ export default function RankingPage() {
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-medium text-gray-700">商品詳細・ランキング履歴</h4>
                             <div className="flex items-center gap-3">
-                              <a
-                                href={`/products?search=${encodeURIComponent(extractProductNumber(product.item_code))}`}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  const sales = salesDataMap[product.matched_product_code]
+                                  setDialogProduct({
+                                    productCode: sales?.product_code || extractRakutenProductId(product.item_url) || extractProductNumber(product.item_code),
+                                    sales,
+                                  })
+                                }}
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                               >
                                 <BarChart3 className="w-3 h-3" />
                                 商品分析を見る
-                              </a>
+                              </button>
                               {product.item_url && (
                                 <a
                                   href={product.item_url}
@@ -775,6 +794,30 @@ export default function RankingPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 商品分析ダイアログ */}
+      <ProductDetailDialog
+        open={!!dialogProduct}
+        onClose={() => setDialogProduct(null)}
+        mode="product"
+        productCode={dialogProduct?.productCode || ''}
+        product={dialogProduct?.sales ? {
+          product_code: dialogProduct.sales.product_code,
+          product_name: dialogProduct.sales.product_name,
+          image_url: dialogProduct.sales.image_url ?? null,
+          total_quantity: dialogProduct.sales.total_quantity,
+          sales_amount: dialogProduct.sales.sales_amount,
+          gross_profit_rate: dialogProduct.sales.gross_profit_rate,
+          total_stock: dialogProduct.sales.total_stock ?? 0,
+          free_stock: dialogProduct.sales.free_stock ?? 0,
+          zozo_stock: dialogProduct.sales.zozo_stock ?? 0,
+          reserved_stock: dialogProduct.sales.reserved_stock ?? 0,
+          daily_sales: dialogProduct.sales.daily_sales ?? 0,
+          stock_days: dialogProduct.sales.stock_days ?? 0,
+          inventory_status: dialogProduct.sales.inventory_status ?? '',
+          sales_start_date: dialogProduct.sales.sales_start_date,
+        } : null}
+      />
     </>
   )
 }
