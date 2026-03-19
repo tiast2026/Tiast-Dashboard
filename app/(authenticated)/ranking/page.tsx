@@ -375,7 +375,7 @@ function RankSparkline({ history }: { history: { date: string; rank: number }[] 
     return <div className="text-xs text-gray-300 text-center">データ不足</div>
   }
 
-  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date))
+  const sorted = [...history].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')))
   const ranks = sorted.map((h) => h.rank)
   const maxRank = Math.max(...ranks, 100)
   const minRank = Math.min(...ranks, 1)
