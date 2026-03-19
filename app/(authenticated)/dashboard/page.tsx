@@ -195,7 +195,7 @@ function DashboardPageContent() {
 
   // --- Monthly Trend Chart Data ---
   const { trendChartData, trendKeys } = useMemo(() => {
-    const channelGroups = ['楽天系', '公式系', 'TikTok系', 'その他']
+    const channelGroups = ['公式', '楽天', 'ZOZO', 'TikTok', 'Rakuten Fashion', 'その他']
     const monthMap: Record<string, Record<string, number>> = {}
     for (const item of monthlyTrend) {
       if (!monthMap[item.month]) monthMap[item.month] = {}
