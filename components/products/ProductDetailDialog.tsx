@@ -927,7 +927,7 @@ export default function ProductDetailDialog({
         {/* Trend chart */}
         <div className="bg-gray-50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-gray-500 text-sm font-medium">売上推移（{trendMonths}ヶ月）</div>
+            <div className="text-gray-500 text-sm font-medium">売上推移（{trendMonths === 'all' ? '全期間' : `${trendMonths}ヶ月`}）</div>
             <Select value={trendMonths} onValueChange={setTrendMonths}>
               <SelectTrigger className="w-28 h-7 text-xs bg-white">
                 <SelectValue />
@@ -936,6 +936,7 @@ export default function ProductDetailDialog({
                 <SelectItem value="6">6ヶ月</SelectItem>
                 <SelectItem value="12">12ヶ月</SelectItem>
                 <SelectItem value="24">24ヶ月</SelectItem>
+                <SelectItem value="all">全期間</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -958,7 +959,7 @@ export default function ProductDetailDialog({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-500 text-sm font-medium">SKU別売上比較（{trendMonths}ヶ月）</span>
+                <span className="text-gray-500 text-sm font-medium">SKU別売上比較（{trendMonths === 'all' ? '全期間' : `${trendMonths}ヶ月`}）</span>
               </div>
               <Select value={skuTrendMetric} onValueChange={(v) => setSkuTrendMetric(v as 'sales_amount' | 'quantity')}>
                 <SelectTrigger className="w-24 h-7 text-xs bg-white">
