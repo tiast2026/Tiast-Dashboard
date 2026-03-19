@@ -99,7 +99,7 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 export default function RankingPage() {
-  const [rankingType, setRankingType] = useState('daily')
+  const rankingType = 'daily'
   const [days, setDays] = useState('90')
   const [records, setRecords] = useState<RankingRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -180,13 +180,6 @@ export default function RankingPage() {
       <div className="p-6 space-y-6">
         {/* Controls */}
         <div className="flex items-center gap-3">
-          <Select value={rankingType} onValueChange={setRankingType}>
-            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">デイリー</SelectItem>
-              <SelectItem value="realtime">リアルタイム</SelectItem>
-            </SelectContent>
-          </Select>
           <Select value={days} onValueChange={setDays}>
             <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -206,17 +199,10 @@ export default function RankingPage() {
           </button>
         </div>
 
-        {/* ランキング種別の説明 */}
+        {/* ランキングの説明 */}
         <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium mb-1">ランキング種別について</p>
-            <ul className="space-y-0.5 text-blue-600">
-              <li><span className="font-medium">デイリー:</span> 前日の売上に基づくランキング（毎日更新）</li>
-              <li><span className="font-medium">リアルタイム:</span> 直近の売上に基づくランキング（随時更新）</li>
-            </ul>
-            <p className="mt-1 text-blue-500">※ 楽天市場ランキングAPIは「デイリー」と「リアルタイム」のみ提供しており、週間ランキングには対応していません。更新タイミングは楽天側の仕様により非公開です。</p>
-          </div>
+          <p>楽天市場レディースファッションのデイリーランキング（前日の売上に基づき毎日更新）を取得しています。更新タイミングは楽天側の仕様により非公開です。週間ランキングはAPIが非対応のため提供されていません。</p>
         </div>
 
         {historyError && (
