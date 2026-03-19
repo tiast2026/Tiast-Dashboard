@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronLeft, BarChart3 } from 'lucide-react'
+import { ChevronLeft, BarChart3, Trophy } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format'
 import { getChannelKey, CHANNEL_COLORS } from '@/lib/constants'
@@ -79,6 +79,52 @@ interface TrendData {
   data: TrendPoint[]
   prev_year: TrendPoint[]
   channels: ChannelRow[]
+}
+
+interface RankingRecord {
+  fetched_at: string
+  ranking_type: string
+  genre_id: string
+  rank: number
+  item_name: string
+  matched_product_code: string
+  best_rank: number
+  rank_count: number
+  first_ranked_at: string
+}
+
+interface RankingSummary {
+  genre_id: string
+  genre_name: string
+  best_rank: number
+  latest_rank: number
+  rank_count: number
+  first_ranked_at: string
+  history: { date: string; rank: number }[]
+}
+
+const RANKING_GENRE_MAP: Record<string, string> = {
+  '100371': 'レディースファッション',
+  '555086': 'トップス',
+  '303656': 'Tシャツ・カットソー',
+  '566018': 'タンクトップ',
+  '206471': 'シャツ・ブラウス',
+  '403871': 'カーディガン・ボレロ',
+  '403890': 'ベスト・ジレ',
+  '566028': 'セーター',
+  '502556': 'パーカー',
+  '403923': 'スウェット・トレーナー',
+  '555089': 'ボトムス',
+  '110734': 'スカート',
+  '206440': 'パンツ',
+  '555087': 'コート・ジャケット',
+  '110729': 'ワンピース',
+  '553029': 'チュニック',
+  '555084': 'ドレス',
+  '555091': 'スーツ・セットアップ',
+  '555083': 'オールインワン・サロペット',
+  '409365': '水着',
+  '403911': '福袋',
 }
 
 interface ProductDetailDialogProps {
@@ -397,6 +443,112 @@ function TrendChart({ trend }: { trend: TrendData }) {
   )
 }
 
+function RankSparklineMini({ history }: { history: { date: string; rank: number }[] }) {
+  if (history.length < 2) return null
+
+  const sorted = [...history].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')))
+  const ranks = sorted.map((h) => h.rank)
+  const maxRank = Math.max(...ranks, 100)
+  const minRank = Math.min(...ranks, 1)
+  const range = Math.max(maxRank - minRank, 1)
+
+  const w = 80
+  const h = 24
+  const padding = 2
+
+  const points = ranks.map((rank, i) => {
+    const x = padding + (i / (ranks.length - 1)) * (w - padding * 2)
+    const y = padding + ((rank - minRank) / range) * (h - padding * 2)
+    return `${x},${y}`
+  })
+
+  return (
+    <svg width={w} height={h} className="inline-block align-middle">
+      <polyline
+        points={points.join(' ')}
+        fill="none"
+        stroke="#BF0000"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {points.length > 0 && (
+        <circle
+          cx={points[points.length - 1].split(',')[0]}
+          cy={points[points.length - 1].split(',')[1]}
+          r="2"
+          fill="#BF0000"
+        />
+      )}
+    </svg>
+  )
+}
+
+function RankBadge({ rank }: { rank: number }) {
+  if (rank <= 3) {
+    const colors = ['', 'text-yellow-500', 'text-gray-400', 'text-amber-600']
+    const bgColors = ['', 'bg-yellow-50', 'bg-gray-50', 'bg-amber-50']
+    return (
+      <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded ${bgColors[rank]}`}>
+        <Trophy className={`w-3 h-3 ${colors[rank]}`} />
+        <span className={`text-sm font-bold ${colors[rank]}`}>{rank}位</span>
+      </span>
+    )
+  }
+  return <span className="text-sm font-bold text-gray-700">{rank}位</span>
+}
+
+function formatRankingDate(date: unknown): string {
+  if (!date) return '-'
+  const raw = typeof date === 'object' && date !== null && 'value' in date
+    ? (date as { value: string }).value
+    : String(date)
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return '-'
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
+
+function RankingSection({ rankings }: { rankings: RankingSummary[] }) {
+  if (rankings.length === 0) return null
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Trophy className="w-4 h-4" style={{ color: '#BF0000' }} />
+        <span className="text-gray-500 text-sm font-medium">楽天ランキング実績</span>
+      </div>
+      <div className="space-y-2">
+        {rankings.map((r) => (
+          <div key={r.genre_id} className="flex items-center gap-3 py-1.5 border-b border-gray-100 last:border-0">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-gray-400 mb-0.5">{r.genre_name}</div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500">最高</span>
+                  <RankBadge rank={r.best_rank} />
+                </div>
+                <span className="text-gray-200">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500">最新</span>
+                  <span className="text-sm font-medium text-gray-700">{r.latest_rank}位</span>
+                </div>
+                <span className="text-gray-200">|</span>
+                <span className="text-xs text-gray-500">{r.rank_count}回ランクイン</span>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <RankSparklineMini history={r.history} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="text-[10px] text-gray-300 mt-2 text-right">
+        初回ランクイン: {formatRankingDate(rankings[0].first_ranked_at)}
+      </div>
+    </div>
+  )
+}
+
 export default function ProductDetailDialog({
   open,
   onClose,
@@ -417,6 +569,8 @@ export default function ProductDetailDialog({
   const [skuTrends, setSkuTrends] = useState<SkuTrendRow[]>([])
   const [skuTrendsLoading, setSkuTrendsLoading] = useState(false)
   const [skuTrendMetric, setSkuTrendMetric] = useState<'sales_amount' | 'quantity'>('sales_amount')
+  const [rankings, setRankings] = useState<RankingSummary[]>([])
+  const [rankingsLoading, setRankingsLoading] = useState(false)
 
   const allSkus = allSkusProp || fetchedSkus
   const isSkuView = !!selectedSku
@@ -476,6 +630,40 @@ export default function ProductDetailDialog({
       .catch(() => setSkuTrends([]))
       .finally(() => setSkuTrendsLoading(false))
   }, [open, productCode, isSkuView, trendMonths])
+
+  // Fetch ranking data (product view only)
+  useEffect(() => {
+    if (!open || !productCode || isSkuView) return
+    setRankingsLoading(true)
+    fetch(`/api/rakuten-ranking/history?product_code=${encodeURIComponent(productCode)}&days=90`)
+      .then(res => res.ok ? res.json() : null)
+      .then((data: RankingRecord[] | null) => {
+        if (!data || !Array.isArray(data) || data.length === 0) {
+          setRankings([])
+          return
+        }
+        // Group by genre_id
+        const map = new Map<string, RankingSummary>()
+        for (const r of data) {
+          if (!map.has(r.genre_id)) {
+            map.set(r.genre_id, {
+              genre_id: r.genre_id,
+              genre_name: RANKING_GENRE_MAP[r.genre_id] || r.genre_id,
+              best_rank: r.best_rank,
+              latest_rank: r.rank,
+              rank_count: r.rank_count,
+              first_ranked_at: r.first_ranked_at,
+              history: [],
+            })
+          }
+          const entry = map.get(r.genre_id)!
+          entry.history.push({ date: r.fetched_at, rank: r.rank })
+        }
+        setRankings(Array.from(map.values()).sort((a, b) => a.best_rank - b.best_rank))
+      })
+      .catch(() => setRankings([]))
+      .finally(() => setRankingsLoading(false))
+  }, [open, productCode, isSkuView])
 
   if (!open) return null
 
@@ -701,6 +889,21 @@ export default function ProductDetailDialog({
             </div>
           )}
         </div>
+
+        {/* Ranking info (product view only) */}
+        {!isSkuView && (
+          rankingsLoading ? (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="w-4 h-4" style={{ color: '#BF0000' }} />
+                <span className="text-gray-500 text-sm font-medium">楽天ランキング実績</span>
+              </div>
+              <div className="text-sm text-gray-400 text-center py-2">読み込み中...</div>
+            </div>
+          ) : rankings.length > 0 ? (
+            <RankingSection rankings={rankings} />
+          ) : null
+        )}
 
         {/* Trend chart */}
         <div className="bg-gray-50 rounded-lg p-4">
