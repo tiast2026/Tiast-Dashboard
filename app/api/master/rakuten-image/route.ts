@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rakutenFetch } from '@/lib/rakuten-throttle'
 
 // Rakuten Ichiba Item Search API proxy
 // Requires RAKUTEN_APP_ID environment variable
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     apiUrl.searchParams.set('imageFlag', '1')
     apiUrl.searchParams.set('genreId', '100371') // レディースファッション
 
-    const res = await fetch(apiUrl.toString(), {
+    const res = await rakutenFetch(apiUrl.toString(), {
       headers: {
         'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
         'Origin': 'https://tiast2026.github.io',

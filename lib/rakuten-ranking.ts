@@ -2,6 +2,7 @@
 // API docs: https://webservice.rakuten.co.jp/documentation/ichiba-ranking
 
 import { getBigQueryClient, isBigQueryConfigured } from './bigquery'
+import { rakutenFetch } from './rakuten-throttle'
 import type { RakutenRankingItem, RankingHistoryRecord } from '@/types/ranking'
 
 // 2026年2月以降の新ドメイン（旧: app.rakuten.co.jp/services/api/...）
@@ -69,7 +70,7 @@ async function fetchRakutenRankingPage(
 
   const maxRetries = 3
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res = await fetch(url.toString(), {
+    const res = await rakutenFetch(url.toString(), {
       headers: {
         'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
         'Origin': 'https://tiast2026.github.io',
@@ -148,11 +149,7 @@ export async function fetchRakutenRanking(
 
     // 取得件数がmaxRankに達したら終了
     if (allItems.length >= maxRank) break
-
-    // ページ間で待つ（APIレート制限対策）
-    if (page < pagesNeeded) {
-      await sleep(1000)
-    }
+    // ページ間の待機はrakutenFetchのスロットルで自動制御
   }
 
   // maxRank以内のアイテムのみ返す
