@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       // 手動実行の場合はCRON_SECRET未設定でもOK
       if (authHeader) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return NextResponse.json({ error: '認証エラー' }, { status: 401 })
       }
     }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     if (!process.env.RAKUTEN_APP_ID || !process.env.RAKUTEN_ACCESS_KEY) {
       return NextResponse.json(
-        { error: 'RAKUTEN_APP_ID and RAKUTEN_ACCESS_KEY must be configured' },
+        { error: 'RAKUTEN_APP_ID と RAKUTEN_ACCESS_KEY が設定されていません' },
         { status: 500 }
       )
     }
@@ -75,13 +75,13 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `[Rakuten Ranking] ${rankingType}: ${items.length} items fetched, ${ownProducts.length} own products found, ${savedCount} rows saved`
+      `[楽天ランキング] ${rankingType}: ${items.length}件取得、自社商品${ownProducts.length}件、${savedCount}件保存`
     )
 
     return NextResponse.json(result)
   } catch (e) {
-    console.error('Rakuten ranking collect error:', e)
-    const message = e instanceof Error ? e.message : 'Failed to collect ranking'
+    console.error('楽天ランキング取得エラー:', e)
+    const message = e instanceof Error ? e.message : 'ランキング取得に失敗しました'
     // BigQuery権限エラーをわかりやすく変換
     const isPermissionError = message.includes('Access Denied') || message.includes('permission') || message.includes('updateData')
     const userMessage = isPermissionError
