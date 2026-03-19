@@ -307,14 +307,18 @@ export default function RankingPage() {
       // 重複除去
       const uniqueTerms = Array.from(new Set(searchTerms))
 
+      let foundData: ProductSalesData | null = null
+      let resolvedCode: string | null = null
+
       for (const term of uniqueTerms) {
         // まず直接APIを試す
         const directRes = await fetch(`/api/products/${encodeURIComponent(term)}`)
         if (directRes.ok) {
           const data = await directRes.json()
-          if (data && data.product_code && mountedRef.current) {
-            setSalesDataMap((prev) => ({ ...prev, [productCode]: data }))
-            return
+          if (data && data.product_code) {
+            foundData = data
+            resolvedCode = data.product_code
+            break
           }
         }
 
@@ -322,14 +326,34 @@ export default function RankingPage() {
         const listRes = await fetch(`/api/products/list?search=${encodeURIComponent(term)}&per_page=1`)
         if (listRes.ok) {
           const listData = await listRes.json()
-          if (listData.data?.length > 0 && mountedRef.current) {
-            setSalesDataMap((prev) => ({ ...prev, [productCode]: listData.data[0] }))
-            return
+          if (listData.data?.length > 0) {
+            foundData = listData.data[0]
+            resolvedCode = listData.data[0].product_code
+            break
           }
         }
       }
 
-      if (mountedRef.current) {
+      if (foundData && resolvedCode && mountedRef.current) {
+        // trend APIのチャネル合計(period=all)で正確な全期間売上を取得
+        try {
+          const trendRes = await fetch(`/api/products/${encodeURIComponent(resolvedCode)}/trend?months=60&period=all`)
+          if (trendRes.ok) {
+            const trendData = await trendRes.json()
+            const channels = trendData?.channels as { quantity: number; sales_amount: number }[] | undefined
+            if (channels && channels.length > 0) {
+              const totalAmount = channels.reduce((s: number, c: { sales_amount: number }) => s + Number(c.sales_amount), 0)
+              const totalQuantity = channels.reduce((s: number, c: { quantity: number }) => s + Number(c.quantity), 0)
+              if (totalAmount > 0) {
+                foundData = { ...foundData, sales_amount: totalAmount, total_quantity: totalQuantity }
+              }
+            }
+          }
+        } catch {
+          // trend取得失敗時は元のデータを使用
+        }
+        setSalesDataMap((prev) => ({ ...prev, [productCode]: foundData }))
+      } else if (mountedRef.current) {
         setSalesDataMap((prev) => ({ ...prev, [productCode]: null }))
       }
     } catch {
