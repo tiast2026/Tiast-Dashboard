@@ -230,7 +230,7 @@ export default function RankingPage() {
   return (
     <>
       <Header title="楽天ランキング履歴" subtitle="レディースファッション" />
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Controls */}
         <div className="flex items-center gap-3">
           <Select value={genre} onValueChange={setGenre}>
@@ -382,9 +382,9 @@ export default function RankingPage() {
                       <div className="font-medium text-sm truncate" title={product.item_name}>
                         {product.item_name}
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {product.matched_product_code} / {product.shop_name}
-                        <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">{getGenreLabel(product.genre_id)}</span>
+                      <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>{product.matched_product_code} / {product.shop_name}</span>
+                        <span className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[11px] font-medium">{getGenreLabel(product.genre_id)}</span>
                       </div>
                       <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
                         <span>{formatCurrency(product.item_price)}</span>
