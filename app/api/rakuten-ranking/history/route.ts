@@ -38,7 +38,11 @@ export async function GET(request: NextRequest) {
       const params: Record<string, string> = {}
 
       if (productCode) {
-        conditions.push('matched_product_code = @product_code')
+        // matched_product_code の完全一致、または item_url に品番が含まれるケースにも対応
+        // （過去データで matched_product_code が楽天item_codeのまま保存されている場合の救済）
+        conditions.push(
+          '(matched_product_code = @product_code OR item_url LIKE CONCAT(\'%/\', @product_code, \'/%\') OR item_url LIKE CONCAT(\'%/\', @product_code))'
+        )
         params.product_code = productCode
       }
       if (rankingType) {
