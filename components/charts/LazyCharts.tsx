@@ -19,3 +19,8 @@ export const LazyStackedBarChart = dynamic(
   () => import('./StackedBarChart'),
   { loading: ChartSkeleton, ssr: false }
 )
+
+export const LazyDonutChart = dynamic(
+  () => import('./DonutChart'),
+  { loading: ChartSkeleton, ssr: false }
+)
