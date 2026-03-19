@@ -183,8 +183,8 @@ function SalesCard({ label, quantity, amount, prevQuantity, prevAmount, prevLabe
 
 const CHANNEL_COLOR_MAP: Record<string, string> = {
   '公式': CHANNEL_COLORS.official,
-  '楽天市場': CHANNEL_COLORS.rakuten,
-  'RakutenFashion': CHANNEL_COLORS.rakuten_fashion,
+  '楽天': CHANNEL_COLORS.rakuten,
+  'Rakuten Fashion': CHANNEL_COLORS.rakuten_fashion,
   'Yahoo!': CHANNEL_COLORS.yahoo,
   'Amazon': '#FF9900',
   'SHOPLIST': CHANNEL_COLORS.shoplist,

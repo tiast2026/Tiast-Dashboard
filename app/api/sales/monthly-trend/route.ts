@@ -31,9 +31,11 @@ export async function GET(request: NextRequest) {
         SELECT
           order_month AS month,
           CASE
-            WHEN shop_name IN ('楽天市場', 'RakutenFashion') OR shop_name LIKE '%楽天%' THEN '楽天系'
-            WHEN shop_name = '公式' OR shop_name LIKE '%公式%' THEN '公式系'
-            WHEN shop_name IN ('TikTok') OR UPPER(shop_name) LIKE '%TIKTOK%' THEN 'TikTok系'
+            WHEN shop_name = 'Rakuten Fashion' OR shop_name = 'RakutenFashion' THEN 'Rakuten Fashion'
+            WHEN shop_name = '楽天' OR shop_name = '楽天市場' OR shop_name LIKE '%楽天%' THEN '楽天'
+            WHEN shop_name = '公式' OR shop_name LIKE '%公式%' THEN '公式'
+            WHEN shop_name IN ('TikTok') OR UPPER(shop_name) LIKE '%TIKTOK%' THEN 'TikTok'
+            WHEN shop_name = 'ZOZO' THEN 'ZOZO'
             ELSE 'その他'
           END AS channel_group,
           SUM(sales_amount) AS sales_amount

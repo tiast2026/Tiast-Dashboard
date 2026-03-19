@@ -19,9 +19,11 @@ export const CHANNEL_COLORS: Record<string, string> = {
 
 // Channel group colors (for trend chart)
 export const CHANNEL_GROUP_COLORS: Record<string, string> = {
-  '楽天系': '#BF0000',
-  '公式系': '#4A90D9',
-  'TikTok系': '#25D366',
+  '公式': '#4A90D9',
+  '楽天': '#BF0000',
+  'ZOZO': '#1A1A1A',
+  'TikTok': '#25D366',
+  'Rakuten Fashion': '#E60033',
   'その他': '#F59E0B',
 }
 
@@ -82,15 +84,17 @@ export const PRICE_TIER_OPTIONS = [
 
 // Helper to classify shop into channel group
 export function getChannelGroup(shopName: string): string {
-  if (shopName.includes('楽天') && !shopName.includes('RakutenFashion')) return '楽天系'
-  if (shopName.includes('公式')) return '公式系'
-  if (shopName.includes('TIKTOK') || shopName.includes('TikTok')) return 'TikTok系'
+  if (shopName === 'Rakuten Fashion' || shopName.includes('RakutenFashion')) return 'Rakuten Fashion'
+  if (shopName.includes('楽天')) return '楽天'
+  if (shopName.includes('公式')) return '公式'
+  if (shopName.includes('TIKTOK') || shopName.includes('TikTok')) return 'TikTok'
+  if (shopName.includes('ZOZO')) return 'ZOZO'
   return 'その他'
 }
 
 // Helper to get channel key from shop name
 export function getChannelKey(shopName: string): string {
-  if (shopName.includes('RakutenFashion')) return 'rakuten_fashion'
+  if (shopName === 'Rakuten Fashion' || shopName.includes('RakutenFashion')) return 'rakuten_fashion'
   if (shopName.includes('楽天')) return 'rakuten'
   if (shopName.includes('公式')) return 'official'
   if (shopName.includes('TIKTOK') || shopName.includes('TikTok')) return 'tiktok'

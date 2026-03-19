@@ -53,12 +53,14 @@ export function getMockSalesSummary(_month?: string, _brand?: string) {
 // 2. Sales Monthly Trend
 // ============================================================
 export function getMockSalesMonthlyTrend(months: number = 24, _brand?: string) {
-  const channelGroups = ['楽天系', '公式系', 'TikTok系', 'その他']
+  const channelGroups = ['公式', '楽天', 'ZOZO', 'TikTok', 'Rakuten Fashion', 'その他']
   const baseAmounts: Record<string, number> = {
-    '楽天系': 12000000,
-    '公式系': 8000000,
-    'TikTok系': 5000000,
-    'その他': 3500000,
+    '公式': 8000000,
+    '楽天': 10000000,
+    'ZOZO': 4000000,
+    'TikTok': 5000000,
+    'Rakuten Fashion': 3000000,
+    'その他': 2000000,
   }
   const monthList = generateMonths(months)
   const rand = seededRandom(42)
@@ -116,15 +118,15 @@ export function getMockCategoryRanking(_month?: string, _brand?: string) {
 // ============================================================
 export function getMockYoyComparison(_month?: string) {
   return [
-    { brand: 'NOAHL', channel: 'NOAHL楽天市場店', current_sales: 6500000, previous_year_sales: 5800000, yoy_ratio: 1.12, current_order_count: 320, previous_year_order_count: 290, current_gross_profit: 2600000, previous_year_gross_profit: 2200000 },
-    { brand: 'NOAHL', channel: 'NOAHL公式サイト', current_sales: 4200000, previous_year_sales: 3500000, yoy_ratio: 1.20, current_order_count: 180, previous_year_order_count: 150, current_gross_profit: 2100000, previous_year_gross_profit: 1700000 },
-    { brand: 'NOAHL', channel: 'NOAHL_TIKTOK', current_sales: 2800000, previous_year_sales: 1200000, yoy_ratio: 2.33, current_order_count: 95, previous_year_order_count: 40, current_gross_profit: 980000, previous_year_gross_profit: 420000 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN楽天市場店', current_sales: 5200000, previous_year_sales: 5500000, yoy_ratio: 0.95, current_order_count: 260, previous_year_order_count: 275, current_gross_profit: 2080000, previous_year_gross_profit: 2200000 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN公式サイト', current_sales: 3800000, previous_year_sales: 3200000, yoy_ratio: 1.19, current_order_count: 160, previous_year_order_count: 135, current_gross_profit: 1900000, previous_year_gross_profit: 1600000 },
-    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN_ZOZO', current_sales: 2100000, previous_year_sales: 2400000, yoy_ratio: 0.88, current_order_count: 110, previous_year_order_count: 125, current_gross_profit: 630000, previous_year_gross_profit: 720000 },
-    { brand: 'MYRTH', channel: 'MYRTH楽天市場店', current_sales: 3900000, previous_year_sales: 3100000, yoy_ratio: 1.26, current_order_count: 195, previous_year_order_count: 155, current_gross_profit: 1560000, previous_year_gross_profit: 1240000 },
-    { brand: 'MYRTH', channel: 'MYRTH公式サイト', current_sales: 2500000, previous_year_sales: 2200000, yoy_ratio: 1.14, current_order_count: 105, previous_year_order_count: 92, current_gross_profit: 1250000, previous_year_gross_profit: 1100000 },
-    { brand: 'MYRTH', channel: 'MYRTH_YAHOO', current_sales: 1500000, previous_year_sales: 1800000, yoy_ratio: 0.83, current_order_count: 75, previous_year_order_count: 90, current_gross_profit: 450000, previous_year_gross_profit: 540000 },
+    { brand: 'NOAHL', channel: 'NOAHL楽天店', current_sales: 6500000, previous_year_sales: 5800000, yoy_ratio: 1.12, current_order_count: 320, previous_year_order_count: 290, current_gross_profit: 2600000, previous_year_gross_profit: 2200000 },
+    { brand: 'NOAHL', channel: 'NOAHL公式', current_sales: 4200000, previous_year_sales: 3500000, yoy_ratio: 1.20, current_order_count: 180, previous_year_order_count: 150, current_gross_profit: 2100000, previous_year_gross_profit: 1700000 },
+    { brand: 'NOAHL', channel: 'NOAHL TikTok', current_sales: 2800000, previous_year_sales: 1200000, yoy_ratio: 2.33, current_order_count: 95, previous_year_order_count: 40, current_gross_profit: 980000, previous_year_gross_profit: 420000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN楽天店', current_sales: 5200000, previous_year_sales: 5500000, yoy_ratio: 0.95, current_order_count: 260, previous_year_order_count: 275, current_gross_profit: 2080000, previous_year_gross_profit: 2200000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN公式', current_sales: 3800000, previous_year_sales: 3200000, yoy_ratio: 1.19, current_order_count: 160, previous_year_order_count: 135, current_gross_profit: 1900000, previous_year_gross_profit: 1600000 },
+    { brand: 'BLACKQUEEN', channel: 'BLACKQUEEN ZOZO', current_sales: 2100000, previous_year_sales: 2400000, yoy_ratio: 0.88, current_order_count: 110, previous_year_order_count: 125, current_gross_profit: 630000, previous_year_gross_profit: 720000 },
+    { brand: 'MYRTH', channel: 'MYRTH楽天店', current_sales: 3900000, previous_year_sales: 3100000, yoy_ratio: 1.26, current_order_count: 195, previous_year_order_count: 155, current_gross_profit: 1560000, previous_year_gross_profit: 1240000 },
+    { brand: 'MYRTH', channel: 'MYRTH公式', current_sales: 2500000, previous_year_sales: 2200000, yoy_ratio: 1.14, current_order_count: 105, previous_year_order_count: 92, current_gross_profit: 1250000, previous_year_gross_profit: 1100000 },
+    { brand: 'MYRTH', channel: 'MYRTH Yahoo!', current_sales: 1500000, previous_year_sales: 1800000, yoy_ratio: 0.83, current_order_count: 75, previous_year_order_count: 90, current_gross_profit: 450000, previous_year_gross_profit: 540000 },
   ]
 }
 
@@ -387,15 +389,15 @@ export function getMockCustomerMonthlyTrend(months: number = 24, _brand?: string
 // ============================================================
 export function getMockChannelRepeatRate(_month?: string, _brand?: string) {
   return [
-    { shop_name: 'NOAHL公式サイト', repeat_rate: 0.68, customer_count: 1200 },
-    { shop_name: 'BLACKQUEEN公式サイト', repeat_rate: 0.62, customer_count: 980 },
-    { shop_name: 'MYRTH公式サイト', repeat_rate: 0.58, customer_count: 750 },
-    { shop_name: 'NOAHL楽天市場店', repeat_rate: 0.45, customer_count: 2100 },
-    { shop_name: 'BLACKQUEEN楽天市場店', repeat_rate: 0.42, customer_count: 1800 },
-    { shop_name: 'MYRTH楽天市場店', repeat_rate: 0.38, customer_count: 1400 },
-    { shop_name: 'NOAHL_TIKTOK', repeat_rate: 0.22, customer_count: 850 },
-    { shop_name: 'BLACKQUEEN_ZOZO', repeat_rate: 0.35, customer_count: 1100 },
-    { shop_name: 'MYRTH_YAHOO', repeat_rate: 0.30, customer_count: 620 },
+    { shop_name: 'NOAHL公式', repeat_rate: 0.68, customer_count: 1200 },
+    { shop_name: 'BLACKQUEEN公式', repeat_rate: 0.62, customer_count: 980 },
+    { shop_name: 'MYRTH公式', repeat_rate: 0.58, customer_count: 750 },
+    { shop_name: 'NOAHL楽天店', repeat_rate: 0.45, customer_count: 2100 },
+    { shop_name: 'BLACKQUEEN楽天店', repeat_rate: 0.42, customer_count: 1800 },
+    { shop_name: 'MYRTH楽天店', repeat_rate: 0.38, customer_count: 1400 },
+    { shop_name: 'NOAHL TikTok', repeat_rate: 0.22, customer_count: 850 },
+    { shop_name: 'BLACKQUEEN ZOZO', repeat_rate: 0.35, customer_count: 1100 },
+    { shop_name: 'MYRTH Yahoo!', repeat_rate: 0.30, customer_count: 620 },
   ]
 }
 
@@ -405,49 +407,49 @@ export function getMockChannelRepeatRate(_month?: string, _brand?: string) {
 export function getMockChannelDetail(_month?: string, _brand?: string) {
   return [
     {
-      shop_name: 'NOAHL楽天市場店',
+      shop_name: 'NOAHL楽天店',
       new_customers: 580, new_sales: 3200000, new_avg_order_value: 5517,
       repeat_customers: 470, repeat_sales: 3300000, repeat_avg_order_value: 7021,
       repeat_rate: 0.448, new_sales_share: 0.492, repeat_sales_share: 0.508,
     },
     {
-      shop_name: 'NOAHL公式サイト',
+      shop_name: 'NOAHL公式',
       new_customers: 280, new_sales: 1800000, new_avg_order_value: 6429,
       repeat_customers: 420, repeat_sales: 3600000, repeat_avg_order_value: 8571,
       repeat_rate: 0.600, new_sales_share: 0.333, repeat_sales_share: 0.667,
     },
     {
-      shop_name: 'BLACKQUEEN楽天市場店',
+      shop_name: 'BLACKQUEEN楽天店',
       new_customers: 520, new_sales: 2900000, new_avg_order_value: 5577,
       repeat_customers: 380, repeat_sales: 2800000, repeat_avg_order_value: 7368,
       repeat_rate: 0.422, new_sales_share: 0.509, repeat_sales_share: 0.491,
     },
     {
-      shop_name: 'BLACKQUEEN公式サイト',
+      shop_name: 'BLACKQUEEN公式',
       new_customers: 220, new_sales: 1500000, new_avg_order_value: 6818,
       repeat_customers: 360, repeat_sales: 3100000, repeat_avg_order_value: 8611,
       repeat_rate: 0.621, new_sales_share: 0.326, repeat_sales_share: 0.674,
     },
     {
-      shop_name: 'MYRTH楽天市場店',
+      shop_name: 'MYRTH楽天店',
       new_customers: 380, new_sales: 2100000, new_avg_order_value: 5526,
       repeat_customers: 250, repeat_sales: 1800000, repeat_avg_order_value: 7200,
       repeat_rate: 0.397, new_sales_share: 0.538, repeat_sales_share: 0.462,
     },
     {
-      shop_name: 'MYRTH公式サイト',
+      shop_name: 'MYRTH公式',
       new_customers: 180, new_sales: 1200000, new_avg_order_value: 6667,
       repeat_customers: 280, repeat_sales: 2400000, repeat_avg_order_value: 8571,
       repeat_rate: 0.609, new_sales_share: 0.333, repeat_sales_share: 0.667,
     },
     {
-      shop_name: 'NOAHL_TIKTOK',
+      shop_name: 'NOAHL TikTok',
       new_customers: 450, new_sales: 1800000, new_avg_order_value: 4000,
       repeat_customers: 120, repeat_sales: 960000, repeat_avg_order_value: 8000,
       repeat_rate: 0.211, new_sales_share: 0.652, repeat_sales_share: 0.348,
     },
     {
-      shop_name: 'BLACKQUEEN_ZOZO',
+      shop_name: 'BLACKQUEEN ZOZO',
       new_customers: 320, new_sales: 1600000, new_avg_order_value: 5000,
       repeat_customers: 180, repeat_sales: 1300000, repeat_avg_order_value: 7222,
       repeat_rate: 0.360, new_sales_share: 0.552, repeat_sales_share: 0.448,
