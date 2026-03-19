@@ -14,7 +14,7 @@ const GENRE_ID = '100371'
  * 楽天ランキング取得 & BigQuery保存
  *
  * GET /api/rakuten-ranking/collect
- *   ?type=daily (default) | realtime | weekly
+ *   ?type=daily (default) | realtime
  *
  * Vercel Cron または手動実行で呼ばれる
  */
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
 
     const sp = request.nextUrl.searchParams
-    const rankingType = (sp.get('type') || 'daily') as 'realtime' | 'daily' | 'weekly'
+    const rankingType = (sp.get('type') || 'daily') as 'realtime' | 'daily'
 
     if (!process.env.RAKUTEN_APP_ID || !process.env.RAKUTEN_ACCESS_KEY) {
       return NextResponse.json(
