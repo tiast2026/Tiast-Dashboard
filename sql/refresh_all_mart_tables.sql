@@ -1,5 +1,5 @@
 -- Refresh All Mart Tables
--- Materializes all analytics_mart VIEWs (mart_*) into real tables (t_*)
+-- Materializes all analytics_mart VIEWs (mart_*) into real tables (mart_*)
 -- Frequency: Every hour
 -- Region: asia-northeast1
 

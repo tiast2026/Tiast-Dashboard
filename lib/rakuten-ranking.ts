@@ -254,7 +254,7 @@ export async function fetchMasterProductCodes(): Promise<string[]> {
   const [rows] = await bq.query({
     query: `
       SELECT DISTINCT product_code
-      FROM \`tiast-data-platform.analytics_mart.t_mart_product_master\`
+      FROM \`tiast-data-platform.analytics_mart.mart_product_master\`
       WHERE product_code IS NOT NULL
     `,
     location: 'asia-northeast1',
