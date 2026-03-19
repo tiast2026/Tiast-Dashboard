@@ -113,6 +113,22 @@ interface CategoryGroup {
   products: ProductRankingSummary[]
 }
 
+// カテゴリグループの色パレット
+const CATEGORY_COLORS = [
+  { border: 'border-l-red-500', bg: 'bg-red-500' },
+  { border: 'border-l-blue-500', bg: 'bg-blue-500' },
+  { border: 'border-l-emerald-500', bg: 'bg-emerald-500' },
+  { border: 'border-l-amber-500', bg: 'bg-amber-500' },
+  { border: 'border-l-purple-500', bg: 'bg-purple-500' },
+  { border: 'border-l-pink-500', bg: 'bg-pink-500' },
+  { border: 'border-l-cyan-500', bg: 'bg-cyan-500' },
+  { border: 'border-l-orange-500', bg: 'bg-orange-500' },
+  { border: 'border-l-indigo-500', bg: 'bg-indigo-500' },
+  { border: 'border-l-teal-500', bg: 'bg-teal-500' },
+  { border: 'border-l-rose-500', bg: 'bg-rose-500' },
+  { border: 'border-l-lime-500', bg: 'bg-lime-500' },
+]
+
 function groupByCategory(products: ProductRankingSummary[]): CategoryGroup[] {
   const map = new Map<string, ProductRankingSummary[]>()
   for (const p of products) {
@@ -593,10 +609,12 @@ export default function RankingPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {categoryGroups.map((category) => (
+            {categoryGroups.map((category, catIndex) => {
+              const color = CATEGORY_COLORS[catIndex % CATEGORY_COLORS.length]
+              return (
               <div key={category.genre_id}>
                 {/* Category Section Header */}
-                <div className="border-l-4 border-l-[#BF0000] bg-white rounded-r-lg px-4 py-3 mb-3 flex items-center justify-between shadow-sm">
+                <div className={`border-l-4 ${color.border} bg-white rounded-r-lg px-4 py-3 mb-3 flex items-center justify-between shadow-sm`}>
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-gray-800 text-sm">{category.genre_name}</h3>
                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -839,7 +857,7 @@ export default function RankingPage() {
                   })}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
