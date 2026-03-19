@@ -15,15 +15,28 @@ const formatMonth = (month: string) => {
   return `${parseInt(m)}月`
 }
 
+const formatYAxisValue = (value: number) => {
+  if (value >= 10000000) return `${(value / 10000000).toFixed(0)}千万`
+  if (value >= 10000) return `${(value / 10000).toFixed(0)}万`
+  return String(value)
+}
+
+const formatTooltipValue = (value: number) => `¥${Math.round(value).toLocaleString()}`
+
 export default function StackedBarChart({ data, keys, colors, lineKey, lineColor }: StackedBarChartProps) {
   return (
     <ResponsiveContainer width="100%" height={350}>
       <ComposedChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis dataKey="month" tickFormatter={formatMonth} tick={{ fontSize: 12 }} />
-        <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+        <YAxis yAxisId="left" tick={{ fontSize: 12 }} tickFormatter={formatYAxisValue} />
         {lineKey && <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />}
-        <Tooltip />
+        <Tooltip
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(value: any, name: any) => [formatTooltipValue(Number(value)), String(name)]}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          labelFormatter={(label: any) => formatMonth(String(label))}
+        />
         <Legend />
         {keys.map((key) => (
           <Bar key={key} yAxisId="left" dataKey={key} stackId="stack" fill={colors[key] || '#999'} name={key} />

@@ -21,8 +21,8 @@ export const CHANNEL_COLORS: Record<string, string> = {
 export const CHANNEL_GROUP_COLORS: Record<string, string> = {
   '楽天系': '#BF0000',
   '公式系': '#4A90D9',
-  'TikTok系': '#010101',
-  'その他': '#999999',
+  'TikTok系': '#25D366',
+  'その他': '#F59E0B',
 }
 
 // Lifecycle colors
