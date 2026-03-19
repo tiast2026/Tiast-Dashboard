@@ -36,13 +36,13 @@ WITH ne_product_sales AS (
     MAX(p.goods_cost_price) AS cost_price,
     SUM(o.quantity) AS total_quantity,
     COUNT(DISTINCT o.receive_order_id) AS order_count,
-    SUM(o.unit_price * o.quantity) AS sales_amount,
-    SUM(o.unit_price * o.quantity)
+    SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount)) AS sales_amount,
+    SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
       - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity) AS gross_profit,
     SAFE_DIVIDE(
-      SUM(o.unit_price * o.quantity)
+      SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
         - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity),
-      SUM(o.unit_price * o.quantity)
+      SUM(o.unit_price * o.quantity * SAFE_DIVIDE(o.total_amount, o.goods_amount))
     ) AS gross_profit_rate
   FROM `tiast-data-platform.raw_nextengine.orders` o
   LEFT JOIN `tiast-data-platform.raw_nextengine.products` p
