@@ -200,7 +200,11 @@ export default function RankingPage() {
         </div>
 
         {collectResult && (
-          <div className="px-4 py-2 bg-gray-50 rounded-lg text-sm text-gray-600">
+          <div className={`px-4 py-2 rounded-lg text-sm ${
+            collectResult.startsWith('エラー')
+              ? 'bg-red-50 text-red-700 border border-red-200'
+              : 'bg-gray-50 text-gray-600'
+          }`}>
             {collectResult}
           </div>
         )}
