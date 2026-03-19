@@ -13,16 +13,19 @@ export async function GET(request: NextRequest) {
     }
 
     const appId = process.env.RAKUTEN_APP_ID
-    if (!appId) {
-      // Return mock results when API key is not configured
+    const accessKey = process.env.RAKUTEN_ACCESS_KEY
+    if (!appId || !accessKey) {
+      // Return mock results when API keys are not configured
       return NextResponse.json({
         items: generateMockImages(keyword),
-        message: 'Mock data (RAKUTEN_APP_ID not configured)',
+        message: 'Mock data (RAKUTEN_APP_ID or RAKUTEN_ACCESS_KEY not configured)',
       })
     }
 
-    const apiUrl = new URL('https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601')
+    // 2026年2月以降の新ドメイン
+    const apiUrl = new URL('https://openapi.rakuten.co.jp/ichibasearch/api/IchibaItem/Search/20220601')
     apiUrl.searchParams.set('applicationId', appId)
+    apiUrl.searchParams.set('accessKey', accessKey)
     apiUrl.searchParams.set('keyword', keyword)
     apiUrl.searchParams.set('hits', '10')
     apiUrl.searchParams.set('imageFlag', '1')
@@ -30,7 +33,9 @@ export async function GET(request: NextRequest) {
 
     const res = await fetch(apiUrl.toString())
     if (!res.ok) {
-      throw new Error(`Rakuten API error: ${res.status}`)
+      let detail = ''
+      try { detail = (await res.text()).slice(0, 300) } catch { /* ignore */ }
+      throw new Error(`Rakuten API error: ${res.status}${detail ? ` - ${detail}` : ''}`)
     }
 
     const data = await res.json()

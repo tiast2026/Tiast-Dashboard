@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     const sp = request.nextUrl.searchParams
     const rankingType = (sp.get('type') || 'daily') as 'realtime' | 'daily' | 'weekly'
 
-    if (!process.env.RAKUTEN_APP_ID) {
+    if (!process.env.RAKUTEN_APP_ID || !process.env.RAKUTEN_ACCESS_KEY) {
       return NextResponse.json(
-        { error: 'RAKUTEN_APP_ID is not configured' },
+        { error: 'RAKUTEN_APP_ID and RAKUTEN_ACCESS_KEY must be configured' },
         { status: 500 }
       )
     }

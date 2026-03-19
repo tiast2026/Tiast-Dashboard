@@ -4,7 +4,8 @@
 import { getBigQueryClient, isBigQueryConfigured } from './bigquery'
 import type { RakutenRankingItem, RankingHistoryRecord } from '@/types/ranking'
 
-const RAKUTEN_RANKING_API = 'https://app.rakuten.co.jp/services/api/IchibaItem/Ranking/20220601'
+// 2026年2月以降の新ドメイン（旧: app.rakuten.co.jp/services/api/...）
+const RAKUTEN_RANKING_API = 'https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601'
 
 // レディースファッション ジャンルID
 const GENRE_LADIES_FASHION = '100371'
@@ -44,22 +45,29 @@ interface RakutenApiResponse {
  */
 async function fetchRakutenRankingPage(
   appId: string,
+  accessKey: string,
   rankingType: 'realtime' | 'daily' | 'weekly',
   genreId: string,
   page: number,
 ): Promise<RakutenRankingItem[]> {
   const url = new URL(RAKUTEN_RANKING_API)
   url.searchParams.set('applicationId', appId)
+  url.searchParams.set('accessKey', accessKey)
   url.searchParams.set('genreId', genreId)
   url.searchParams.set('carrier', '0')
   url.searchParams.set('page', String(page))
-  if (rankingType === 'weekly') {
-    url.searchParams.set('period', '2')
+  if (rankingType === 'realtime') {
+    url.searchParams.set('period', 'realtime')
   }
 
   const res = await fetch(url.toString())
   if (!res.ok) {
-    throw new Error(`Rakuten Ranking API error: ${res.status} ${res.statusText}`)
+    let detail = ''
+    try {
+      const body = await res.text()
+      detail = body.slice(0, 300)
+    } catch { /* ignore */ }
+    throw new Error(`Rakuten Ranking API error: ${res.status}${detail ? ` - ${detail}` : ''}`)
   }
 
   const data: RakutenApiResponse = await res.json()
@@ -90,8 +98,9 @@ export async function fetchRakutenRanking(
   maxRank: number = 100,
 ): Promise<RakutenRankingItem[]> {
   const appId = process.env.RAKUTEN_APP_ID
-  if (!appId) {
-    throw new Error('RAKUTEN_APP_ID is not configured')
+  const accessKey = process.env.RAKUTEN_ACCESS_KEY
+  if (!appId || !accessKey) {
+    throw new Error('RAKUTEN_APP_ID and RAKUTEN_ACCESS_KEY must be configured')
   }
 
   // 必要ページ数を計算（1ページ30件、最大4ページ）
@@ -99,7 +108,7 @@ export async function fetchRakutenRanking(
   const allItems: RakutenRankingItem[] = []
 
   for (let page = 1; page <= pagesNeeded; page++) {
-    const items = await fetchRakutenRankingPage(appId, rankingType, genreId, page)
+    const items = await fetchRakutenRankingPage(appId, accessKey, rankingType, genreId, page)
     allItems.push(...items)
 
     // 取得件数がmaxRankに達したら終了
