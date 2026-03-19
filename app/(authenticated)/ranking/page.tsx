@@ -868,6 +868,7 @@ export default function RankingPage() {
         onClose={() => setDialogProduct(null)}
         mode="product"
         productCode={dialogProduct?.productCode || ''}
+        period="all"
         product={dialogProduct?.sales ? {
           product_code: dialogProduct.sales.product_code,
           product_name: dialogProduct.sales.product_name,
