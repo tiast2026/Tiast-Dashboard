@@ -253,9 +253,10 @@ export async function fetchMasterProductCodes(): Promise<string[]> {
   const bq = getBigQueryClient()
   const [rows] = await bq.query({
     query: `
-      SELECT DISTINCT product_code
-      FROM \`tiast-data-platform.analytics_mart.mart_product_master\`
-      WHERE product_code IS NOT NULL
+      SELECT DISTINCT goods_representation_id AS product_code
+      FROM \`tiast-data-platform.raw_nextengine.products\`
+      WHERE goods_representation_id IS NOT NULL
+        AND goods_representation_id != ''
     `,
     location: 'asia-northeast1',
   })
