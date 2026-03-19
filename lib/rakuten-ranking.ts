@@ -201,7 +201,88 @@ export function matchOwnProduct(
 }
 
 /**
+ * テーブルが存在しなければ作成する
+ */
+async function ensureRankingTableExists(bq: ReturnType<typeof getBigQueryClient>): Promise<void> {
+  const dataset = bq.dataset('analytics_mart')
+  const table = dataset.table('rakuten_ranking_history')
+
+  const [exists] = await table.exists()
+  if (exists) return
+
+  console.log('[Rakuten Ranking] Table does not exist, creating...')
+  await table.create({
+    schema: {
+      fields: [
+        { name: 'fetched_at', type: 'TIMESTAMP', mode: 'REQUIRED' },
+        { name: 'ranking_type', type: 'STRING', mode: 'REQUIRED' },
+        { name: 'genre_id', type: 'STRING', mode: 'REQUIRED' },
+        { name: 'rank', type: 'INT64', mode: 'REQUIRED' },
+        { name: 'item_name', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'item_code', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'item_price', type: 'INT64', mode: 'NULLABLE' },
+        { name: 'item_url', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'image_url', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'shop_name', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'review_count', type: 'INT64', mode: 'NULLABLE' },
+        { name: 'review_average', type: 'FLOAT64', mode: 'NULLABLE' },
+        { name: 'is_own_product', type: 'BOOL', mode: 'NULLABLE' },
+        { name: 'matched_product_code', type: 'STRING', mode: 'NULLABLE' },
+      ],
+    },
+    timePartitioning: {
+      type: 'DAY',
+      field: 'fetched_at',
+    },
+    clustering: {
+      fields: ['genre_id', 'is_own_product'],
+    },
+  })
+  console.log('[Rakuten Ranking] Table created successfully')
+}
+
+/**
+ * SQL INSERT でランキングデータを保存（streaming insert の代替）
+ */
+async function insertRankingViaSQL(
+  bq: ReturnType<typeof getBigQueryClient>,
+  rows: RankingHistoryRecord[],
+): Promise<void> {
+  if (rows.length === 0) return
+
+  // バッチサイズごとに分割（BigQuery DML の制限対策）
+  const BATCH_SIZE = 50
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE)
+    const values = batch
+      .map(
+        (r) =>
+          `(TIMESTAMP('${r.fetched_at}'), '${r.ranking_type}', '${r.genre_id}', ${r.rank}, ` +
+          `${sqlStr(r.item_name)}, ${sqlStr(r.item_code)}, ${r.item_price}, ` +
+          `${sqlStr(r.item_url)}, ${sqlStr(r.image_url)}, ${sqlStr(r.shop_name)}, ` +
+          `${r.review_count}, ${r.review_average}, ${r.is_own_product}, ${sqlStr(r.matched_product_code)})`
+      )
+      .join(',\n')
+
+    const query = `
+      INSERT INTO \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
+        (fetched_at, ranking_type, genre_id, rank, item_name, item_code, item_price,
+         item_url, image_url, shop_name, review_count, review_average, is_own_product, matched_product_code)
+      VALUES ${values}
+    `
+    await bq.query({ query, location: 'asia-northeast1' })
+  }
+}
+
+/** SQL文字列リテラルのエスケープ（NULL対応） */
+function sqlStr(value: string | null | undefined): string {
+  if (value == null) return 'NULL'
+  return `'${value.replace(/'/g, "\\'")}'`
+}
+
+/**
  * ランキングデータをBigQueryに保存
+ * streaming insert を試み、権限エラーの場合は SQL INSERT にフォールバック
  */
 export async function saveRankingToBigQuery(
   items: RakutenRankingItem[],
@@ -237,11 +318,40 @@ export async function saveRankingToBigQuery(
     }
   })
 
-  const dataset = bq.dataset('analytics_mart')
-  const table = dataset.table('rakuten_ranking_history')
+  // テーブルが存在しなければ作成
+  try {
+    await ensureRankingTableExists(bq)
+  } catch (e) {
+    console.warn('[Rakuten Ranking] Could not verify/create table:', e)
+    // テーブル存在確認に失敗しても INSERT を試行する
+  }
 
-  await table.insert(rows)
-  return rows.length
+  // 1. まず streaming insert を試行
+  try {
+    const dataset = bq.dataset('analytics_mart')
+    const table = dataset.table('rakuten_ranking_history')
+    await table.insert(rows)
+    return rows.length
+  } catch (streamingError) {
+    const errMsg = streamingError instanceof Error ? streamingError.message : String(streamingError)
+
+    // streaming insert の権限エラーの場合、SQL INSERT にフォールバック
+    if (errMsg.includes('updateData') || errMsg.includes('Access Denied') || errMsg.includes('permission')) {
+      console.warn('[Rakuten Ranking] Streaming insert denied, falling back to SQL INSERT...')
+      try {
+        await insertRankingViaSQL(bq, rows)
+        return rows.length
+      } catch (sqlError) {
+        const sqlErrMsg = sqlError instanceof Error ? sqlError.message : String(sqlError)
+        throw new Error(
+          `BigQueryへの書き込み権限がありません。サービスアカウントに「BigQuery データ編集者」ロールを付与してください。\n` +
+          `詳細: ${sqlErrMsg}`
+        )
+      }
+    }
+
+    throw streamingError
+  }
 }
 
 /**
