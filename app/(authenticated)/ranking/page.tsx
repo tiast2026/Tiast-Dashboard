@@ -107,25 +107,81 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className="font-bold text-lg text-gray-700">{rank}</span>
 }
 
-// ジャンル一覧（クライアント側定義）
-const GENRES = [
+// 全ジャンルID→名前マップ（表示用）
+const GENRE_MAP: Record<string, string> = {
+  '100371': 'レディースファッション（全体）',
+  '555086': 'トップス',
+  '303656': 'Tシャツ・カットソー',
+  '566018': 'タンクトップ',
+  '206471': 'シャツ・ブラウス',
+  '409352': 'ポロシャツ',
+  '303662': 'キャミソール',
+  '303655': 'ベアトップ・チューブトップ',
+  '403871': 'カーディガン・ボレロ',
+  '403890': 'ベスト・ジレ',
+  '303699': 'アンサンブル',
+  '566028': 'セーター',
+  '566029': 'ニットパーカー',
+  '566030': 'ニットキャミソール',
+  '200343': 'ニット・セーター > その他',
+  '502556': 'パーカー',
+  '403923': 'スウェット・トレーナー',
+  '112719': 'トップス > その他',
+  '555089': 'ボトムス',
+  '110734': 'スカート',
+  '303587': 'キュロット',
+  '206440': 'パンツ',
+  '555087': 'コート・ジャケット',
+  '110729': 'ワンピース',
+  '568650': 'シャツワンピース',
+  '568651': 'ジャンパースカート',
+  '553029': 'チュニック',
+  '555084': 'ドレス',
+  '568279': 'パンツドレス',
+  '555091': 'スーツ・セットアップ',
+  '110724': 'パンツスーツ',
+  '409073': 'スカートスーツ',
+  '409120': 'ワンピーススーツ',
+  '409096': '3・4点セット',
+  '566020': 'セットアップ > トップスのみ',
+  '566021': 'セットアップ > ボトムスのみ',
+  '555083': 'オールインワン・サロペット',
+  '553037': 'レインコート',
+  '553038': 'レインスーツ',
+  '409395': 'レインウェア > その他',
+  '409365': '水着',
+  '564338': 'ウェディングドレス',
+  '403911': '福袋',
+  '101801': 'その他',
+}
+
+// フィルタ用ジャンルリスト（主要カテゴリのみ、階層構造でグルーピング）
+const FILTER_GENRES = [
   { id: 'all', name: '全カテゴリ' },
   { id: '100371', name: 'レディースファッション（全体）' },
-  { id: '110729', name: 'ワンピース' },
-  { id: '555086', name: 'トップス' },
-  { id: '555089', name: 'ボトムス' },
+  { id: '555086', name: 'トップス（全体）', group: 'トップス' },
+  { id: '303656', name: '┗ Tシャツ・カットソー', group: 'トップス' },
+  { id: '206471', name: '┗ シャツ・ブラウス', group: 'トップス' },
+  { id: '403871', name: '┗ カーディガン・ボレロ', group: 'トップス' },
+  { id: '502556', name: '┗ パーカー', group: 'トップス' },
+  { id: '403923', name: '┗ スウェット・トレーナー', group: 'トップス' },
+  { id: '555089', name: 'ボトムス（全体）', group: 'ボトムス' },
+  { id: '110734', name: '┗ スカート', group: 'ボトムス' },
+  { id: '206440', name: '┗ パンツ', group: 'ボトムス' },
   { id: '555087', name: 'コート・ジャケット' },
-  { id: '555091', name: 'スーツ・セットアップ' },
-  { id: '555083', name: 'オールインワン・サロペット' },
+  { id: '110729', name: 'ワンピース' },
+  { id: '568650', name: 'シャツワンピース' },
   { id: '553029', name: 'チュニック' },
   { id: '555084', name: 'ドレス' },
   { id: '568279', name: 'パンツドレス' },
+  { id: '555091', name: 'スーツ・セットアップ' },
+  { id: '555083', name: 'オールインワン・サロペット' },
   { id: '409365', name: '水着' },
   { id: '101801', name: 'その他' },
 ]
 
 function getGenreLabel(genreId: string): string {
-  return GENRES.find((g) => g.id === genreId)?.name ?? genreId
+  return GENRE_MAP[genreId] ?? genreId
 }
 
 export default function RankingPage() {
@@ -229,14 +285,14 @@ export default function RankingPage() {
 
   return (
     <>
-      <Header title="楽天ランキング履歴" subtitle="レディースファッション" />
+      <Header title="楽天ランキング履歴" subtitle="レディースファッション｜デイリー集計" />
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Controls */}
         <div className="flex items-center gap-3">
           <Select value={genre} onValueChange={setGenre}>
             <SelectTrigger className="w-64 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {GENRES.map((g) => (
+              {FILTER_GENRES.map((g) => (
                 <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
               ))}
             </SelectContent>
@@ -272,7 +328,7 @@ export default function RankingPage() {
         {/* ランキングの説明 */}
         <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <p>楽天市場レディースファッション各カテゴリのデイリーランキング（前日の売上に基づき毎日更新）を一括取得します。「今すぐ取得」で全カテゴリ（約1分）を取得し、左のフィルタでカテゴリ別に絞り込めます。</p>
+          <p>楽天市場レディースファッション各カテゴリの<strong>デイリーランキング</strong>（前日の売上に基づき毎日更新）を取得しています。毎日自動で全カテゴリを収集し、左のフィルタでカテゴリ別に絞り込めます。</p>
         </div>
 
         {historyError && (
