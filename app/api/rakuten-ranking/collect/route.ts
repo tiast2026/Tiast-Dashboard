@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     for (const genre of targetGenres) {
       try {
         // 楽天ランキングAPI取得
-        const items = await fetchRakutenRanking('daily', genre.id)
+        const { items, lastBuildDate } = await fetchRakutenRanking('daily', genre.id)
 
         // 自社商品マッチング
         const matchResults = new Map<number, { isOwn: boolean; matchedCode: string | null }>()
@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // BigQueryに保存
-        await saveRankingToBigQuery(items, 'daily', genre.id, matchResults)
+        // BigQueryに保存（ランキング発表日時を渡す）
+        await saveRankingToBigQuery(items, 'daily', genre.id, matchResults, lastBuildDate)
 
         totalItems += items.length
         totalOwn += ownProducts.length
