@@ -31,6 +31,7 @@ interface RankingRecord {
 
 interface ProductRankingSummary {
   matched_product_code: string
+  item_code: string
   item_name: string
   image_url: string
   item_price: number
@@ -47,6 +48,21 @@ interface ProductRankingSummary {
   history: { date: string; rank: number }[]
 }
 
+/** item_code から品番部分を抽出（例: "noahl:10002595" → "10002595"） */
+function extractProductNumber(itemCode: string): string {
+  if (!itemCode) return ''
+  const colonIdx = itemCode.indexOf(':')
+  if (colonIdx >= 0) return itemCode.substring(colonIdx + 1)
+  return itemCode
+}
+
+/** item_url から楽天の商品ID部分を抽出（例: "https://item.rakuten.co.jp/noahl/nlwp473-2512/" → "nlwp473-2512"） */
+function extractRakutenProductId(itemUrl: string): string | null {
+  if (!itemUrl) return null
+  const match = itemUrl.match(/item\.rakuten\.co\.jp\/[^/]+\/([^/?]+)/)
+  return match ? match[1] : null
+}
+
 function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
@@ -55,6 +71,7 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     if (!map.has(key)) {
       map.set(key, {
         matched_product_code: r.matched_product_code,
+        item_code: r.item_code,
         item_name: r.item_name,
         image_url: r.image_url,
         item_price: r.item_price,
@@ -88,9 +105,13 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   return Array.from(map.values()).sort((a, b) => a.best_rank - b.best_rank)
 }
 
-function formatDateTime(date: string | null | undefined): string {
+function formatDateTime(date: unknown): string {
   if (!date) return '-'
-  const d = new Date(date)
+  // BigQuery timestamp may come as { value: "..." } object
+  const raw = typeof date === 'object' && date !== null && 'value' in date
+    ? (date as { value: string }).value
+    : String(date)
+  const d = new Date(raw)
   if (isNaN(d.getTime())) return '-'
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
@@ -220,20 +241,46 @@ export default function RankingPage() {
 
   const cacheKey = `ranking:${genre}:${days}`
 
-  const fetchSalesData = useCallback(async (productCode: string) => {
+  const fetchSalesData = useCallback(async (productCode: string, itemCode: string, itemUrl: string) => {
     if (salesDataMap[productCode] !== undefined) return
     setSalesLoadingSet((prev) => new Set(prev).add(productCode))
     try {
-      const res = await fetch(`/api/products/${encodeURIComponent(productCode)}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (mountedRef.current) {
-          setSalesDataMap((prev) => ({ ...prev, [productCode]: data }))
+      // 品番の候補を複数生成して順に検索
+      const rakutenId = extractRakutenProductId(itemUrl)
+      const itemNum = extractProductNumber(itemCode || productCode)
+      const searchTerms = [
+        productCode.includes(':') ? null : productCode,
+        rakutenId,
+        itemNum,
+      ].filter((t): t is string => !!t && t.length > 0)
+
+      // 重複除去
+      const uniqueTerms = Array.from(new Set(searchTerms))
+
+      for (const term of uniqueTerms) {
+        // まず直接APIを試す
+        const directRes = await fetch(`/api/products/${encodeURIComponent(term)}`)
+        if (directRes.ok) {
+          const data = await directRes.json()
+          if (data && data.product_code && mountedRef.current) {
+            setSalesDataMap((prev) => ({ ...prev, [productCode]: data }))
+            return
+          }
         }
-      } else {
-        if (mountedRef.current) {
-          setSalesDataMap((prev) => ({ ...prev, [productCode]: null }))
+
+        // 見つからなければ list API で部分検索
+        const listRes = await fetch(`/api/products/list?search=${encodeURIComponent(term)}&per_page=1`)
+        if (listRes.ok) {
+          const listData = await listRes.json()
+          if (listData.data?.length > 0 && mountedRef.current) {
+            setSalesDataMap((prev) => ({ ...prev, [productCode]: listData.data[0] }))
+            return
+          }
         }
+      }
+
+      if (mountedRef.current) {
+        setSalesDataMap((prev) => ({ ...prev, [productCode]: null }))
       }
     } catch {
       if (mountedRef.current) {
@@ -250,14 +297,14 @@ export default function RankingPage() {
     }
   }, [salesDataMap])
 
-  const toggleExpand = (key: string, productCode: string) => {
+  const toggleExpand = (key: string, productCode: string, itemCode: string, itemUrl: string) => {
     setExpandedProducts((prev) => {
       const next = new Set(prev)
       if (next.has(key)) {
         next.delete(key)
       } else {
         next.add(key)
-        fetchSalesData(productCode)
+        fetchSalesData(productCode, itemCode, itemUrl)
       }
       return next
     })
@@ -516,7 +563,7 @@ export default function RankingPage() {
                       {/* Main Row */}
                       <button
                         type="button"
-                        onClick={() => toggleExpand(key, product.matched_product_code)}
+                        onClick={() => toggleExpand(key, product.matched_product_code, product.item_code, product.item_url)}
                         className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50/50 transition-colors rounded-lg"
                       >
                         {/* Rank */}
@@ -536,7 +583,9 @@ export default function RankingPage() {
                             {product.item_name}
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                            <span>{product.matched_product_code} / {product.shop_name}</span>
+                            <span className="font-mono text-gray-500">{extractRakutenProductId(product.item_url) || extractProductNumber(product.item_code)}</span>
+                            <span className="text-gray-300">/</span>
+                            <span>{product.shop_name}</span>
                             <span className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[11px] font-medium">{getGenreLabel(product.genre_id)}</span>
                           </div>
                           <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
@@ -587,7 +636,7 @@ export default function RankingPage() {
                             <h4 className="text-sm font-medium text-gray-700">商品詳細・ランキング履歴</h4>
                             <div className="flex items-center gap-3">
                               <a
-                                href={`/products?search=${encodeURIComponent(product.matched_product_code)}`}
+                                href={`/products?search=${encodeURIComponent(extractProductNumber(product.item_code))}`}
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                               >
                                 <BarChart3 className="w-3 h-3" />
@@ -612,7 +661,11 @@ export default function RankingPage() {
                             const sales = salesDataMap[product.matched_product_code]
                             const isLoadingSales = salesLoadingSet.has(product.matched_product_code)
                             return (
-                              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+                                <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                  <div className="text-[10px] text-gray-400">品番</div>
+                                  <div className="text-sm font-mono font-medium text-gray-700">{extractRakutenProductId(product.item_url) || extractProductNumber(product.item_code)}</div>
+                                </div>
                                 <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
                                   <div className="text-[10px] text-gray-400">楽天カテゴリ</div>
                                   <div className="text-sm font-medium text-gray-700">{getGenreLabel(product.genre_id)}</div>
