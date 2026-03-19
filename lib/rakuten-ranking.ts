@@ -288,6 +288,13 @@ export async function fetchRakutenRanking(
   }
 }
 
+/** item_url から楽天の商品ID部分を抽出（例: "https://item.rakuten.co.jp/noahl/nlwp473-2512/" → "nlwp473-2512"） */
+function extractProductIdFromUrl(itemUrl: string): string | null {
+  if (!itemUrl) return null
+  const match = itemUrl.match(/item\.rakuten\.co\.jp\/[^/]+\/([^/?]+)/)
+  return match ? match[1] : null
+}
+
 /**
  * 自社商品かどうか判定
  * ショップ名 or 商品コードでマッチング
@@ -304,9 +311,22 @@ export function matchOwnProduct(
   const codeLower = item.item_code.toLowerCase()
   let matchedMasterCode: string | null = null
   if (masterCodes) {
-    matchedMasterCode = masterCodes.find((mc) =>
+    // item_code でマッチ（長い品番を優先するためソート）
+    const sortedCodes = [...masterCodes].sort((a, b) => b.length - a.length)
+    matchedMasterCode = sortedCodes.find((mc) =>
       codeLower.includes(mc.toLowerCase()) || item.item_name.toLowerCase().includes(mc.toLowerCase())
     ) || null
+
+    // item_url からも品番を抽出してマッチ（item_code にない品番がURLに含まれるケースに対応）
+    if (!matchedMasterCode) {
+      const urlProductId = extractProductIdFromUrl(item.item_url)
+      if (urlProductId) {
+        const urlLower = urlProductId.toLowerCase()
+        matchedMasterCode = sortedCodes.find((mc) =>
+          mc.toLowerCase() === urlLower || urlLower.includes(mc.toLowerCase())
+        ) || null
+      }
+    }
   }
 
   // 3. 品番プレフィックスはショップ名が自社の場合のみ使用
@@ -325,8 +345,14 @@ export function matchOwnProduct(
       const m = codeLower.match(regex)
       matched = m ? m[1] : codeLower
     }
+    // item_url から品番を抽出してフォールバック
     if (!matched && isOwnShop) {
-      matched = item.item_code
+      const urlProductId = extractProductIdFromUrl(item.item_url)
+      if (urlProductId && OWN_PRODUCT_CODE_PREFIXES.some(p => urlProductId.toLowerCase().startsWith(p))) {
+        matched = urlProductId
+      } else {
+        matched = item.item_code
+      }
     }
     return { isOwn: true, matchedCode: matched }
   }
