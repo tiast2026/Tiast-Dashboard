@@ -727,9 +727,28 @@ export default function ProductDetailDialog({
   const prevYearMap = new Map(trend?.prev_year?.map(r => [r.month, r]) || [])
   const prevYearData = currentMonthData ? prevYearMap.get(currentMonthData.month) : null
 
-  // Use product/sku data (already filtered by page period) for display values
-  const displayQuantity = isSkuView ? selectedSku.total_quantity : prodData?.total_quantity ?? 0
-  const displayAmount = isSkuView ? selectedSku.sales_amount : prodData?.sales_amount ?? 0
+  // Use product/sku data for display values
+  // When period=all and channel data is available, prefer channel totals (from raw orders)
+  // over mart table data which may be stale
+  const channelTotalQuantity = trend?.channels?.reduce((s, c) => s + Number(c.quantity), 0) ?? 0
+  const channelTotalAmount = trend?.channels?.reduce((s, c) => s + Number(c.sales_amount), 0) ?? 0
+  const trendTotalQuantity = trend?.data?.reduce((s, r) => s + Number(r.quantity), 0) ?? 0
+  const trendTotalAmount = trend?.data?.reduce((s, r) => s + Number(r.sales_amount), 0) ?? 0
+
+  const displayQuantity = isSkuView
+    ? selectedSku.total_quantity
+    : (period === 'all' && channelTotalQuantity > 0)
+      ? channelTotalQuantity
+      : (period === 'all' && trendTotalQuantity > 0)
+        ? trendTotalQuantity
+        : prodData?.total_quantity ?? 0
+  const displayAmount = isSkuView
+    ? selectedSku.sales_amount
+    : (period === 'all' && channelTotalAmount > 0)
+      ? channelTotalAmount
+      : (period === 'all' && trendTotalAmount > 0)
+        ? trendTotalAmount
+        : prodData?.sales_amount ?? 0
 
   // Header info
   const title = isSkuView ? selectedSku.goods_id : (prodData?.product_name || productCode)

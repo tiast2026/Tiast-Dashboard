@@ -81,24 +81,98 @@ export async function GET(
     const cacheKey = buildCacheKey('product-detail', { product_code })
 
     const data = await cachedQuery(cacheKey, async () => {
-      // Fetch sales data
+      // Fetch sales data directly from raw orders (not mart table which may be stale)
       const salesQuery = `
+        WITH ne_sales AS (
+          SELECT
+            p.goods_representation_id AS product_code,
+            MAX(p.goods_name) AS product_name,
+            CASE
+              WHEN LEFT(p.goods_representation_id, 1) = 'n' THEN 'NOAHL'
+              WHEN LEFT(p.goods_representation_id, 1) = 'b' THEN 'BLACKQUEEN'
+              ELSE 'OTHER'
+            END AS brand,
+            MAX(COALESCE(p.goods_merchandise_name, 'その他')) AS category,
+            MAX(CASE
+              WHEN SAFE_CAST(RIGHT(p.goods_representation_id, 2) AS INT64) BETWEEN 1 AND 3 THEN '春'
+              WHEN SAFE_CAST(RIGHT(p.goods_representation_id, 2) AS INT64) BETWEEN 4 AND 6 THEN '夏'
+              WHEN SAFE_CAST(RIGHT(p.goods_representation_id, 2) AS INT64) BETWEEN 7 AND 9 THEN '秋'
+              WHEN SAFE_CAST(RIGHT(p.goods_representation_id, 2) AS INT64) BETWEEN 10 AND 12 THEN '冬'
+              ELSE ''
+            END) AS season,
+            MAX(CASE
+              WHEN p.goods_selling_price < 3000 THEN '~3,000'
+              WHEN p.goods_selling_price < 5000 THEN '3,000~5,000'
+              WHEN p.goods_selling_price < 8000 THEN '5,000~8,000'
+              WHEN p.goods_selling_price < 10000 THEN '8,000~10,000'
+              ELSE '10,000~'
+            END) AS price_tier,
+            MAX(p.goods_selling_price) AS selling_price,
+            MAX(p.goods_cost_price) AS cost_price,
+            SUM(o.quantity) AS total_quantity,
+            COUNT(DISTINCT o.receive_order_id) AS order_count,
+            SUM(o.unit_price * o.quantity) AS sales_amount,
+            SUM(o.unit_price * o.quantity)
+              - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity) AS gross_profit,
+            SAFE_DIVIDE(
+              SUM(o.unit_price * o.quantity)
+                - SUM(COALESCE(o.received_time_first_cost, 0) * o.quantity),
+              SUM(o.unit_price * o.quantity)
+            ) AS gross_profit_rate
+          FROM \`tiast-data-platform.raw_nextengine.orders\` o
+          LEFT JOIN \`tiast-data-platform.raw_nextengine.products\` p
+            ON o.goods_id = p.goods_id
+          WHERE p.goods_representation_id = @product_code
+            AND CAST(o.cancel_type_id AS STRING) = '0'
+            AND CAST(o.row_cancel_flag AS STRING) = '0'
+            AND o.receive_order_date IS NOT NULL
+          GROUP BY product_code, brand
+        ),
+        zozo_sales AS (
+          SELECT
+            COALESCE(z.ne_goods_representation_id, z.brand_code) AS product_code,
+            MAX(z.product_name) AS product_name,
+            CASE
+              WHEN LEFT(z.brand_code, 1) = 'n' THEN 'NOAHL'
+              WHEN LEFT(z.brand_code, 1) = 'b' THEN 'BLACKQUEEN'
+              ELSE 'OTHER'
+            END AS brand,
+            MAX(COALESCE(z.child_category, z.parent_category, 'その他')) AS category,
+            '' AS season,
+            '' AS price_tier,
+            MAX(z.proper_price) AS selling_price,
+            0 AS cost_price,
+            SUM(z.order_quantity) AS total_quantity,
+            COUNT(DISTINCT z.order_number) AS order_count,
+            SUM(z.selling_price * z.order_quantity) AS sales_amount,
+            0 AS gross_profit,
+            0 AS gross_profit_rate
+          FROM \`tiast-data-platform.raw_zozo.zozo_orders\` z
+          WHERE COALESCE(z.ne_goods_representation_id, z.brand_code) = @product_code
+            AND (z.cancel_flag = '' OR z.cancel_flag IS NULL)
+            AND z.order_date IS NOT NULL
+          GROUP BY product_code, brand
+        )
         SELECT
           product_code,
-          product_name,
-          brand,
-          category,
-          season,
-          price_tier,
-          selling_price,
-          cost_price,
-          total_quantity,
-          order_count,
-          sales_amount,
-          gross_profit,
-          gross_profit_rate
-        FROM ${tableName('mart_sales_by_product')}
-        WHERE product_code = @product_code
+          MAX(product_name) AS product_name,
+          MAX(brand) AS brand,
+          MAX(category) AS category,
+          MAX(season) AS season,
+          MAX(price_tier) AS price_tier,
+          MAX(selling_price) AS selling_price,
+          MAX(cost_price) AS cost_price,
+          SUM(total_quantity) AS total_quantity,
+          SUM(order_count) AS order_count,
+          SUM(sales_amount) AS sales_amount,
+          SUM(gross_profit) AS gross_profit,
+          SAFE_DIVIDE(SUM(gross_profit), SUM(sales_amount)) AS gross_profit_rate
+        FROM (
+          SELECT * FROM ne_sales
+          UNION ALL
+          SELECT * FROM zozo_sales
+        )
+        GROUP BY product_code
       `
 
       // Fetch product master info (image, dates, sku count)
