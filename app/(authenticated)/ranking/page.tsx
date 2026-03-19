@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { Trophy, TrendingUp, Star, Clock, RefreshCw, Info, Trash2 } from 'lucide-react'
+import { Trophy, TrendingUp, Star, RefreshCw, Info, Trash2, ChevronDown, ExternalLink, Calendar, Hash, Package, DollarSign, ShoppingCart, BarChart3, Loader2 } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
 
 interface RankingRecord {
@@ -29,12 +29,12 @@ interface RankingRecord {
   rank_count: number
 }
 
-// ランクイン商品をグループ化
 interface ProductRankingSummary {
   matched_product_code: string
   item_name: string
   image_url: string
   item_price: number
+  item_url: string
   shop_name: string
   genre_id: string
   best_rank: number
@@ -51,7 +51,6 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
   for (const r of records) {
-    // ジャンル×商品コードでグループ化
     const key = `${r.genre_id}:${r.matched_product_code}`
     if (!map.has(key)) {
       map.set(key, {
@@ -59,6 +58,7 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
         item_name: r.item_name,
         image_url: r.image_url,
         item_price: r.item_price,
+        item_url: r.item_url,
         shop_name: r.shop_name,
         genre_id: r.genre_id,
         best_rank: r.best_rank,
@@ -81,6 +81,7 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
       entry.latest_fetched_at = r.fetched_at
       entry.item_name = r.item_name
       entry.image_url = r.image_url
+      entry.item_url = r.item_url
     }
   }
 
@@ -94,17 +95,23 @@ function formatDateTime(date: string | null | undefined): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function RankBadge({ rank }: { rank: number }) {
+function RankBadge({ rank, size = 'md' }: { rank: number; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClasses = {
+    sm: 'text-sm',
+    md: 'text-xl',
+    lg: 'text-3xl',
+  }
   if (rank <= 3) {
     const colors = ['', 'text-yellow-500', 'text-gray-400', 'text-amber-600']
+    const bgColors = ['', 'bg-yellow-50', 'bg-gray-50', 'bg-amber-50']
     return (
-      <div className="flex items-center gap-1">
+      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg ${bgColors[rank]}`}>
         <Trophy className={`w-4 h-4 ${colors[rank]}`} />
-        <span className="font-bold text-lg">{rank}</span>
+        <span className={`font-bold ${sizeClasses[size]} ${colors[rank]}`}>{rank}位</span>
       </div>
     )
   }
-  return <span className="font-bold text-lg text-gray-700">{rank}</span>
+  return <span className={`font-bold ${sizeClasses[size]} text-gray-700`}>{rank}位</span>
 }
 
 // 全ジャンルID→名前マップ（表示用）
@@ -155,19 +162,19 @@ const GENRE_MAP: Record<string, string> = {
   '101801': 'その他',
 }
 
-// フィルタ用ジャンルリスト（主要カテゴリのみ、階層構造でグルーピング）
+// フィルタ用ジャンルリスト
 const FILTER_GENRES = [
   { id: 'all', name: '全カテゴリ' },
   { id: '100371', name: 'レディースファッション（全体）' },
-  { id: '555086', name: 'トップス（全体）', group: 'トップス' },
-  { id: '303656', name: '┗ Tシャツ・カットソー', group: 'トップス' },
-  { id: '206471', name: '┗ シャツ・ブラウス', group: 'トップス' },
-  { id: '403871', name: '┗ カーディガン・ボレロ', group: 'トップス' },
-  { id: '502556', name: '┗ パーカー', group: 'トップス' },
-  { id: '403923', name: '┗ スウェット・トレーナー', group: 'トップス' },
-  { id: '555089', name: 'ボトムス（全体）', group: 'ボトムス' },
-  { id: '110734', name: '┗ スカート', group: 'ボトムス' },
-  { id: '206440', name: '┗ パンツ', group: 'ボトムス' },
+  { id: '555086', name: 'トップス（全体）' },
+  { id: '303656', name: '┗ Tシャツ・カットソー' },
+  { id: '206471', name: '┗ シャツ・ブラウス' },
+  { id: '403871', name: '┗ カーディガン・ボレロ' },
+  { id: '502556', name: '┗ パーカー' },
+  { id: '403923', name: '┗ スウェット・トレーナー' },
+  { id: '555089', name: 'ボトムス（全体）' },
+  { id: '110734', name: '┗ スカート' },
+  { id: '206440', name: '┗ パンツ' },
   { id: '555087', name: 'コート・ジャケット' },
   { id: '110729', name: 'ワンピース' },
   { id: '568650', name: 'シャツワンピース' },
@@ -184,6 +191,20 @@ function getGenreLabel(genreId: string): string {
   return GENRE_MAP[genreId] ?? genreId
 }
 
+interface ProductSalesData {
+  product_code: string
+  product_name: string
+  total_quantity: number
+  order_count: number
+  sales_amount: number
+  gross_profit: number
+  gross_profit_rate: number
+  selling_price: number
+  cost_price: number
+  brand: string
+  category: string
+}
+
 export default function RankingPage() {
   const [genre, setGenre] = useState('all')
   const [days, setDays] = useState('90')
@@ -192,9 +213,55 @@ export default function RankingPage() {
   const [collecting, setCollecting] = useState(false)
   const [collectResult, setCollectResult] = useState<string | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set())
+  const [salesDataMap, setSalesDataMap] = useState<Record<string, ProductSalesData | null>>({})
+  const [salesLoadingSet, setSalesLoadingSet] = useState<Set<string>>(new Set())
   const mountedRef = useRef(true)
 
   const cacheKey = `ranking:${genre}:${days}`
+
+  const fetchSalesData = useCallback(async (productCode: string) => {
+    if (salesDataMap[productCode] !== undefined) return
+    setSalesLoadingSet((prev) => new Set(prev).add(productCode))
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(productCode)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (mountedRef.current) {
+          setSalesDataMap((prev) => ({ ...prev, [productCode]: data }))
+        }
+      } else {
+        if (mountedRef.current) {
+          setSalesDataMap((prev) => ({ ...prev, [productCode]: null }))
+        }
+      }
+    } catch {
+      if (mountedRef.current) {
+        setSalesDataMap((prev) => ({ ...prev, [productCode]: null }))
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSalesLoadingSet((prev) => {
+          const next = new Set(prev)
+          next.delete(productCode)
+          return next
+        })
+      }
+    }
+  }, [salesDataMap])
+
+  const toggleExpand = (key: string, productCode: string) => {
+    setExpandedProducts((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+        fetchSalesData(productCode)
+      }
+      return next
+    })
+  }
 
   const fetchHistory = useCallback(async () => {
     if (isFresh(cacheKey)) return
@@ -268,7 +335,6 @@ export default function RankingPage() {
           `全${data.genre_results?.length ?? 0}カテゴリ ${data.total_items}件取得、自社商品 ${data.own_items}件検出` +
           (genreDetail ? `\n${genreDetail}` : '')
         )
-        // Refresh history
         setCache(cacheKey, null as unknown)
         fetchHistory()
       } else {
@@ -283,12 +349,17 @@ export default function RankingPage() {
 
   const grouped = groupByProduct(records)
 
+  // データ期間を計算
+  const allDates = records.map((r) => r.fetched_at).filter(Boolean).sort()
+  const oldestDate = allDates[0]
+  const newestDate = allDates[allDates.length - 1]
+
   return (
     <>
       <Header title="楽天ランキング履歴" subtitle="レディースファッション｜デイリー集計" />
       <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={genre} onValueChange={setGenre}>
             <SelectTrigger className="w-64 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -328,7 +399,7 @@ export default function RankingPage() {
         {/* ランキングの説明 */}
         <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <p>楽天市場レディースファッション各カテゴリの<strong>デイリーランキング</strong>（前日の売上に基づき毎日更新）を取得しています。毎日自動で全カテゴリを収集し、左のフィルタでカテゴリ別に絞り込めます。</p>
+          <p>楽天市場レディースファッション各カテゴリの<strong>デイリーランキング</strong>（前日の売上に基づき毎日更新）を取得しています。毎日自動で全カテゴリを収集し、フィルタでカテゴリ別に絞り込めます。商品をクリックすると詳細な履歴が確認できます。</p>
         </div>
 
         {historyError && (
@@ -351,14 +422,14 @@ export default function RankingPage() {
 
         {/* Summary KPIs */}
         {!loading && (
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
                   <Trophy className="w-4 h-4 text-yellow-500" />
                   ランクイン商品数
                 </div>
-                <div className="text-2xl font-bold text-gray-800">{grouped.length}</div>
+                <div className="text-2xl font-bold text-gray-800">{grouped.length}<span className="text-sm font-normal text-gray-400 ml-1">商品</span></div>
               </CardContent>
             </Card>
             <Card>
@@ -375,38 +446,51 @@ export default function RankingPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                  <Star className="w-4 h-4 text-blue-500" />
+                  <Hash className="w-4 h-4 text-blue-500" />
                   総ランクイン回数
                 </div>
                 <div className="text-2xl font-bold text-gray-800">
-                  {records.length}
+                  {records.length}<span className="text-sm font-normal text-gray-400 ml-1">回</span>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                  <Clock className="w-4 h-4 text-purple-500" />
-                  最終取得
+                  <Calendar className="w-4 h-4 text-purple-500" />
+                  データ期間
                 </div>
-                <div className="text-lg font-bold text-gray-800">
-                  {records.length > 0 ? formatDateTime(records[0].fetched_at) : '-'}
+                <div className="text-sm font-bold text-gray-800">
+                  {oldestDate && newestDate ? (
+                    <>
+                      <span>{formatDate(oldestDate)}</span>
+                      <span className="text-gray-400 mx-1">〜</span>
+                      <span>{formatDate(newestDate)}</span>
+                    </>
+                  ) : '-'}
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Ranking History Table */}
+        {/* Ranking History */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">自社商品ランクイン履歴</CardTitle>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">自社商品ランクイン履歴</CardTitle>
+              {!loading && grouped.length > 0 && (
+                <span className="text-xs text-gray-400">
+                  最終取得: {formatDateTime(newestDate)}
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded" />
+                  <Skeleton key={i} className="h-24 w-full rounded" />
                 ))}
               </div>
             ) : grouped.length === 0 ? (
@@ -416,65 +500,223 @@ export default function RankingPage() {
                 <p className="text-xs mt-1">「今すぐ取得」ボタンでランキングを取得してください</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {grouped.map((product) => (
-                  <div
-                    key={product.matched_product_code}
-                    className="flex items-center gap-4 p-4 border border-gray-100 rounded-lg hover:bg-gray-50/50 transition-colors"
-                  >
-                    {/* Rank */}
-                    <div className="w-14 text-center flex-shrink-0">
-                      <div className="text-[10px] text-gray-400 mb-0.5">最高</div>
-                      <RankBadge rank={product.best_rank} />
-                    </div>
+              <div className="space-y-2">
+                {grouped.map((product) => {
+                  const key = `${product.genre_id}:${product.matched_product_code}`
+                  const isExpanded = expandedProducts.has(key)
+                  const sortedHistory = [...product.history].sort(
+                    (a, b) => String(b.date ?? '').localeCompare(String(a.date ?? ''))
+                  )
 
-                    {/* Image */}
-                    <div className="flex-shrink-0">
-                      <ProductImage src={product.image_url} size={64} />
-                    </div>
+                  return (
+                    <div
+                      key={key}
+                      className={`border rounded-lg transition-all ${isExpanded ? 'border-gray-200 shadow-sm' : 'border-gray-100 hover:border-gray-200'}`}
+                    >
+                      {/* Main Row */}
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(key, product.matched_product_code)}
+                        className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50/50 transition-colors rounded-lg"
+                      >
+                        {/* Rank */}
+                        <div className="w-16 text-center flex-shrink-0">
+                          <div className="text-[10px] text-gray-400 mb-0.5">最高順位</div>
+                          <RankBadge rank={product.best_rank} />
+                        </div>
 
-                    {/* Product Info */}
-                    <div className="flex-1 min-w-0 max-w-md">
-                      <div className="font-medium text-sm truncate" title={product.item_name}>
-                        {product.item_name}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                        <span>{product.matched_product_code} / {product.shop_name}</span>
-                        <span className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[11px] font-medium">{getGenreLabel(product.genre_id)}</span>
-                      </div>
-                      <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
-                        <span>{formatCurrency(product.item_price)}</span>
-                        {product.review_count > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                            {product.review_average.toFixed(1)} ({product.review_count})
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                        {/* Image */}
+                        <div className="flex-shrink-0">
+                          <ProductImage src={product.image_url} size={72} />
+                        </div>
 
-                    {/* Stats */}
-                    <div className="flex gap-6 flex-shrink-0 text-center">
-                      <div>
-                        <div className="text-[10px] text-gray-400">現在順位</div>
-                        <div className="text-lg font-semibold text-gray-700">{product.latest_rank}位</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-gray-400">ランクイン</div>
-                        <div className="text-lg font-semibold text-gray-700">{product.rank_count}回</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-gray-400">初回</div>
-                        <div className="text-sm font-medium text-gray-600">{formatDate(product.first_ranked_at)}</div>
-                      </div>
-                    </div>
+                        {/* Product Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate" title={product.item_name}>
+                            {product.item_name}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>{product.matched_product_code} / {product.shop_name}</span>
+                            <span className="px-1.5 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded text-[11px] font-medium">{getGenreLabel(product.genre_id)}</span>
+                          </div>
+                          <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
+                            <span className="font-medium">{formatCurrency(product.item_price)}</span>
+                            {product.review_count > 0 && (
+                              <span className="flex items-center gap-0.5">
+                                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                {product.review_average.toFixed(1)} ({product.review_count})
+                              </span>
+                            )}
+                            <span className="text-gray-300">|</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              最新: {formatDate(product.latest_fetched_at)}
+                            </span>
+                          </div>
+                        </div>
 
-                    {/* Rank History Mini Chart */}
-                    <div className="w-32 flex-shrink-0">
-                      <RankSparkline history={product.history} />
+                        {/* Stats */}
+                        <div className="flex gap-5 flex-shrink-0 text-center">
+                          <div>
+                            <div className="text-[10px] text-gray-400">現在順位</div>
+                            <div className="text-lg font-semibold text-gray-700">{product.latest_rank}位</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-gray-400">ランクイン</div>
+                            <div className="text-lg font-semibold text-gray-700">{product.rank_count}回</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-gray-400">初回ランクイン</div>
+                            <div className="text-sm font-medium text-gray-600">{formatDate(product.first_ranked_at)}</div>
+                          </div>
+                        </div>
+
+                        {/* Sparkline + Expand */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="w-28">
+                            <RankSparkline history={product.history} />
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+
+                      {/* Expanded Detail */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium text-gray-700">商品詳細・ランキング履歴</h4>
+                            <div className="flex items-center gap-3">
+                              <a
+                                href={`/products?search=${encodeURIComponent(product.matched_product_code)}`}
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                              >
+                                <BarChart3 className="w-3 h-3" />
+                                商品分析を見る
+                              </a>
+                              {product.item_url && (
+                                <a
+                                  href={product.item_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-[#BF0000] hover:underline"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  楽天で商品を見る
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 売上・商品情報サマリ */}
+                          {(() => {
+                            const sales = salesDataMap[product.matched_product_code]
+                            const isLoadingSales = salesLoadingSet.has(product.matched_product_code)
+                            return (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+                                <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                  <div className="text-[10px] text-gray-400">楽天カテゴリ</div>
+                                  <div className="text-sm font-medium text-gray-700">{getGenreLabel(product.genre_id)}</div>
+                                </div>
+                                <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                  <div className="text-[10px] text-gray-400">楽天価格</div>
+                                  <div className="text-sm font-medium text-gray-700">{formatCurrency(product.item_price)}</div>
+                                </div>
+                                <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                  <div className="text-[10px] text-gray-400">レビュー</div>
+                                  <div className="text-sm font-medium text-gray-700">
+                                    {product.review_count > 0 ? (
+                                      <span className="flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                        {product.review_average.toFixed(1)} ({product.review_count}件)
+                                      </span>
+                                    ) : 'なし'}
+                                  </div>
+                                </div>
+                                {isLoadingSales ? (
+                                  <div className="col-span-3 bg-white rounded-lg px-3 py-2 border border-gray-100 flex items-center justify-center gap-2 text-gray-400 text-xs">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    売上データ読み込み中...
+                                  </div>
+                                ) : sales ? (
+                                  <>
+                                    <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                      <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                        <DollarSign className="w-3 h-3" />
+                                        売上（全期間）
+                                      </div>
+                                      <div className="text-sm font-bold text-gray-800">{formatCurrency(sales.sales_amount)}</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                      <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                        <ShoppingCart className="w-3 h-3" />
+                                        販売数
+                                      </div>
+                                      <div className="text-sm font-bold text-gray-800">{sales.total_quantity?.toLocaleString() ?? '-'}点</div>
+                                    </div>
+                                    <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                      <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                        <Package className="w-3 h-3" />
+                                        粗利率
+                                      </div>
+                                      <div className="text-sm font-bold text-gray-800">
+                                        {sales.gross_profit_rate != null ? `${(sales.gross_profit_rate * 100).toFixed(1)}%` : '-'}
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : salesDataMap[product.matched_product_code] === null ? (
+                                  <div className="col-span-3 bg-white rounded-lg px-3 py-2 border border-gray-100 text-xs text-gray-400 flex items-center justify-center">
+                                    売上データなし（商品マスタ未登録の可能性）
+                                  </div>
+                                ) : null}
+                              </div>
+                            )
+                          })()}
+
+                          {/* 履歴テーブル */}
+                          <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-50 text-gray-500 text-xs">
+                                  <th className="text-left px-4 py-2 font-medium">取得日時</th>
+                                  <th className="text-center px-4 py-2 font-medium">順位</th>
+                                  <th className="text-center px-4 py-2 font-medium">変動</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedHistory.map((h, i) => {
+                                  const prev = sortedHistory[i + 1]
+                                  const diff = prev ? prev.rank - h.rank : 0
+                                  return (
+                                    <tr key={h.date} className="border-t border-gray-50 hover:bg-gray-50/50">
+                                      <td className="px-4 py-2 text-gray-600">
+                                        <div className="flex items-center gap-1.5">
+                                          <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                          {formatDateTime(h.date)}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2 text-center font-semibold text-gray-800">{h.rank}位</td>
+                                      <td className="px-4 py-2 text-center">
+                                        {diff > 0 ? (
+                                          <span className="text-green-600 font-medium">+{diff} ↑</span>
+                                        ) : diff < 0 ? (
+                                          <span className="text-red-500 font-medium">{diff} ↓</span>
+                                        ) : prev ? (
+                                          <span className="text-gray-400">→</span>
+                                        ) : (
+                                          <span className="text-blue-500 text-xs">初回</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -487,7 +729,12 @@ export default function RankingPage() {
 /** ミニ順位推移グラフ（SVGスパークライン） */
 function RankSparkline({ history }: { history: { date: string; rank: number }[] }) {
   if (history.length < 2) {
-    return <div className="text-xs text-gray-300 text-center">データ不足</div>
+    return (
+      <div className="text-center">
+        <div className="text-[10px] text-gray-400">順位推移</div>
+        <div className="text-xs text-gray-300 mt-1">データ不足</div>
+      </div>
+    )
   }
 
   const sorted = [...history].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')))
@@ -496,20 +743,20 @@ function RankSparkline({ history }: { history: { date: string; rank: number }[] 
   const minRank = Math.min(...ranks, 1)
   const range = Math.max(maxRank - minRank, 1)
 
-  const w = 120
+  const w = 112
   const h = 36
   const padding = 2
 
   const points = ranks.map((rank, i) => {
     const x = padding + (i / (ranks.length - 1)) * (w - padding * 2)
-    // 順位は低い方が良い → Y軸反転
     const y = padding + ((rank - minRank) / range) * (h - padding * 2)
     return `${x},${y}`
   })
 
   return (
     <div className="relative">
-      <svg width={w} height={h} className="block">
+      <div className="text-[10px] text-gray-400 text-center mb-0.5">順位推移</div>
+      <svg width={w} height={h} className="block mx-auto">
         <polyline
           points={points.join(' ')}
           fill="none"
@@ -518,7 +765,6 @@ function RankSparkline({ history }: { history: { date: string; rank: number }[] 
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        {/* 最新の点 */}
         {points.length > 0 && (
           <circle
             cx={points[points.length - 1].split(',')[0]}
