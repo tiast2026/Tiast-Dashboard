@@ -36,6 +36,7 @@ interface ProductRankingSummary {
   image_url: string
   item_price: number
   shop_name: string
+  genre_id: string
   best_rank: number
   rank_count: number
   first_ranked_at: string
@@ -50,7 +51,8 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
   for (const r of records) {
-    const key = r.matched_product_code
+    // ジャンル×商品コードでグループ化
+    const key = `${r.genre_id}:${r.matched_product_code}`
     if (!map.has(key)) {
       map.set(key, {
         matched_product_code: r.matched_product_code,
@@ -58,6 +60,7 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
         image_url: r.image_url,
         item_price: r.item_price,
         shop_name: r.shop_name,
+        genre_id: r.genre_id,
         best_rank: r.best_rank,
         rank_count: r.rank_count,
         first_ranked_at: r.first_ranked_at,
@@ -73,7 +76,6 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
       date: r.fetched_at,
       rank: r.rank,
     })
-    // latest = 最新のfetched_at
     if (r.fetched_at > entry.latest_fetched_at) {
       entry.latest_rank = r.rank
       entry.latest_fetched_at = r.fetched_at
@@ -105,8 +107,29 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className="font-bold text-lg text-gray-700">{rank}</span>
 }
 
+// ジャンル一覧（クライアント側定義）
+const GENRES = [
+  { id: 'all', name: '全カテゴリ' },
+  { id: '100371', name: 'レディースファッション（全体）' },
+  { id: '110729', name: 'ワンピース' },
+  { id: '555086', name: 'トップス' },
+  { id: '555089', name: 'ボトムス' },
+  { id: '555087', name: 'コート・ジャケット' },
+  { id: '555091', name: 'スーツ・セットアップ' },
+  { id: '555083', name: 'オールインワン・サロペット' },
+  { id: '553029', name: 'チュニック' },
+  { id: '555084', name: 'ドレス' },
+  { id: '568279', name: 'パンツドレス' },
+  { id: '409365', name: '水着' },
+  { id: '101801', name: 'その他' },
+]
+
+function getGenreLabel(genreId: string): string {
+  return GENRES.find((g) => g.id === genreId)?.name ?? genreId
+}
+
 export default function RankingPage() {
-  const rankingType = 'daily'
+  const [genre, setGenre] = useState('all')
   const [days, setDays] = useState('90')
   const [records, setRecords] = useState<RankingRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,7 +138,7 @@ export default function RankingPage() {
   const [historyError, setHistoryError] = useState<string | null>(null)
   const mountedRef = useRef(true)
 
-  const cacheKey = `ranking:${rankingType}:${days}`
+  const cacheKey = `ranking:${genre}:${days}`
 
   const fetchHistory = useCallback(async () => {
     if (isFresh(cacheKey)) return
@@ -123,7 +146,8 @@ export default function RankingPage() {
     if (!cached) setLoading(true)
 
     try {
-      const params = new URLSearchParams({ type: rankingType, days, limit: '500' })
+      const params = new URLSearchParams({ days, limit: '500' })
+      if (genre !== 'all') params.set('genre', genre)
       const res = await fetch(`/api/rakuten-ranking/history?${params}`)
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: '不明なエラー' }))
@@ -143,7 +167,7 @@ export default function RankingPage() {
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [rankingType, days, cacheKey])
+  }, [genre, days, cacheKey])
 
   useEffect(() => {
     mountedRef.current = true
@@ -177,11 +201,16 @@ export default function RankingPage() {
     setCollecting(true)
     setCollectResult(null)
     try {
-      const res = await fetch(`/api/rakuten-ranking/collect?type=${rankingType}`)
+      const res = await fetch('/api/rakuten-ranking/collect?genre=all')
       const data = await res.json()
       if (res.ok) {
+        const genreDetail = data.genre_results
+          ?.map((g: { genre_name: string; items: number; own: number }) =>
+            `${g.genre_name}: ${g.items}件(自社${g.own}件)`
+          ).join('、')
         setCollectResult(
-          `${data.total_items}件取得、自社商品 ${data.own_items}件検出`
+          `全${data.genre_results?.length ?? 0}カテゴリ ${data.total_items}件取得、自社商品 ${data.own_items}件検出` +
+          (genreDetail ? `\n${genreDetail}` : '')
         )
         // Refresh history
         setCache(cacheKey, null as unknown)
@@ -204,6 +233,14 @@ export default function RankingPage() {
       <div className="p-6 space-y-6">
         {/* Controls */}
         <div className="flex items-center gap-3">
+          <Select value={genre} onValueChange={setGenre}>
+            <SelectTrigger className="w-64 bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {GENRES.map((g) => (
+                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={days} onValueChange={setDays}>
             <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -227,7 +264,7 @@ export default function RankingPage() {
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#BF0000] hover:bg-[#A00000] rounded-lg transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${collecting ? 'animate-spin' : ''}`} />
-              {collecting ? '取得中...' : '今すぐ取得'}
+              {collecting ? '全カテゴリ取得中...' : '今すぐ取得'}
             </button>
           </div>
         </div>
@@ -235,7 +272,7 @@ export default function RankingPage() {
         {/* ランキングの説明 */}
         <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <p>楽天市場レディースファッションのデイリーランキング（前日の売上に基づき毎日更新）を取得しています。更新タイミングは楽天側の仕様により非公開です。週間ランキングはAPIが非対応のため提供されていません。</p>
+          <p>楽天市場レディースファッション各カテゴリのデイリーランキング（前日の売上に基づき毎日更新）を一括取得します。「今すぐ取得」で全カテゴリ（約1分）を取得し、左のフィルタでカテゴリ別に絞り込めます。</p>
         </div>
 
         {historyError && (
@@ -250,7 +287,9 @@ export default function RankingPage() {
               ? 'bg-red-50 text-red-700 border border-red-200'
               : 'bg-gray-50 text-gray-600'
           }`}>
-            {collectResult}
+            {collectResult.split('\n').map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
           </div>
         )}
 
@@ -345,6 +384,7 @@ export default function RankingPage() {
                       </div>
                       <div className="text-xs text-gray-400 mt-0.5">
                         {product.matched_product_code} / {product.shop_name}
+                        <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">{getGenreLabel(product.genre_id)}</span>
                       </div>
                       <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500">
                         <span>{formatCurrency(product.item_price)}</span>
