@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     const res = await fetch(apiUrl.toString(), {
       headers: {
         'Referer': 'https://tiast2026.github.io/Conversion-Tool/index.html',
+        'Origin': 'https://tiast2026.github.io',
       },
     })
     if (!res.ok) {
