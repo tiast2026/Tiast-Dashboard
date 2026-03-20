@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const days = parseInt(sp.get('days') || '90', 10)
     const limit = parseInt(sp.get('limit') || '200', 10)
 
-    const cacheKey = buildCacheKey('rakuten-ranking-history', {
+    const cacheKey = buildCacheKey('rakuten-ranking-history-v2', {
       product_code: productCode || undefined,
       type: rankingType || undefined,
       genre: genreId || undefined,
@@ -54,27 +54,18 @@ export async function GET(request: NextRequest) {
         params.genre_id = genreId
       }
 
-      // item_url から楽天商品IDを抽出し、同一ジャンル・同一商品・同一日付(JST)で最高順位のみ返す
+      // item_code（楽天APIの一意商品コード）で同一ジャンル・同一日付の重複を排除
       const query = `
-        WITH base AS (
+        WITH deduped AS (
           SELECT
             *,
-            COALESCE(
-              REGEXP_EXTRACT(item_url, r'item\\.rakuten\\.co\\.jp/[^/]+/([^/?]+)'),
-              matched_product_code
-            ) AS product_id,
-            DATE(fetched_at, 'Asia/Tokyo') AS ranked_date
-          FROM \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
-          WHERE ${conditions.join(' AND ')}
-        ),
-        deduped AS (
-          SELECT
-            *,
+            DATE(fetched_at, 'Asia/Tokyo') AS ranked_date,
             ROW_NUMBER() OVER (
-              PARTITION BY genre_id, product_id, ranked_date
+              PARTITION BY genre_id, item_code, DATE(fetched_at, 'Asia/Tokyo')
               ORDER BY rank ASC
             ) AS rn
-          FROM base
+          FROM \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
+          WHERE ${conditions.join(' AND ')}
         )
         SELECT
           fetched_at,
@@ -91,13 +82,13 @@ export async function GET(request: NextRequest) {
           review_count,
           review_average,
           MIN(fetched_at) OVER (
-            PARTITION BY genre_id, product_id
+            PARTITION BY genre_id, item_code
           ) AS first_ranked_at,
           MIN(rank) OVER (
-            PARTITION BY genre_id, product_id
+            PARTITION BY genre_id, item_code
           ) AS best_rank,
           COUNT(*) OVER (
-            PARTITION BY genre_id, product_id
+            PARTITION BY genre_id, item_code
           ) AS rank_count
         FROM deduped
         WHERE rn = 1
