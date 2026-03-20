@@ -54,7 +54,28 @@ export async function GET(request: NextRequest) {
         params.genre_id = genreId
       }
 
+      // item_url から楽天商品IDを抽出し、同一ジャンル・同一商品・同一日付(JST)で最高順位のみ返す
       const query = `
+        WITH base AS (
+          SELECT
+            *,
+            COALESCE(
+              REGEXP_EXTRACT(item_url, r'item\\.rakuten\\.co\\.jp/[^/]+/([^/?]+)'),
+              matched_product_code
+            ) AS product_id,
+            DATE(fetched_at, 'Asia/Tokyo') AS ranked_date
+          FROM \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
+          WHERE ${conditions.join(' AND ')}
+        ),
+        deduped AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY genre_id, product_id, ranked_date
+              ORDER BY rank ASC
+            ) AS rn
+          FROM base
+        )
         SELECT
           fetched_at,
           ranking_type,
@@ -70,16 +91,16 @@ export async function GET(request: NextRequest) {
           review_count,
           review_average,
           MIN(fetched_at) OVER (
-            PARTITION BY matched_product_code, ranking_type, genre_id
+            PARTITION BY genre_id, product_id
           ) AS first_ranked_at,
           MIN(rank) OVER (
-            PARTITION BY matched_product_code, ranking_type, genre_id
+            PARTITION BY genre_id, product_id
           ) AS best_rank,
           COUNT(*) OVER (
-            PARTITION BY matched_product_code, ranking_type, genre_id
+            PARTITION BY genre_id, product_id
           ) AS rank_count
-        FROM \`tiast-data-platform.analytics_mart.rakuten_ranking_history\`
-        WHERE ${conditions.join(' AND ')}
+        FROM deduped
+        WHERE rn = 1
         ORDER BY fetched_at DESC, rank ASC
         LIMIT ${limit}
       `
