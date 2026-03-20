@@ -76,9 +76,9 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
   for (const r of records) {
-    // item_url から楽天商品IDを抽出してグループ化（matched_product_code はマッチング方法により値が異なる場合があるため）
-    const rakutenProductId = extractRakutenProductId(r.item_url)
-    const key = rakutenProductId || r.matched_product_code
+    // ジャンル × 楽天商品IDでグループ化（同一ジャンル内の重複のみ集約、異なるジャンルは別エントリ）
+    const rakutenProductId = extractRakutenProductId(r.item_url) || r.matched_product_code
+    const key = `${r.genre_id}:${rakutenProductId}`
     if (!map.has(key)) {
       map.set(key, {
         matched_product_code: r.matched_product_code,
@@ -101,24 +101,12 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     }
     const entry = map.get(key)!
     const fetchedAt = toDateStr(r.fetched_at)
-    // 同一日付は最高順位のみ保持（異なるジャンルの重複を排除）
-    const dateKey = fetchedAt.slice(0, 10) // YYYY-MM-DD
-    const existingForDate = entry.history.find(h => h.date.slice(0, 10) === dateKey)
-    if (existingForDate) {
-      // 同じ日に複数ジャンルでランクインしている場合、最高順位を採用
-      if (r.rank < existingForDate.rank) {
-        existingForDate.rank = r.rank
-      }
-    } else {
-      entry.history.push({
-        date: fetchedAt,
-        rank: r.rank,
-      })
-    }
-    // 最高順位のジャンルをカテゴリ表示用に採用
+    entry.history.push({
+      date: fetchedAt,
+      rank: r.rank,
+    })
     if (r.rank < entry.best_rank) {
       entry.best_rank = r.rank
-      entry.genre_id = r.genre_id
     }
     if (fetchedAt > entry.latest_fetched_at) {
       entry.latest_rank = r.rank
@@ -129,10 +117,9 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     }
   }
 
-  // rank_count を重複排除後の履歴数に設定し、first_ranked_at を履歴から算出
+  // rank_count と first_ranked_at を履歴から算出
   for (const entry of map.values()) {
     entry.rank_count = entry.history.length
-    // 履歴の最古日付を初回ランクイン日とする（APIの first_ranked_at はBigQuery形式で不安定なため）
     if (entry.history.length > 0) {
       const oldest = entry.history.reduce((a, b) => (a.date < b.date ? a : b))
       entry.first_ranked_at = oldest.date
