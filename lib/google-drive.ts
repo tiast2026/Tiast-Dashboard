@@ -260,7 +260,7 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 async function fetchReviewCSVsFromFolder(
   folderId: string,
   shopName: string,
-): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[] }> {
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown> }> {
   const client = getDriveClient()
 
   const queryParts: string[] = [
@@ -270,7 +270,6 @@ async function fetchReviewCSVsFromFolder(
   ]
 
   const query = queryParts.join(' and ')
-  console.log(`[レビュー][${shopName}] Drive検索クエリ: ${query}`)
 
   const res = await client.files.list({
     q: query,
@@ -280,31 +279,26 @@ async function fetchReviewCSVsFromFolder(
   })
 
   const files = res.data.files || []
-  console.log(`[レビュー][${shopName}] Drive API結果: ${files.length}件 (フォルダ: ${folderId})`)
-  if (files.length > 0) {
-    for (const f of files) {
-      console.log(`[レビュー][${shopName}]   - ${f.name} (${f.mimeType}, ${f.modifiedTime})`)
-    }
-  } else {
-    // フォルダ自体にアクセスできるか確認
+  if (files.length === 0) {
+    // Diagnose: check folder access and list all files
+    const debug: Record<string, unknown> = { shop: shopName, folderId, query, reviewFilesFound: 0 }
     try {
       const folderRes = await client.files.get({ fileId: folderId, fields: 'id,name,mimeType' })
-      console.log(`[レビュー][${shopName}] フォルダアクセスOK: ${folderRes.data.name} (${folderRes.data.mimeType})`)
-      // フォルダ内の全ファイルを確認（reviewsフィルタなし）
+      debug.folderAccess = 'OK'
+      debug.folderName = folderRes.data.name
+      // List all files in folder (no reviews filter)
       const allFilesRes = await client.files.list({
         q: `'${folderId}' in parents and trashed=false`,
         fields: 'files(id, name, mimeType)',
-        pageSize: 10,
+        pageSize: 20,
       })
       const allFiles = allFilesRes.data.files || []
-      console.log(`[レビュー][${shopName}] フォルダ内全ファイル: ${allFiles.length}件`)
-      for (const f of allFiles) {
-        console.log(`[レビュー][${shopName}]   全ファイル: ${f.name} (${f.mimeType})`)
-      }
+      debug.allFilesInFolder = allFiles.map(f => ({ name: f.name, mimeType: f.mimeType }))
     } catch (folderErr) {
-      console.error(`[レビュー][${shopName}] フォルダアクセスエラー (${folderId}):`, folderErr)
+      debug.folderAccess = 'ERROR'
+      debug.folderError = folderErr instanceof Error ? folderErr.message : String(folderErr)
     }
-    return { reviews: [], fileIds: [] }
+    return { reviews: [], fileIds: [], debug }
   }
 
   console.log(`[レビュー][${shopName}] ${files.length}件のreviews CSVファイルを発見`)
@@ -341,18 +335,21 @@ async function fetchReviewCSVsFromFolder(
 export async function fetchAllShopReviewCSVs(): Promise<{
   reviews: ReviewRow[]
   fileIds: { id: string; name: string }[]
+  debug?: Record<string, unknown>[]
 }> {
   const allReviews: ReviewRow[] = []
   const allFileIds: { id: string; name: string }[] = []
+  const debugInfo: Record<string, unknown>[] = []
 
   for (const shop of REVIEW_CSV_FOLDERS) {
-    const { reviews, fileIds } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
+    const { reviews, fileIds, debug } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
     allReviews.push(...reviews)
     allFileIds.push(...fileIds)
+    if (debug) debugInfo.push(debug)
   }
 
   console.log(`[レビュー] 全店舗合計: ${allReviews.length}件（${allFileIds.length}ファイル）`)
-  return { reviews: allReviews, fileIds: allFileIds }
+  return { reviews: allReviews, fileIds: allFileIds, debug: debugInfo.length > 0 ? debugInfo : undefined }
 }
 
 /**
