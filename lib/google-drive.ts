@@ -33,12 +33,14 @@ export interface ReviewRow {
   flag: number
   order_number: string
   unhandled_flag: number
+  manage_number: string
 }
 
 // CSV header → internal key mapping
 const REVIEW_HEADER_MAP: Record<string, keyof ReviewRow> = {
   'レビュータイプ': 'review_type',
   '商品名': 'product_name',
+  '商品管理番号': 'manage_number',
   'レビュー詳細URL': 'review_url',
   '評価': 'rating',
   '投稿時間': 'posted_at',
@@ -144,6 +146,7 @@ function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
       flag: Number(obj.flag) || 0,
       order_number: String(obj.order_number || ''),
       unhandled_flag: Number(obj.unhandled_flag) || 0,
+      manage_number: String(obj.manage_number || ''),
     })
   }
 

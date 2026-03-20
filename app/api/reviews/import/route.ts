@@ -78,7 +78,7 @@ function makeReviewKey(reviewUrl: string, postedAt: string): string {
 /**
  * Core import logic shared by GET (Vercel Cron) and POST (manual).
  */
-async function runImport(dryRun = false) {
+async function runImport(dryRun = false, reprocess = false) {
   if (!isBigQueryConfigured()) {
     return { error: 'BigQuery未設定', status: 500 }
   }
@@ -106,7 +106,14 @@ async function runImport(dryRun = false) {
   const bq = getBigQueryClient()
   await ensureTableExists(bq)
 
-  // 2. Duplicate check (review_url + posted_at)
+  // 2. Reprocess: delete all existing reviews first
+  if (reprocess) {
+    console.log('[レビューインポート] reprocess: 既存レビューを全削除中...')
+    await bq.query({ query: `DELETE FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE 1=1`, location: 'asia-northeast1' })
+    console.log('[レビューインポート] 既存レビュー削除完了')
+  }
+
+  // 3. Duplicate check (review_url + posted_at)
   console.log('[レビューインポート] 既存レビュー取得中（重複チェック用）...')
   const existingKeys = await getExistingReviewKeys(bq)
   console.log(`[レビューインポート] 既存レビュー: ${existingKeys.size}件`)
@@ -131,10 +138,11 @@ async function runImport(dryRun = false) {
     }
   }
 
-  // 3. Enrich reviews with rakuten_item_id (scraping skipped for speed — serverless timeout)
+  // 3. Enrich reviews with rakuten_item_id and manage_number as matched_product_code
   const enrichedReviews = newReviews.map(r => {
     const rakutenItemId = extractRakutenItemId(r.review_url)
-    return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: null as string | null }
+    const matched = r.manage_number || null
+    return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
 
   if (dryRun) {
@@ -235,9 +243,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
-    const { dryRun = false } = body as { dryRun?: boolean }
+    const { dryRun = false, reprocess = false } = body as { dryRun?: boolean; reprocess?: boolean }
 
-    const result = await runImport(dryRun)
+    const result = await runImport(dryRun, reprocess)
     if ('status' in result) {
       return NextResponse.json({ error: result.error }, { status: result.status as number })
     }
