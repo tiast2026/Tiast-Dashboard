@@ -68,7 +68,8 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
   for (const r of records) {
-    const key = `${r.genre_id}:${r.matched_product_code}`
+    // 商品コードのみでグループ化（ジャンル横断で同一商品を集約）
+    const key = r.matched_product_code
     if (!map.has(key)) {
       map.set(key, {
         matched_product_code: r.matched_product_code,
@@ -79,8 +80,8 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
         item_url: r.item_url,
         shop_name: r.shop_name,
         genre_id: r.genre_id,
-        best_rank: r.best_rank,
-        rank_count: r.rank_count,
+        best_rank: r.rank,
+        rank_count: 0,
         first_ranked_at: r.first_ranked_at,
         latest_rank: r.rank,
         latest_fetched_at: r.fetched_at,
@@ -90,16 +91,25 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
       })
     }
     const entry = map.get(key)!
+    entry.rank_count++
     entry.history.push({
       date: r.fetched_at,
       rank: r.rank,
     })
+    // 最高順位のジャンルをカテゴリ表示用に採用
+    if (r.rank < entry.best_rank) {
+      entry.best_rank = r.rank
+      entry.genre_id = r.genre_id
+    }
     if (r.fetched_at > entry.latest_fetched_at) {
       entry.latest_rank = r.rank
       entry.latest_fetched_at = r.fetched_at
       entry.item_name = r.item_name
       entry.image_url = r.image_url
       entry.item_url = r.item_url
+    }
+    if (r.first_ranked_at < entry.first_ranked_at) {
+      entry.first_ranked_at = r.first_ranked_at
     }
   }
 
