@@ -264,7 +264,6 @@ async function fetchReviewCSVsFromFolder(
   const client = getDriveClient()
 
   const queryParts: string[] = [
-    "(mimeType='text/csv' or mimeType='text/tab-separated-values')",
     "trashed=false",
     `name contains 'reviews'`,
     `'${folderId}' in parents`,
