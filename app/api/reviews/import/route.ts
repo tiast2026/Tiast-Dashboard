@@ -4,7 +4,7 @@ import {
   fetchAllShopReviewCSVs,
   deleteDriveFiles,
 } from '@/lib/google-drive'
-import { getReviewMappingMap } from '@/lib/google-sheets'
+import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
 
 // Allow up to 60s for this function (Vercel Pro)
 export const maxDuration = 60
@@ -148,6 +148,27 @@ async function runImport(dryRun = false, reprocess = false) {
     const matched = mappingValue || r.manage_number || null
     return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
+
+  // 3.5 Auto-populate mapping sheet from reviews that have both rakuten_item_id and manage_number
+  const newMappings: Array<{ rakuten_item_id: string; product_code: string }> = []
+  for (const r of enrichedReviews) {
+    if (r.rakuten_item_id && r.manage_number && !mappingMap.has(r.rakuten_item_id)) {
+      newMappings.push({ rakuten_item_id: r.rakuten_item_id, product_code: r.manage_number })
+    }
+  }
+  if (newMappings.length > 0) {
+    // De-duplicate within this batch
+    const seen = new Set<string>()
+    const unique = newMappings.filter(m => {
+      if (seen.has(m.rakuten_item_id)) return false
+      seen.add(m.rakuten_item_id)
+      return true
+    })
+    const added = await appendReviewMappings(unique)
+    if (added > 0) {
+      console.log(`[レビューインポート] マッピング自動追加: ${added}件`)
+    }
+  }
 
   if (dryRun) {
     const matched = enrichedReviews.filter(r => r.matched_product_code).length
