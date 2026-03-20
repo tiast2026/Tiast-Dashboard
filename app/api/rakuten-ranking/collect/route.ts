@@ -8,8 +8,8 @@ import {
 } from '@/lib/rakuten-ranking'
 import type { RankingCollectResult } from '@/types/ranking'
 
-// Vercel Pro: 最大300秒、Hobby: 最大60秒
-export const maxDuration = 300
+// Vercel Hobby: 最大60秒、Pro: 最大300秒
+export const maxDuration = 60
 
 /**
  * 楽天ランキング取得 & BigQuery保存
@@ -17,7 +17,7 @@ export const maxDuration = 300
  * GET /api/rakuten-ranking/collect
  *   ?genre=all (default) | 100371 | 110729 | ...
  *   &batch=0 (default) — バッチ番号（genre=all時、ジャンルを分割取得）
- *   &batch_size=10 (default) — 1バッチあたりのジャンル数
+ *   &batch_size=3 (default) — 1バッチあたりのジャンル数
  *
  * genre=all の場合、全サブジャンルを順次取得
  * Vercel Cron または手動実行で呼ばれる
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     // バッチ分割: genre=all 時にジャンルを分割して取得
     const batchIndex = parseInt(sp.get('batch') || '0', 10)
-    const batchSize = parseInt(sp.get('batch_size') || '10', 10)
+    const batchSize = parseInt(sp.get('batch_size') || '3', 10)
     const start = batchIndex * batchSize
     const targetGenres = genreParam === 'all'
       ? allTargetGenres.slice(start, start + batchSize)
