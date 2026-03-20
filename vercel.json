@@ -3,6 +3,10 @@
     {
       "path": "/api/rakuten-ranking/collect?genre=all&batch=0&batch_size=3",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/reviews/import",
+      "schedule": "0 6 * * *"
     }
   ]
 }
