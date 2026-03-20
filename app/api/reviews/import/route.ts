@@ -143,8 +143,9 @@ async function runImport(dryRun = false, reprocess = false) {
 
   const enrichedReviews = newReviews.map(r => {
     const rakutenItemId = extractRakutenItemId(r.review_url)
-    // Priority: manage_number from CSV > mapping sheet lookup > null
-    const matched = r.manage_number || (rakutenItemId ? mappingMap.get(rakutenItemId) ?? null : null)
+    // Priority: mapping sheet lookup > manage_number from CSV > null
+    const mappingValue = rakutenItemId ? mappingMap.get(rakutenItemId) ?? null : null
+    const matched = mappingValue || r.manage_number || null
     return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
 
