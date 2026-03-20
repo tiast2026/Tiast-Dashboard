@@ -65,6 +65,13 @@ function toDateStr(v: unknown): string {
   return String(v)
 }
 
+/** タイムスタンプからローカル日付キー（YYYY-MM-DD）を取得（JST等のタイムゾーン対応） */
+function toLocalDateKey(v: string): string {
+  const d = new Date(v)
+  if (isNaN(d.getTime())) return v.slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** item_url から楽天の商品ID部分を抽出（例: "https://item.rakuten.co.jp/noahl/nlwp473-2512/" → "nlwp473-2512"） */
 function extractRakutenProductId(itemUrl: string): string | null {
   if (!itemUrl) return null
@@ -102,8 +109,9 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     const entry = map.get(key)!
     const fetchedAt = toDateStr(r.fetched_at)
     // 同一日付は最高順位のみ保持（ranking_type違いや複数回取得の重複を排除）
-    const dateKey = fetchedAt.slice(0, 10) // YYYY-MM-DD
-    const existingForDate = entry.history.find(h => h.date.slice(0, 10) === dateKey)
+    // ローカル時間（JST）で日付比較（UTCだと日本時間で同日でも別日扱いになる）
+    const dateKey = toLocalDateKey(fetchedAt)
+    const existingForDate = entry.history.find(h => toLocalDateKey(h.date) === dateKey)
     if (existingForDate) {
       if (r.rank < existingForDate.rank) {
         existingForDate.rank = r.rank
