@@ -46,7 +46,7 @@ interface ProductRankingSummary {
   latest_fetched_at: string
   review_count: number
   review_average: number
-  history: { date: string; rank: number }[]
+  history: { date: string; rank: number; genre_id?: string }[]
 }
 
 /** item_code から品番部分を抽出（例: "noahl:10002595" → "10002595"） */
@@ -107,20 +107,11 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     }
     const entry = map.get(key)!
     const fetchedAt = toDateStr(r.fetched_at)
-    // 同一日付は最高順位のみ保持（ranking_type違いや複数回取得の重複を排除）
-    // ローカル時間（JST）で日付比較（UTCだと日本時間で同日でも別日扱いになる）
-    const dateKey = toLocalDateKey(fetchedAt)
-    const existingForDate = entry.history.find(h => toLocalDateKey(h.date) === dateKey)
-    if (existingForDate) {
-      if (r.rank < existingForDate.rank) {
-        existingForDate.rank = r.rank
-      }
-    } else {
-      entry.history.push({
-        date: fetchedAt,
-        rank: r.rank,
-      })
-    }
+    entry.history.push({
+      date: fetchedAt,
+      rank: r.rank,
+      genre_id: r.genre_id,
+    })
     if (r.rank < entry.best_rank) {
       entry.best_rank = r.rank
     }
@@ -876,6 +867,7 @@ export default function RankingPage() {
                                 <thead>
                                   <tr className="bg-gray-50 text-gray-500 text-xs">
                                     <th className="text-left px-4 py-2 font-medium">ランキング発表日時</th>
+                                    <th className="text-left px-4 py-2 font-medium">ジャンル</th>
                                     <th className="text-center px-4 py-2 font-medium">順位</th>
                                     <th className="text-center px-4 py-2 font-medium">変動</th>
                                   </tr>
@@ -885,13 +877,14 @@ export default function RankingPage() {
                                     const prev = sortedHistory[i + 1]
                                     const diff = prev ? prev.rank - h.rank : 0
                                     return (
-                                      <tr key={h.date} className="border-t border-gray-50 hover:bg-gray-50/50">
+                                      <tr key={`${h.date}-${h.genre_id}-${h.rank}`} className="border-t border-gray-50 hover:bg-gray-50/50">
                                         <td className="px-4 py-2 text-gray-600">
                                           <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5 text-gray-400" />
                                             {formatDateTime(h.date)}
                                           </div>
                                         </td>
+                                        <td className="px-4 py-2 text-gray-500 text-xs">{h.genre_id ? getGenreLabel(h.genre_id) : '-'}</td>
                                         <td className="px-4 py-2 text-center font-semibold text-gray-800">{h.rank}位</td>
                                         <td className="px-4 py-2 text-center">
                                           {diff > 0 ? (
