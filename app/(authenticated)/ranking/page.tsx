@@ -57,6 +57,14 @@ function extractProductNumber(itemCode: string): string {
   return itemCode
 }
 
+/** BigQuery timestamp（{value: "..."} 形式）を文字列に変換 */
+function toDateStr(v: unknown): string {
+  if (!v) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'object' && v !== null && 'value' in v) return String((v as { value: unknown }).value)
+  return String(v)
+}
+
 /** item_url から楽天の商品ID部分を抽出（例: "https://item.rakuten.co.jp/noahl/nlwp473-2512/" → "nlwp473-2512"） */
 function extractRakutenProductId(itemUrl: string): string | null {
   if (!itemUrl) return null
@@ -83,34 +91,51 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
         genre_id: r.genre_id,
         best_rank: r.rank,
         rank_count: 0,
-        first_ranked_at: r.first_ranked_at,
+        first_ranked_at: '',
         latest_rank: r.rank,
-        latest_fetched_at: r.fetched_at,
+        latest_fetched_at: toDateStr(r.fetched_at),
         review_count: r.review_count,
         review_average: r.review_average,
         history: [],
       })
     }
     const entry = map.get(key)!
-    entry.rank_count++
-    entry.history.push({
-      date: r.fetched_at,
-      rank: r.rank,
-    })
+    const fetchedAt = toDateStr(r.fetched_at)
+    // 同一日付は最高順位のみ保持（異なるジャンルの重複を排除）
+    const dateKey = fetchedAt.slice(0, 10) // YYYY-MM-DD
+    const existingForDate = entry.history.find(h => h.date.slice(0, 10) === dateKey)
+    if (existingForDate) {
+      // 同じ日に複数ジャンルでランクインしている場合、最高順位を採用
+      if (r.rank < existingForDate.rank) {
+        existingForDate.rank = r.rank
+      }
+    } else {
+      entry.history.push({
+        date: fetchedAt,
+        rank: r.rank,
+      })
+    }
     // 最高順位のジャンルをカテゴリ表示用に採用
     if (r.rank < entry.best_rank) {
       entry.best_rank = r.rank
       entry.genre_id = r.genre_id
     }
-    if (r.fetched_at > entry.latest_fetched_at) {
+    if (fetchedAt > entry.latest_fetched_at) {
       entry.latest_rank = r.rank
-      entry.latest_fetched_at = r.fetched_at
+      entry.latest_fetched_at = fetchedAt
       entry.item_name = r.item_name
       entry.image_url = r.image_url
       entry.item_url = r.item_url
     }
-    if (r.first_ranked_at < entry.first_ranked_at) {
-      entry.first_ranked_at = r.first_ranked_at
+  }
+
+  // rank_count を重複排除後の履歴数に設定し、first_ranked_at を履歴から算出
+  for (const entry of map.values()) {
+    entry.rank_count = entry.history.length
+    // 履歴の最古日付を初回ランクイン日とする（APIの first_ranked_at はBigQuery形式で不安定なため）
+    if (entry.history.length > 0) {
+      const oldest = entry.history.reduce((a, b) => (a.date < b.date ? a : b))
+      entry.first_ranked_at = oldest.date
     }
   }
 
@@ -732,7 +757,7 @@ export default function RankingPage() {
                             </div>
                             <div>
                               <div className="text-[10px] text-gray-400">初回ランクイン</div>
-                              <div className="text-sm font-medium text-gray-600">{formatDate(product.first_ranked_at)}</div>
+                              <div className="text-sm font-medium text-gray-600">{formatDateTime(product.first_ranked_at)}</div>
                             </div>
                           </div>
 
