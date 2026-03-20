@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import { fetchReviewCSVFromDrive } from '@/lib/google-drive'
-import { getReviewMappingMap, getRmsNameToCodeMap, fetchRmsItemsFromSheet } from '@/lib/google-sheets'
+import { getReviewMappingMap } from '@/lib/google-sheets'
+import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
 
 const PROJECT = 'tiast-data-platform'
 const DATASET = 'analytics_mart'
@@ -18,7 +19,6 @@ function sqlStr(v: string): string {
  */
 function extractRakutenItemId(reviewUrl: string): string | null {
   if (!reviewUrl) return null
-  // Product review URL pattern: /item/1/SHOPID_ITEMID/...
   const match = reviewUrl.match(/review\.rakuten\.co\.jp\/item\/\d+\/\d+_(\d+)\//)
   return match ? match[1] : null
 }
@@ -55,8 +55,8 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
  * POST /api/reviews/import
  * Body: { fileId?, fileName?, folderId?, mode: 'replace' | 'append' | 'scan' }
  *
- * mode='scan': CSVから楽天商品番号と商品名を抽出して返す（インポートしない）
- * mode='replace'/'append': BigQueryにインポート
+ * mode='scan':   CSVの楽天商品番号一覧 + スクレイピングで品番を取得して返す
+ * mode='replace'/'append': BigQueryにインポート（スクレイピングで品番マッチング）
  */
 export async function POST(request: NextRequest) {
   try {
@@ -76,8 +76,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'レビューデータが見つかりません', imported: 0 })
     }
 
-    // --- scan mode: extract unique Rakuten item IDs with product names ---
+    // Collect product review URLs for scraping
+    const productReviewUrls = reviews
+      .map(r => r.review_url)
+      .filter(url => url && url.includes('review.rakuten.co.jp/item/'))
+
+    // Load existing manual mapping (as fallback / cache)
+    let manualMapping = new Map<string, string>()
+    try {
+      manualMapping = await getReviewMappingMap()
+    } catch { /* ignore */ }
+
+    // --- scan mode ---
     if (mode === 'scan') {
+      // Scrape product codes from review pages
+      console.log('[スキャン] レビューページから品番をスクレイピング中...')
+      const scrapedMapping = await batchScrapeProductCodes(productReviewUrls, manualMapping)
+
       const itemMap = new Map<string, { product_names: Set<string>; count: number }>()
       for (const r of reviews) {
         const itemId = extractRakutenItemId(r.review_url)
@@ -88,17 +103,12 @@ export async function POST(request: NextRequest) {
         itemMap.set(itemId, entry)
       }
 
-      // Check which are already mapped
-      let existingMapping = new Map<string, string>()
-      try {
-        existingMapping = await getReviewMappingMap()
-      } catch { /* ignore if sheet doesn't exist */ }
-
       const items = Array.from(itemMap.entries()).map(([id, info]) => ({
         rakuten_item_id: id,
         product_names: Array.from(info.product_names),
         review_count: info.count,
-        mapped_product_code: existingMapping.get(id) || null,
+        matched_product_code: scrapedMapping.get(id) || manualMapping.get(id) || null,
+        match_source: scrapedMapping.has(id) ? 'scrape' : manualMapping.has(id) ? 'manual' : null,
       }))
 
       return NextResponse.json({
@@ -106,7 +116,8 @@ export async function POST(request: NextRequest) {
         product_reviews: reviews.filter(r => r.review_type === '商品レビュー').length,
         shop_reviews: reviews.filter(r => r.review_type === 'ショップレビュー').length,
         items,
-        unmapped: items.filter(i => !i.mapped_product_code).length,
+        mapped: items.filter(i => i.matched_product_code).length,
+        unmapped: items.filter(i => !i.matched_product_code).length,
       })
     }
 
@@ -118,49 +129,27 @@ export async function POST(request: NextRequest) {
     const bq = getBigQueryClient()
     await ensureTableExists(bq)
 
-    // 2. Load all mapping sources in parallel
-    console.log('[レビューインポート] マッピング読み込み中...')
-    const [manualMapping, rmsNameMap, rmsItems] = await Promise.all([
-      getReviewMappingMap(),         // 手動マッピング: 楽天商品番号 → 品番
-      getRmsNameToCodeMap(),         // RMS商品名 → 品番（商品管理番号）
-      fetchRmsItemsFromSheet(),      // RMS商品一覧（itemNumber → item_url）
-    ])
+    // 2. Scrape product codes from review pages (main matching method)
+    console.log('[レビューインポート] レビューページから品番をスクレイピング中...')
+    const scrapedMapping = await batchScrapeProductCodes(productReviewUrls, manualMapping)
+    console.log(`[レビューインポート] スクレイピング結果: ${scrapedMapping.size}件マッチ`)
 
-    // Build rakuten_item_number → product_code map from RMS data
-    const rmsItemNumberMap = new Map<string, string>()
-    for (const item of rmsItems) {
-      if (item.item_number && item.item_url) {
-        rmsItemNumberMap.set(item.item_number, item.item_url)
-      }
-    }
-
-    console.log(`[レビューインポート] マッピング: 手動=${manualMapping.size}, RMS商品番号=${rmsItemNumberMap.size}, RMS商品名=${rmsNameMap.size}`)
-
-    // 3. Assign matched_product_code (3-tier matching)
+    // 3. Assign matched_product_code
     const enrichedReviews = reviews.map(r => {
       const rakutenItemId = extractRakutenItemId(r.review_url)
       let matchedCode: string | null = null
-      let matchMethod: string | null = null
 
-      // Tier 1: 手動マッピングシート（楽天商品番号 → 品番）
-      if (rakutenItemId && manualMapping.has(rakutenItemId)) {
+      // Priority 1: スクレイピング結果（レビューページ→商品URL→品番）
+      if (rakutenItemId && scrapedMapping.has(rakutenItemId)) {
+        matchedCode = scrapedMapping.get(rakutenItemId)!
+      }
+
+      // Priority 2: 手動マッピングシート（フォールバック）
+      if (!matchedCode && rakutenItemId && manualMapping.has(rakutenItemId)) {
         matchedCode = manualMapping.get(rakutenItemId)!
-        matchMethod = 'manual'
       }
 
-      // Tier 2: RMS itemNumber マッチ（楽天内部ID → 商品管理番号）
-      if (!matchedCode && rakutenItemId && rmsItemNumberMap.has(rakutenItemId)) {
-        matchedCode = rmsItemNumberMap.get(rakutenItemId)!
-        matchMethod = 'rms_item_number'
-      }
-
-      // Tier 3: 商品名マッチ（レビューの商品名 → RMS商品名 → 品番）
-      if (!matchedCode && r.product_name && rmsNameMap.has(r.product_name)) {
-        matchedCode = rmsNameMap.get(r.product_name)!
-        matchMethod = 'product_name'
-      }
-
-      return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode, match_method: matchMethod }
+      return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode }
     })
 
     // 4. Clear existing data if mode is 'replace'
@@ -201,9 +190,6 @@ export async function POST(request: NextRequest) {
     const shopReviews = enrichedReviews.filter(r => r.review_type === 'ショップレビュー').length
 
     console.log(`[レビューインポート] 完了: ${inserted}件 (商品: ${productReviews}, ショップ: ${shopReviews}, マッチ: ${matched})`)
-    if (unmatchedItemIds.length > 0) {
-      console.log(`[レビューインポート] 未マッチの楽天商品番号: ${unmatchedItemIds.join(', ')}`)
-    }
 
     return NextResponse.json({
       success: true,
