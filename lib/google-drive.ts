@@ -264,7 +264,7 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 async function fetchReviewCSVsFromFolder(
   folderId: string,
   shopName: string,
-): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown> }> {
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[] }> {
   const client = getDriveClient()
 
   const queryParts: string[] = [
@@ -313,6 +313,7 @@ async function fetchReviewCSVsFromFolder(
 
   const allReviews: ReviewRow[] = []
   const fileIds: { id: string; name: string }[] = []
+  const csvDebug: Record<string, unknown>[] = []
 
   for (const file of files) {
     if (!file.id || !file.name) continue
@@ -325,16 +326,28 @@ async function fetchReviewCSVsFromFolder(
         { responseType: 'text' },
       )
       const content = dlRes.data as string
+      const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
+      const headerLine = contentLines[0] || ''
       const rows = parseReviewCSV(content, shopName)
+      csvDebug.push({
+        fileName: file.name,
+        mimeType: file.mimeType,
+        contentLength: content.length,
+        totalLines: contentLines.length,
+        headerLine: headerLine.substring(0, 500),
+        secondLine: (contentLines[1] || '').substring(0, 500),
+        parsedRows: rows.length,
+      })
       console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
       allReviews.push(...rows)
       fileIds.push({ id: file.id, name: file.name })
     } catch (e) {
+      csvDebug.push({ fileName: file.name, error: e instanceof Error ? e.message : String(e) })
       console.warn(`[レビュー][${shopName}] ${file.name} 読み込みエラー:`, e)
     }
   }
 
-  return { reviews: allReviews, fileIds }
+  return { reviews: allReviews, fileIds, csvDebug: csvDebug.length > 0 ? csvDebug : undefined }
 }
 
 /**
@@ -344,20 +357,28 @@ export async function fetchAllShopReviewCSVs(): Promise<{
   reviews: ReviewRow[]
   fileIds: { id: string; name: string }[]
   debug?: Record<string, unknown>[]
+  csvDebug?: Record<string, unknown>[]
 }> {
   const allReviews: ReviewRow[] = []
   const allFileIds: { id: string; name: string }[] = []
   const debugInfo: Record<string, unknown>[] = []
+  const allCsvDebug: Record<string, unknown>[] = []
 
   for (const shop of REVIEW_CSV_FOLDERS) {
-    const { reviews, fileIds, debug } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
+    const { reviews, fileIds, debug, csvDebug } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
     allReviews.push(...reviews)
     allFileIds.push(...fileIds)
     if (debug) debugInfo.push(debug)
+    if (csvDebug) allCsvDebug.push(...csvDebug)
   }
 
   console.log(`[レビュー] 全店舗合計: ${allReviews.length}件（${allFileIds.length}ファイル）`)
-  return { reviews: allReviews, fileIds: allFileIds, debug: debugInfo.length > 0 ? debugInfo : undefined }
+  return {
+    reviews: allReviews,
+    fileIds: allFileIds,
+    debug: debugInfo.length > 0 ? debugInfo : undefined,
+    csvDebug: allCsvDebug.length > 0 ? allCsvDebug : undefined,
+  }
 }
 
 /**
