@@ -12,6 +12,7 @@ export const maxDuration = 60
 const PROJECT = 'tiast-data-platform'
 const DATASET = 'analytics_mart'
 const TABLE = 'rakuten_reviews'
+const SHOP_TABLE = 'rakuten_shop_reviews'
 
 function sqlStr(v: string): string {
   return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
@@ -52,12 +53,45 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
   })
 }
 
+async function ensureShopTableExists(bq: ReturnType<typeof getBigQueryClient>): Promise<void> {
+  const dataset = bq.dataset(DATASET)
+  const table = dataset.table(SHOP_TABLE)
+  const [exists] = await table.exists()
+  if (exists) return
+
+  console.log('[レビュー] ショップレビューテーブルが存在しないため作成します...')
+  await table.create({
+    schema: {
+      fields: [
+        { name: 'shop_name', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'review_type', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'product_name', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'review_url', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'rating', type: 'INT64', mode: 'NULLABLE' },
+        { name: 'posted_at', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'title', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'review_body', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'flag', type: 'INT64', mode: 'NULLABLE' },
+        { name: 'order_number', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'unhandled_flag', type: 'INT64', mode: 'NULLABLE' },
+        { name: '_imported_at', type: 'TIMESTAMP', mode: 'NULLABLE' },
+      ],
+    },
+  })
+}
+
 async function getExistingReviewKeys(
   bq: ReturnType<typeof getBigQueryClient>,
 ): Promise<Set<string>> {
   try {
     const [rows] = await bq.query({
-      query: `SELECT DISTINCT CONCAT(IFNULL(review_url,''), '|', IFNULL(posted_at,'')) AS review_key FROM \`${PROJECT}.${DATASET}.${TABLE}\``,
+      query: `
+        SELECT DISTINCT CONCAT(IFNULL(review_url,''), '|', IFNULL(posted_at,'')) AS review_key
+        FROM \`${PROJECT}.${DATASET}.${TABLE}\`
+        UNION DISTINCT
+        SELECT DISTINCT CONCAT(IFNULL(review_url,''), '|', IFNULL(posted_at,'')) AS review_key
+        FROM \`${PROJECT}.${DATASET}.${SHOP_TABLE}\`
+      `,
       location: 'asia-northeast1',
     })
     const set = new Set<string>()
@@ -104,11 +138,15 @@ async function runImport(dryRun = false, reprocess = false) {
 
   const bq = getBigQueryClient()
   await ensureTableExists(bq)
+  await ensureShopTableExists(bq)
 
   // 2. Reprocess: delete all existing reviews first
   if (reprocess) {
     console.log('[レビューインポート] reprocess: 既存レビューを全削除中...')
-    await bq.query({ query: `DELETE FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE 1=1`, location: 'asia-northeast1' })
+    await Promise.all([
+      bq.query({ query: `DELETE FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE 1=1`, location: 'asia-northeast1' }),
+      bq.query({ query: `DELETE FROM \`${PROJECT}.${DATASET}.${SHOP_TABLE}\` WHERE 1=1`, location: 'asia-northeast1' }),
+    ])
     console.log('[レビューインポート] 既存レビュー削除完了')
   }
 
@@ -182,11 +220,16 @@ async function runImport(dryRun = false, reprocess = false) {
     }
   }
 
-  // 4. Insert into BigQuery
+  // 4. Split into product reviews and shop reviews, insert into separate tables
+  const productReviewList = enrichedReviews.filter(r => r.review_type !== 'ショップレビュー')
+  const shopReviewList = enrichedReviews.filter(r => r.review_type === 'ショップレビュー')
+
   const batchSize = 500
   let inserted = 0
-  for (let i = 0; i < enrichedReviews.length; i += batchSize) {
-    const batch = enrichedReviews.slice(i, i + batchSize)
+
+  // 4a. Insert product reviews into rakuten_reviews
+  for (let i = 0; i < productReviewList.length; i += batchSize) {
+    const batch = productReviewList.slice(i, i + batchSize)
     const values = batch.map(r =>
       `(${sqlStr(r.shop_name)}, ${sqlStr(r.review_type)}, ${sqlStr(r.product_name)}, ${sqlStr(r.review_url)}, ` +
       `${r.rating}, ${sqlStr(r.posted_at)}, ${sqlStr(r.title)}, ${sqlStr(r.review_body)}, ` +
@@ -195,14 +238,36 @@ async function runImport(dryRun = false, reprocess = false) {
       `${r.matched_product_code ? sqlStr(r.matched_product_code) : 'NULL'}, CURRENT_TIMESTAMP())`
     ).join(',\n')
 
-    const query = `
-      INSERT INTO \`${PROJECT}.${DATASET}.${TABLE}\`
-      (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
-       flag, order_number, unhandled_flag, rakuten_item_id, matched_product_code, _imported_at)
-      VALUES ${values}
-    `
+    await bq.query({
+      query: `
+        INSERT INTO \`${PROJECT}.${DATASET}.${TABLE}\`
+        (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
+         flag, order_number, unhandled_flag, rakuten_item_id, matched_product_code, _imported_at)
+        VALUES ${values}
+      `,
+      location: 'asia-northeast1',
+    })
+    inserted += batch.length
+  }
 
-    await bq.query({ query, location: 'asia-northeast1' })
+  // 4b. Insert shop reviews into rakuten_shop_reviews
+  for (let i = 0; i < shopReviewList.length; i += batchSize) {
+    const batch = shopReviewList.slice(i, i + batchSize)
+    const values = batch.map(r =>
+      `(${sqlStr(r.shop_name)}, ${sqlStr(r.review_type)}, ${sqlStr(r.product_name)}, ${sqlStr(r.review_url)}, ` +
+      `${r.rating}, ${sqlStr(r.posted_at)}, ${sqlStr(r.title)}, ${sqlStr(r.review_body)}, ` +
+      `${r.flag}, ${sqlStr(r.order_number)}, ${r.unhandled_flag}, CURRENT_TIMESTAMP())`
+    ).join(',\n')
+
+    await bq.query({
+      query: `
+        INSERT INTO \`${PROJECT}.${DATASET}.${SHOP_TABLE}\`
+        (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
+         flag, order_number, unhandled_flag, _imported_at)
+        VALUES ${values}
+      `,
+      location: 'asia-northeast1',
+    })
     inserted += batch.length
   }
 
@@ -214,19 +279,17 @@ async function runImport(dryRun = false, reprocess = false) {
     console.warn(`[レビューインポート] 削除エラー:`, delResult.errors)
   }
 
-  const matched = enrichedReviews.filter(r => r.matched_product_code).length
-  const productReviews = enrichedReviews.filter(r => r.review_type === '商品レビュー').length
-  const shopReviews = enrichedReviews.filter(r => r.review_type === 'ショップレビュー').length
+  const matched = productReviewList.filter(r => r.matched_product_code).length
 
-  console.log(`[レビューインポート] 完了: ${inserted}件新規インポート (商品: ${productReviews}, ショップ: ${shopReviews}, マッチ: ${matched}, 重複スキップ: ${skipped})`)
+  console.log(`[レビューインポート] 完了: ${inserted}件新規インポート (商品→rakuten_reviews: ${productReviewList.length}, ショップ→rakuten_shop_reviews: ${shopReviewList.length}, マッチ: ${matched}, 重複スキップ: ${skipped})`)
 
   return {
     success: true,
     imported: inserted,
     matched,
     skipped_duplicates: skipped,
-    product_reviews: productReviews,
-    shop_reviews: shopReviews,
+    product_reviews: productReviewList.length,
+    shop_reviews: shopReviewList.length,
     files_processed: fileIds.map(f => f.name),
     files_deleted: delResult.deleted,
     delete_errors: delResult.errors.length > 0 ? delResult.errors : undefined,
