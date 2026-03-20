@@ -4,8 +4,7 @@ import {
   fetchAllShopReviewCSVs,
   deleteDriveFiles,
 } from '@/lib/google-drive'
-// import { getReviewMappingMap } from '@/lib/google-sheets'
-// import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
+import { getReviewMappingMap } from '@/lib/google-sheets'
 
 // Allow up to 60s for this function (Vercel Pro)
 export const maxDuration = 60
@@ -138,10 +137,14 @@ async function runImport(dryRun = false, reprocess = false) {
     }
   }
 
-  // 3. Enrich reviews with rakuten_item_id and manage_number as matched_product_code
+  // 3. Enrich reviews with rakuten_item_id → matched_product_code via mapping sheet
+  const mappingMap = await getReviewMappingMap()
+  console.log(`[レビューインポート] レビューマッピング: ${mappingMap.size}件`)
+
   const enrichedReviews = newReviews.map(r => {
     const rakutenItemId = extractRakutenItemId(r.review_url)
-    const matched = r.manage_number || null
+    // Priority: manage_number from CSV > mapping sheet lookup > null
+    const matched = r.manage_number || (rakutenItemId ? mappingMap.get(rakutenItemId) ?? null : null)
     return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
 
