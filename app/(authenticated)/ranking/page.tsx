@@ -65,13 +65,6 @@ function toDateStr(v: unknown): string {
   return String(v)
 }
 
-/** タイムスタンプからローカル日付キー（YYYY-MM-DD）を取得（JST等のタイムゾーン対応） */
-function toLocalDateKey(v: string): string {
-  const d = new Date(v)
-  if (isNaN(d.getTime())) return v.slice(0, 10)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 /** item_url から楽天の商品ID部分を抽出（例: "https://item.rakuten.co.jp/noahl/nlwp473-2512/" → "nlwp473-2512"） */
 function extractRakutenProductId(itemUrl: string): string | null {
   if (!itemUrl) return null
@@ -121,7 +114,7 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   }
 
   // latest_rank, rank_count, first_ranked_at を重複排除後の履歴から算出
-  for (const entry of map.values()) {
+  for (const entry of Array.from(map.values())) {
     entry.history.sort((a, b) => b.date.localeCompare(a.date)) // 新しい順
     entry.rank_count = entry.history.length
     if (entry.history.length > 0) {
