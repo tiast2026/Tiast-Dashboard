@@ -68,8 +68,9 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
   const map = new Map<string, ProductRankingSummary>()
 
   for (const r of records) {
-    // 商品コードのみでグループ化（ジャンル横断で同一商品を集約）
-    const key = r.matched_product_code
+    // item_url から楽天商品IDを抽出してグループ化（matched_product_code はマッチング方法により値が異なる場合があるため）
+    const rakutenProductId = extractRakutenProductId(r.item_url)
+    const key = rakutenProductId || r.matched_product_code
     if (!map.has(key)) {
       map.set(key, {
         matched_product_code: r.matched_product_code,
