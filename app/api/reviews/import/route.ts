@@ -82,7 +82,7 @@ async function runImport(dryRun = false) {
 
   // 1. Fetch all "reviews*" CSVs from both shop folders
   console.log(`[レビューインポート] NOAHL + BLACKQUEEN のDriveフォルダからreviews CSVを取得中...`)
-  const { reviews, fileIds, debug } = await fetchAllShopReviewCSVs()
+  const { reviews, fileIds, debug, csvDebug } = await fetchAllShopReviewCSVs()
 
   if (reviews.length === 0) {
     return {
@@ -94,6 +94,7 @@ async function runImport(dryRun = false) {
       skipped_duplicates: 0,
       files_found: fileIds.length,
       debug,
+      csvDebug,
     }
   }
 
