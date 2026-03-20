@@ -196,6 +196,7 @@ async function runImport(dryRun = false) {
     shop_reviews: shopReviews,
     files_processed: fileIds.map(f => f.name),
     files_deleted: delResult.deleted,
+    delete_errors: delResult.errors.length > 0 ? delResult.errors : undefined,
   }
 }
 
