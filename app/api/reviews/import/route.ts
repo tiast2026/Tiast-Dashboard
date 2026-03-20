@@ -87,10 +87,12 @@ async function runImport(dryRun = false) {
   if (reviews.length === 0) {
     return {
       success: true,
-      message: 'reviews CSVファイルが見つかりません',
+      message: fileIds.length === 0
+        ? 'reviews CSVファイルが見つかりません（Driveフォルダ内にファイルなし。フォルダ共有・ファイル名を確認してください）'
+        : 'reviews CSVファイルにレビューデータがありません',
       imported: 0,
       skipped_duplicates: 0,
-      files_found: 0,
+      files_found: fileIds.length,
     }
   }
 
