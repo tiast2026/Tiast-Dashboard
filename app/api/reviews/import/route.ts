@@ -4,8 +4,11 @@ import {
   fetchAllShopReviewCSVs,
   deleteDriveFiles,
 } from '@/lib/google-drive'
-import { getReviewMappingMap } from '@/lib/google-sheets'
-import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
+// import { getReviewMappingMap } from '@/lib/google-sheets'
+// import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
+
+// Allow up to 60s for this function (Vercel Pro)
+export const maxDuration = 60
 
 const PROJECT = 'tiast-data-platform'
 const DATASET = 'analytics_mart'
@@ -128,32 +131,10 @@ async function runImport(dryRun = false) {
     }
   }
 
-  // 3. Scrape product codes from review pages
-  const productReviewUrls = newReviews
-    .map(r => r.review_url)
-    .filter(url => url && url.includes('review.rakuten.co.jp/item/'))
-
-  let manualMapping = new Map<string, string>()
-  try {
-    manualMapping = await getReviewMappingMap()
-  } catch { /* ignore */ }
-
-  console.log('[レビューインポート] レビューページから品番をスクレイピング中...')
-  const scrapedMapping = await batchScrapeProductCodes(productReviewUrls, manualMapping)
-  console.log(`[レビューインポート] スクレイピング結果: ${scrapedMapping.size}件マッチ`)
-
-  // 4. Enrich reviews
+  // 3. Enrich reviews with rakuten_item_id (scraping skipped for speed — serverless timeout)
   const enrichedReviews = newReviews.map(r => {
     const rakutenItemId = extractRakutenItemId(r.review_url)
-    let matchedCode: string | null = null
-
-    if (rakutenItemId && scrapedMapping.has(rakutenItemId)) {
-      matchedCode = scrapedMapping.get(rakutenItemId)!
-    } else if (rakutenItemId && manualMapping.has(rakutenItemId)) {
-      matchedCode = manualMapping.get(rakutenItemId)!
-    }
-
-    return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode }
+    return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: null as string | null }
   })
 
   if (dryRun) {
@@ -168,8 +149,8 @@ async function runImport(dryRun = false) {
     }
   }
 
-  // 5. Insert into BigQuery
-  const batchSize = 50
+  // 4. Insert into BigQuery
+  const batchSize = 500
   let inserted = 0
   for (let i = 0; i < enrichedReviews.length; i += batchSize) {
     const batch = enrichedReviews.slice(i, i + batchSize)
@@ -192,7 +173,7 @@ async function runImport(dryRun = false) {
     inserted += batch.length
   }
 
-  // 6. Delete CSV files from Drive
+  // 5. Delete CSV files from Drive
   console.log(`[レビューインポート] CSVファイルを削除中...`)
   const delResult = await deleteDriveFiles(fileIds.map(f => f.id))
   console.log(`[レビューインポート] ${delResult.deleted}ファイル削除完了`)
