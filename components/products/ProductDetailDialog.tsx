@@ -799,11 +799,16 @@ export default function ProductDetailDialog({
       .finally(() => setRankingsLoading(false))
   }, [open, productCode, isSkuView])
 
+  // Derive product_name from props for review search
+  const reviewProductName = product?.product_name || allSkus[0]?.goods_name || ''
+
   // Fetch reviews (product view only)
   useEffect(() => {
     if (!open || !productCode || isSkuView) return
     setReviewsLoading(true)
-    fetch(`/api/reviews?product_code=${encodeURIComponent(productCode)}&limit=50`)
+    const reviewParams = new URLSearchParams({ product_code: productCode, limit: '50' })
+    if (reviewProductName) reviewParams.set('product_name', reviewProductName)
+    fetch(`/api/reviews?${reviewParams}`)
       .then(res => res.ok ? res.json() : null)
       .then((data: { data: ReviewRecord[]; summary: ReviewSummary | null } | null) => {
         setReviews(data?.data || [])
@@ -811,7 +816,7 @@ export default function ProductDetailDialog({
       })
       .catch(() => { setReviews([]); setReviewSummary(null) })
       .finally(() => setReviewsLoading(false))
-  }, [open, productCode, isSkuView])
+  }, [open, productCode, isSkuView, reviewProductName])
 
   if (!open) return null
 
