@@ -269,15 +269,41 @@ async function fetchReviewCSVsFromFolder(
     `'${folderId}' in parents`,
   ]
 
+  const query = queryParts.join(' and ')
+  console.log(`[レビュー][${shopName}] Drive検索クエリ: ${query}`)
+
   const res = await client.files.list({
-    q: queryParts.join(' and '),
+    q: query,
     fields: 'files(id, name, mimeType, modifiedTime)',
     orderBy: 'modifiedTime desc',
     pageSize: 50,
   })
 
   const files = res.data.files || []
-  if (files.length === 0) {
+  console.log(`[レビュー][${shopName}] Drive API結果: ${files.length}件 (フォルダ: ${folderId})`)
+  if (files.length > 0) {
+    for (const f of files) {
+      console.log(`[レビュー][${shopName}]   - ${f.name} (${f.mimeType}, ${f.modifiedTime})`)
+    }
+  } else {
+    // フォルダ自体にアクセスできるか確認
+    try {
+      const folderRes = await client.files.get({ fileId: folderId, fields: 'id,name,mimeType' })
+      console.log(`[レビュー][${shopName}] フォルダアクセスOK: ${folderRes.data.name} (${folderRes.data.mimeType})`)
+      // フォルダ内の全ファイルを確認（reviewsフィルタなし）
+      const allFilesRes = await client.files.list({
+        q: `'${folderId}' in parents and trashed=false`,
+        fields: 'files(id, name, mimeType)',
+        pageSize: 10,
+      })
+      const allFiles = allFilesRes.data.files || []
+      console.log(`[レビュー][${shopName}] フォルダ内全ファイル: ${allFiles.length}件`)
+      for (const f of allFiles) {
+        console.log(`[レビュー][${shopName}]   全ファイル: ${f.name} (${f.mimeType})`)
+      }
+    } catch (folderErr) {
+      console.error(`[レビュー][${shopName}] フォルダアクセスエラー (${folderId}):`, folderErr)
+    }
     return { reviews: [], fileIds: [] }
   }
 
