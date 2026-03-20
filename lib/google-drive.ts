@@ -182,6 +182,8 @@ export async function fetchReviewCSVFromDrive(
       fields: 'files(id, name, mimeType, modifiedTime)',
       orderBy: 'modifiedTime desc',
       pageSize: 10,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     })
 
     const files = res.data.files || []
@@ -195,7 +197,7 @@ export async function fetchReviewCSVFromDrive(
   }
 
   // Check if it's a Google Sheets file (needs export instead of download)
-  const fileMeta = await client.files.get({ fileId: targetFileId, fields: 'mimeType,name' })
+  const fileMeta = await client.files.get({ fileId: targetFileId, fields: 'mimeType,name', supportsAllDrives: true })
   const mimeType = fileMeta.data.mimeType
 
   let content: string
@@ -244,6 +246,8 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
     fields: 'files(id, name, modifiedTime)',
     orderBy: 'modifiedTime desc',
     pageSize: 20,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
 
   return (res.data.files || []).map(f => ({
@@ -276,6 +280,8 @@ async function fetchReviewCSVsFromFolder(
     fields: 'files(id, name, mimeType, modifiedTime)',
     orderBy: 'modifiedTime desc',
     pageSize: 50,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   })
 
   const files = res.data.files || []
@@ -283,7 +289,7 @@ async function fetchReviewCSVsFromFolder(
     // Diagnose: check folder access and list all files
     const debug: Record<string, unknown> = { shop: shopName, folderId, query, reviewFilesFound: 0 }
     try {
-      const folderRes = await client.files.get({ fileId: folderId, fields: 'id,name,mimeType' })
+      const folderRes = await client.files.get({ fileId: folderId, fields: 'id,name,mimeType', supportsAllDrives: true })
       debug.folderAccess = 'OK'
       debug.folderName = folderRes.data.name
       // List all files in folder (no reviews filter)
@@ -291,6 +297,8 @@ async function fetchReviewCSVsFromFolder(
         q: `'${folderId}' in parents and trashed=false`,
         fields: 'files(id, name, mimeType)',
         pageSize: 20,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       })
       const allFiles = allFilesRes.data.files || []
       debug.allFilesInFolder = allFiles.map(f => ({ name: f.name, mimeType: f.mimeType }))
@@ -313,7 +321,7 @@ async function fetchReviewCSVsFromFolder(
     console.log(`[レビュー][${shopName}] 読み込み中: ${file.name}`)
     try {
       const dlRes = await client.files.get(
-        { fileId: file.id, alt: 'media' },
+        { fileId: file.id, alt: 'media', supportsAllDrives: true },
         { responseType: 'text' },
       )
       const content = dlRes.data as string
@@ -357,7 +365,7 @@ export async function fetchAllShopReviewCSVs(): Promise<{
  */
 export async function deleteDriveFile(fileId: string): Promise<void> {
   const client = getDriveClient()
-  await client.files.delete({ fileId })
+  await client.files.delete({ fileId, supportsAllDrives: true })
 }
 
 /**
