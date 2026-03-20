@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import {
-  fetchAllReviewCSVsFromFolder,
+  fetchAllShopReviewCSVs,
   deleteDriveFiles,
-  REVIEW_CSV_FOLDER_ID,
 } from '@/lib/google-drive'
 import { getReviewMappingMap } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
@@ -32,6 +31,7 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
   await table.create({
     schema: {
       fields: [
+        { name: 'shop_name', type: 'STRING', mode: 'NULLABLE' },
         { name: 'review_type', type: 'STRING', mode: 'NULLABLE' },
         { name: 'product_name', type: 'STRING', mode: 'NULLABLE' },
         { name: 'review_url', type: 'STRING', mode: 'NULLABLE' },
@@ -51,19 +51,19 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
 }
 
 /**
- * Get all existing review_urls from BigQuery to detect duplicates.
+ * Get existing review keys (review_url + posted_at) from BigQuery to detect duplicates.
  */
-async function getExistingReviewUrls(
+async function getExistingReviewKeys(
   bq: ReturnType<typeof getBigQueryClient>,
 ): Promise<Set<string>> {
   try {
     const [rows] = await bq.query({
-      query: `SELECT DISTINCT review_url FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE review_url IS NOT NULL`,
+      query: `SELECT DISTINCT CONCAT(IFNULL(review_url,''), '|', IFNULL(posted_at,'')) AS review_key FROM \`${PROJECT}.${DATASET}.${TABLE}\``,
       location: 'asia-northeast1',
     })
     const set = new Set<string>()
-    for (const row of rows as { review_url: string }[]) {
-      if (row.review_url) set.add(row.review_url)
+    for (const row of rows as { review_key: string }[]) {
+      if (row.review_key) set.add(row.review_key)
     }
     return set
   } catch {
@@ -72,14 +72,18 @@ async function getExistingReviewUrls(
   }
 }
 
+function makeReviewKey(reviewUrl: string, postedAt: string): string {
+  return `${reviewUrl || ''}|${postedAt || ''}`
+}
+
 /**
  * POST /api/reviews/import
  *
- * Reads all "reviews*" CSV files from Google Drive folder,
+ * Reads all "reviews*" CSV files from NOAHL and BLACKQUEEN Drive folders,
  * imports new reviews (skipping duplicates), scrapes product codes,
  * and deletes the CSV files after successful import.
  *
- * Body: { folderId?: string, dryRun?: boolean }
+ * Body: { dryRun?: boolean }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -88,14 +92,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { folderId = REVIEW_CSV_FOLDER_ID, dryRun = false } = body as {
-      folderId?: string
-      dryRun?: boolean
-    }
+    const { dryRun = false } = body as { dryRun?: boolean }
 
-    // 1. Fetch all "reviews*" CSVs from the Drive folder
-    console.log(`[レビューインポート] Google Driveフォルダからreviews CSVを取得中...`)
-    const { reviews, fileIds } = await fetchAllReviewCSVsFromFolder(folderId)
+    // 1. Fetch all "reviews*" CSVs from both shop folders
+    console.log(`[レビューインポート] NOAHL + BLACKQUEEN のDriveフォルダからreviews CSVを取得中...`)
+    const { reviews, fileIds } = await fetchAllShopReviewCSVs()
 
     if (reviews.length === 0) {
       return NextResponse.json({
@@ -112,13 +113,13 @@ export async function POST(request: NextRequest) {
     const bq = getBigQueryClient()
     await ensureTableExists(bq)
 
-    // 2. Get existing review URLs to skip duplicates
-    console.log('[レビューインポート] 既存レビューURL取得中（重複チェック用）...')
-    const existingUrls = await getExistingReviewUrls(bq)
-    console.log(`[レビューインポート] 既存レビュー: ${existingUrls.size}件`)
+    // 2. Get existing review keys (URL + posted_at) to skip duplicates
+    console.log('[レビューインポート] 既存レビュー取得中（重複チェック用）...')
+    const existingKeys = await getExistingReviewKeys(bq)
+    console.log(`[レビューインポート] 既存レビュー: ${existingKeys.size}件`)
 
-    // 3. Filter out duplicates
-    const newReviews = reviews.filter(r => !r.review_url || !existingUrls.has(r.review_url))
+    // 3. Filter out duplicates (by review_url + posted_at)
+    const newReviews = reviews.filter(r => !existingKeys.has(makeReviewKey(r.review_url, r.posted_at)))
     const skipped = reviews.length - newReviews.length
     console.log(`[レビューインポート] 新規: ${newReviews.length}件, 重複スキップ: ${skipped}件`)
 
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < enrichedReviews.length; i += batchSize) {
       const batch = enrichedReviews.slice(i, i + batchSize)
       const values = batch.map(r =>
-        `(${sqlStr(r.review_type)}, ${sqlStr(r.product_name)}, ${sqlStr(r.review_url)}, ` +
+        `(${sqlStr(r.shop_name)}, ${sqlStr(r.review_type)}, ${sqlStr(r.product_name)}, ${sqlStr(r.review_url)}, ` +
         `${r.rating}, ${sqlStr(r.posted_at)}, ${sqlStr(r.title)}, ${sqlStr(r.review_body)}, ` +
         `${r.flag}, ${sqlStr(r.order_number)}, ${r.unhandled_flag}, ` +
         `${r.rakuten_item_id ? sqlStr(r.rakuten_item_id) : 'NULL'}, ` +
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
 
       const query = `
         INSERT INTO \`${PROJECT}.${DATASET}.${TABLE}\`
-        (review_type, product_name, review_url, rating, posted_at, title, review_body,
+        (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
          flag, order_number, unhandled_flag, rakuten_item_id, matched_product_code, _imported_at)
         VALUES ${values}
       `

@@ -15,10 +15,14 @@ function getDriveClient(): drive_v3.Drive {
   return drive({ version: 'v3', auth: authClient })
 }
 
-/** Default folder for review CSVs */
-export const REVIEW_CSV_FOLDER_ID = process.env.REVIEW_CSV_FOLDER_ID || '1B4QMfyfgoh7I3D5n2pGLBNFSSmHudmEk'
+/** Review CSV folders per shop */
+export const REVIEW_CSV_FOLDERS: { shopName: string; folderId: string }[] = [
+  { shopName: 'NOAHL',      folderId: '1B4QMfyfgoh7I3D5n2pGLBNFSSmHudmEk' },
+  { shopName: 'BLACKQUEEN', folderId: '1uLw0fGWu6I0YGHduENPYoUOObQ3J_7ox' },
+]
 
 export interface ReviewRow {
+  shop_name: string
   review_type: string
   product_name: string
   review_url: string
@@ -88,7 +92,7 @@ function normalizeDate(raw: string): string {
   return raw
 }
 
-function parseReviewCSV(content: string): ReviewRow[] {
+function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
   const lines = content.split(/\r?\n/).filter(l => l.trim())
   if (lines.length < 2) return []
 
@@ -129,6 +133,7 @@ function parseReviewCSV(content: string): ReviewRow[] {
     if (!obj.review_type && !obj.review_url) continue
 
     rows.push({
+      shop_name: shopName,
       review_type: String(obj.review_type || ''),
       product_name: String(obj.product_name || ''),
       review_url: String(obj.review_url || ''),
@@ -249,11 +254,12 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 }
 
 /**
- * Find all "reviews*" CSV files in the specified folder,
+ * Find all "reviews*" CSV files in the specified folder for one shop,
  * read and merge all reviews, then return file IDs for deletion.
  */
-export async function fetchAllReviewCSVsFromFolder(
-  folderId: string = REVIEW_CSV_FOLDER_ID,
+async function fetchReviewCSVsFromFolder(
+  folderId: string,
+  shopName: string,
 ): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[] }> {
   const client = getDriveClient()
 
@@ -276,34 +282,52 @@ export async function fetchAllReviewCSVsFromFolder(
     return { reviews: [], fileIds: [] }
   }
 
-  console.log(`[レビュー] ${files.length}件のreviews CSVファイルを発見`)
+  console.log(`[レビュー][${shopName}] ${files.length}件のreviews CSVファイルを発見`)
 
   const allReviews: ReviewRow[] = []
   const fileIds: { id: string; name: string }[] = []
 
   for (const file of files) {
     if (!file.id || !file.name) continue
-    // Only process files whose name starts with "reviews" (case-insensitive)
     if (!file.name.toLowerCase().startsWith('reviews')) continue
 
-    console.log(`[レビュー] 読み込み中: ${file.name}`)
+    console.log(`[レビュー][${shopName}] 読み込み中: ${file.name}`)
     try {
       const dlRes = await client.files.get(
         { fileId: file.id, alt: 'media' },
         { responseType: 'text' },
       )
       const content = dlRes.data as string
-      const rows = parseReviewCSV(content)
-      console.log(`[レビュー] ${file.name}: ${rows.length}件`)
+      const rows = parseReviewCSV(content, shopName)
+      console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
       allReviews.push(...rows)
       fileIds.push({ id: file.id, name: file.name })
     } catch (e) {
-      console.warn(`[レビュー] ${file.name} 読み込みエラー:`, e)
+      console.warn(`[レビュー][${shopName}] ${file.name} 読み込みエラー:`, e)
     }
   }
 
-  console.log(`[レビュー] 合計 ${allReviews.length}件のレビュー（${fileIds.length}ファイル）`)
   return { reviews: allReviews, fileIds }
+}
+
+/**
+ * Fetch reviews from all shop folders (NOAHL + BLACKQUEEN).
+ */
+export async function fetchAllShopReviewCSVs(): Promise<{
+  reviews: ReviewRow[]
+  fileIds: { id: string; name: string }[]
+}> {
+  const allReviews: ReviewRow[] = []
+  const allFileIds: { id: string; name: string }[] = []
+
+  for (const shop of REVIEW_CSV_FOLDERS) {
+    const { reviews, fileIds } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
+    allReviews.push(...reviews)
+    allFileIds.push(...fileIds)
+  }
+
+  console.log(`[レビュー] 全店舗合計: ${allReviews.length}件（${allFileIds.length}ファイル）`)
+  return { reviews: allReviews, fileIds: allFileIds }
 }
 
 /**
