@@ -15,10 +15,19 @@ interface ReviewRecord {
   matched_product_code: string | null
 }
 
+function escapeSQL(v: string): string {
+  return v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+}
+
+const REVIEW_COLUMNS = `
+  review_type, product_name, review_url, rating, posted_at,
+  title, review_body, flag, order_number, unhandled_flag, matched_product_code
+`
+
 /**
- * GET /api/reviews?product_code=xxx&limit=50
+ * GET /api/reviews?product_code=xxx&product_name=xxx&limit=50
  *
- * Fetch reviews, optionally filtered by product_code
+ * Fetch reviews filtered by product_code (matched_product_code) or product_name fallback.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,62 +37,83 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const productCode = searchParams.get('product_code')
+    const productName = searchParams.get('product_name')
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
-    const reviewType = searchParams.get('type') // 商品レビュー or ショップレビュー
+    const reviewType = searchParams.get('type')
 
-    let whereClause = 'WHERE 1=1'
+    const typeFilter = reviewType
+      ? ` AND review_type = '${escapeSQL(reviewType)}'`
+      : ''
+
+    // Build the product filter: try matched_product_code first, fallback to product_name LIKE
+    let productFilter = ''
     if (productCode) {
-      whereClause += ` AND matched_product_code = '${productCode.replace(/'/g, "")}'`
-    }
-    if (reviewType) {
-      whereClause += ` AND review_type = '${reviewType.replace(/'/g, "")}'`
+      productFilter = `AND matched_product_code = '${escapeSQL(productCode)}'`
     }
 
-    // Fetch reviews
-    const query = `
-      SELECT
-        review_type,
-        product_name,
-        review_url,
-        rating,
-        posted_at,
-        title,
-        review_body,
-        flag,
-        order_number,
-        unhandled_flag,
-        matched_product_code
+    // Fetch reviews with product_code filter
+    let reviews = await runQuery<ReviewRecord>(`
+      SELECT ${REVIEW_COLUMNS}
       FROM ${tableName('rakuten_reviews')}
-      ${whereClause}
+      WHERE 1=1 ${productFilter} ${typeFilter}
       ORDER BY posted_at DESC, _imported_at DESC
       LIMIT ${limit}
-    `
+    `)
 
-    const reviews = await runQuery<ReviewRecord>(query)
+    // Fallback: if product_code returned no results and product_name is available,
+    // search by product_name
+    if (reviews.length === 0 && productName) {
+      const escaped = escapeSQL(productName)
+      productFilter = `AND product_name = '${escaped}'`
 
-    // Fetch summary if product_code is specified
-    let summary = null
-    if (productCode) {
-      const summaryQuery = `
-        SELECT
-          COUNT(*) AS total_reviews,
-          COUNT(CASE WHEN review_type = '商品レビュー' THEN 1 END) AS product_reviews,
-          COUNT(CASE WHEN review_type = 'ショップレビュー' THEN 1 END) AS shop_reviews,
-          ROUND(AVG(rating), 2) AS avg_rating,
-          COUNT(CASE WHEN rating >= 4 THEN 1 END) AS positive_count,
-          COUNT(CASE WHEN rating <= 2 THEN 1 END) AS negative_count,
+      reviews = await runQuery<ReviewRecord>(`
+        SELECT ${REVIEW_COLUMNS}
         FROM ${tableName('rakuten_reviews')}
-        WHERE matched_product_code = '${productCode.replace(/'/g, "")}'
-      `
-      const [summaryRow] = await runQuery<{
-        total_reviews: number
-        product_reviews: number
-        shop_reviews: number
-        avg_rating: number
-        positive_count: number
-        negative_count: number
-      }>(summaryQuery)
-      summary = summaryRow || null
+        WHERE 1=1 ${productFilter} ${typeFilter}
+        ORDER BY posted_at DESC, _imported_at DESC
+        LIMIT ${limit}
+      `)
+    }
+
+    // Build summary
+    let summary = null
+    if ((productCode || productName) && reviews.length > 0) {
+      // Calculate summary from the fetched reviews (avoid extra query)
+      const totalReviews = reviews.length
+      const productReviews = reviews.filter(r => r.review_type === '商品レビュー').length
+      const shopReviews = reviews.filter(r => r.review_type === 'ショップレビュー').length
+      const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / totalReviews
+      const positiveCount = reviews.filter(r => r.rating >= 4).length
+      const negativeCount = reviews.filter(r => r.rating <= 2).length
+
+      // If we might be missing reviews (hit limit), fetch full count
+      if (reviews.length >= limit) {
+        const countQuery = `
+          SELECT
+            COUNT(*) AS total_reviews,
+            COUNT(CASE WHEN review_type = '商品レビュー' THEN 1 END) AS product_reviews,
+            COUNT(CASE WHEN review_type = 'ショップレビュー' THEN 1 END) AS shop_reviews,
+            ROUND(AVG(rating), 2) AS avg_rating,
+            COUNT(CASE WHEN rating >= 4 THEN 1 END) AS positive_count,
+            COUNT(CASE WHEN rating <= 2 THEN 1 END) AS negative_count
+          FROM ${tableName('rakuten_reviews')}
+          WHERE 1=1 ${productFilter}
+        `
+        const [row] = await runQuery<{
+          total_reviews: number; product_reviews: number; shop_reviews: number
+          avg_rating: number; positive_count: number; negative_count: number
+        }>(countQuery)
+        summary = row || null
+      } else {
+        summary = {
+          total_reviews: totalReviews,
+          product_reviews: productReviews,
+          shop_reviews: shopReviews,
+          avg_rating: Math.round(avgRating * 100) / 100,
+          positive_count: positiveCount,
+          negative_count: negativeCount,
+        }
+      }
     }
 
     return NextResponse.json({ data: reviews, summary })
