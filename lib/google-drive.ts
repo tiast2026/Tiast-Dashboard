@@ -321,11 +321,21 @@ async function fetchReviewCSVsFromFolder(
 
     console.log(`[レビュー][${shopName}] 読み込み中: ${file.name}`)
     try {
+      // Download as arraybuffer to handle Shift_JIS encoding
       const dlRes = await client.files.get(
         { fileId: file.id, alt: 'media', supportsAllDrives: true },
-        { responseType: 'text' },
+        { responseType: 'arraybuffer' },
       )
-      const content = dlRes.data as string
+      const buffer = dlRes.data as ArrayBuffer
+      // Try Shift_JIS first (Rakuten CSVs are typically Shift_JIS), fall back to UTF-8
+      let content: string
+      try {
+        const sjisDecoder = new TextDecoder('shift_jis')
+        content = sjisDecoder.decode(buffer)
+      } catch {
+        const utf8Decoder = new TextDecoder('utf-8')
+        content = utf8Decoder.decode(buffer)
+      }
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
       const rows = parseReviewCSV(content, shopName)
