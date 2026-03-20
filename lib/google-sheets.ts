@@ -480,3 +480,125 @@ export async function getReviewMappingMap(): Promise<Map<string, string>> {
   }
   return map
 }
+
+/**
+ * Build a map of product_name → product_code from the mapping sheet
+ */
+export async function getProductNameMappingMap(): Promise<Map<string, string>> {
+  // Name mapping comes from the RMS items sheet, not this one
+  return new Map()
+}
+
+// ============================================================
+// RMS商品マスタシート（RMS APIから取得した商品一覧）
+// ============================================================
+
+const RMS_ITEMS_SHEET_NAME = 'RMS商品マスタ'
+
+export interface RmsItemRow {
+  item_url: string        // 商品管理番号 (= 品番)
+  item_name: string       // 商品名
+  item_price: number      // 価格
+  item_number: string     // 楽天商品番号（内部ID）
+}
+
+/**
+ * Write RMS items to the RMS商品マスタ sheet.
+ * Overwrites existing data.
+ */
+export async function writeRmsItemsToSheet(items: RmsItemRow[]): Promise<void> {
+  const client = getSheetsClient()
+
+  // Clear existing data
+  try {
+    await client.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${RMS_ITEMS_SHEET_NAME}`,
+    })
+  } catch {
+    // Sheet might not exist yet, create it
+    try {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: { title: RMS_ITEMS_SHEET_NAME },
+            },
+          }],
+        },
+      })
+    } catch (e) {
+      console.warn('[RMS商品マスタ] シート作成エラー (既に存在する場合は無視):', e)
+    }
+  }
+
+  // Write headers + data
+  const headers = ['商品管理番号', '商品名', '価格', '楽天商品番号']
+  const rows = items.map(item => [
+    item.item_url,
+    item.item_name,
+    String(item.item_price),
+    item.item_number,
+  ])
+
+  await client.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${RMS_ITEMS_SHEET_NAME}!A1`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [headers, ...rows],
+    },
+  })
+
+  console.log(`[RMS商品マスタ] ${items.length}件をシートに書き込み完了`)
+
+  // Invalidate review mapping cache since it may depend on this data
+  cachedReviewMapping = null
+  reviewMappingCacheTimestamp = 0
+}
+
+/**
+ * Read RMS items from the sheet and build a name → product_code map
+ */
+export async function fetchRmsItemsFromSheet(): Promise<RmsItemRow[]> {
+  const client = getSheetsClient()
+
+  try {
+    const res = await client.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${RMS_ITEMS_SHEET_NAME}`,
+    })
+
+    const rows = res.data.values
+    if (!rows || rows.length < 2) return []
+
+    const items: RmsItemRow[] = []
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] as string[]
+      items.push({
+        item_url: (row[0] || '').trim(),
+        item_name: (row[1] || '').trim(),
+        item_price: Number(row[2]) || 0,
+        item_number: (row[3] || '').trim(),
+      })
+    }
+    return items
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Build a product_name → product_code map from RMS items sheet
+ */
+export async function getRmsNameToCodeMap(): Promise<Map<string, string>> {
+  const items = await fetchRmsItemsFromSheet()
+  const map = new Map<string, string>()
+  for (const item of items) {
+    if (item.item_name && item.item_url) {
+      map.set(item.item_name, item.item_url)
+    }
+  }
+  return map
+}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import { fetchReviewCSVFromDrive } from '@/lib/google-drive'
-import { getReviewMappingMap } from '@/lib/google-sheets'
+import { getReviewMappingMap, getRmsNameToCodeMap, fetchRmsItemsFromSheet } from '@/lib/google-sheets'
 
 const PROJECT = 'tiast-data-platform'
 const DATASET = 'analytics_mart'
@@ -118,21 +118,49 @@ export async function POST(request: NextRequest) {
     const bq = getBigQueryClient()
     await ensureTableExists(bq)
 
-    // 2. Get mapping from Google Sheets (楽天商品番号 → 品番)
-    console.log('[レビューインポート] マッピングシート読み込み中...')
-    const itemMapping = await getReviewMappingMap()
-    console.log(`[レビューインポート] マッピング: ${itemMapping.size}件`)
+    // 2. Load all mapping sources in parallel
+    console.log('[レビューインポート] マッピング読み込み中...')
+    const [manualMapping, rmsNameMap, rmsItems] = await Promise.all([
+      getReviewMappingMap(),         // 手動マッピング: 楽天商品番号 → 品番
+      getRmsNameToCodeMap(),         // RMS商品名 → 品番（商品管理番号）
+      fetchRmsItemsFromSheet(),      // RMS商品一覧（itemNumber → item_url）
+    ])
 
-    // 3. Assign matched_product_code to each review via Rakuten item ID
+    // Build rakuten_item_number → product_code map from RMS data
+    const rmsItemNumberMap = new Map<string, string>()
+    for (const item of rmsItems) {
+      if (item.item_number && item.item_url) {
+        rmsItemNumberMap.set(item.item_number, item.item_url)
+      }
+    }
+
+    console.log(`[レビューインポート] マッピング: 手動=${manualMapping.size}, RMS商品番号=${rmsItemNumberMap.size}, RMS商品名=${rmsNameMap.size}`)
+
+    // 3. Assign matched_product_code (3-tier matching)
     const enrichedReviews = reviews.map(r => {
       const rakutenItemId = extractRakutenItemId(r.review_url)
       let matchedCode: string | null = null
+      let matchMethod: string | null = null
 
-      if (rakutenItemId && itemMapping.has(rakutenItemId)) {
-        matchedCode = itemMapping.get(rakutenItemId)!
+      // Tier 1: 手動マッピングシート（楽天商品番号 → 品番）
+      if (rakutenItemId && manualMapping.has(rakutenItemId)) {
+        matchedCode = manualMapping.get(rakutenItemId)!
+        matchMethod = 'manual'
       }
 
-      return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode }
+      // Tier 2: RMS itemNumber マッチ（楽天内部ID → 商品管理番号）
+      if (!matchedCode && rakutenItemId && rmsItemNumberMap.has(rakutenItemId)) {
+        matchedCode = rmsItemNumberMap.get(rakutenItemId)!
+        matchMethod = 'rms_item_number'
+      }
+
+      // Tier 3: 商品名マッチ（レビューの商品名 → RMS商品名 → 品番）
+      if (!matchedCode && r.product_name && rmsNameMap.has(r.product_name)) {
+        matchedCode = rmsNameMap.get(r.product_name)!
+        matchMethod = 'product_name'
+      }
+
+      return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode, match_method: matchMethod }
     })
 
     // 4. Clear existing data if mode is 'replace'
