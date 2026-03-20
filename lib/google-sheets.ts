@@ -482,6 +482,71 @@ export async function getReviewMappingMap(): Promise<Map<string, string>> {
 }
 
 /**
+ * Append new mappings to the レビューマッピング sheet (skip duplicates).
+ * Automatically creates the sheet + headers if it doesn't exist.
+ */
+export async function appendReviewMappings(
+  newMappings: ReviewMappingRow[],
+): Promise<number> {
+  if (newMappings.length === 0) return 0
+
+  const client = getSheetsClient()
+
+  // Fetch existing mappings to avoid duplicates
+  const existing = await fetchReviewMapping(true)
+  const existingSet = new Set(existing.map(r => r.rakuten_item_id))
+
+  const toAdd = newMappings.filter(m => !existingSet.has(m.rakuten_item_id))
+  if (toAdd.length === 0) return 0
+
+  // Ensure sheet exists with headers
+  if (existing.length === 0) {
+    try {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: { title: REVIEW_MAPPING_SHEET_NAME },
+            },
+          }],
+        },
+      })
+    } catch {
+      // Sheet already exists — ignore
+    }
+
+    // Write headers
+    await client.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${REVIEW_MAPPING_SHEET_NAME}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['楽天商品番号', '品番']],
+      },
+    })
+  }
+
+  // Append new rows
+  const rows = toAdd.map(m => [m.rakuten_item_id, m.product_code])
+  await client.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${REVIEW_MAPPING_SHEET_NAME}!A:B`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: rows,
+    },
+  })
+
+  // Invalidate cache
+  cachedReviewMapping = null
+  reviewMappingCacheTimestamp = 0
+
+  console.log(`[レビューマッピング] ${toAdd.length}件の新規マッピングを自動追加`)
+  return toAdd.length
+}
+
+/**
  * Build a map of product_name → product_code from the mapping sheet
  */
 export async function getProductNameMappingMap(): Promise<Map<string, string>> {
