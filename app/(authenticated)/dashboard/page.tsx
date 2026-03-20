@@ -232,7 +232,10 @@ function DashboardPageContent() {
 
         {/* ===== 常時表示: 売上 KPI ===== */}
         <div>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">売上サマリー</h2>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 rounded-full bg-gradient-to-b from-[#C4A882] to-[#A8896A]" />
+            <h2 className="text-[13px] font-semibold text-[#8A7D72] tracking-wide">売上サマリー</h2>
+          </div>
           {loading ? (
             <div className="grid grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
@@ -273,35 +276,36 @@ function DashboardPageContent() {
 
         {/* ===== 常時表示: 在庫アラート（コンパクト版） ===== */}
         {inventoryAlerts && (inventoryAlerts.overstock.count > 0 || inventoryAlerts.season_ending.count > 0 || inventoryAlerts.season_exceeded.count > 0) && (
-          <div className="flex gap-3">
+          <div className="flex items-center gap-2 p-3 bg-white/60 border border-black/[0.06] rounded-xl backdrop-blur-sm">
+            <span className="text-[12px] font-medium text-[#8A7D72] mr-1 shrink-0">在庫アラート</span>
             {inventoryAlerts.overstock.count > 0 && (
               <button
                 onClick={() => router.push('/inventory?alert=overstock')}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200/60 rounded-full hover:bg-red-100 hover:border-red-300 transition-all duration-200 group"
               >
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-sm font-medium text-red-700">過剰在庫 {inventoryAlerts.overstock.count}件</span>
-                <span className="text-xs text-red-500">{formatCurrency(inventoryAlerts.overstock.amount)}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 group-hover:bg-red-500 transition-colors" />
+                <span className="text-[12px] font-medium text-red-700">過剰在庫</span>
+                <span className="text-[11px] font-semibold text-red-500 tabular-nums">{inventoryAlerts.overstock.count}</span>
               </button>
             )}
             {inventoryAlerts.season_ending.count > 0 && (
               <button
                 onClick={() => router.push('/inventory?alert=season_ending')}
-                className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200/60 rounded-full hover:bg-amber-100 hover:border-amber-300 transition-all duration-200 group"
               >
-                <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                <span className="text-sm font-medium text-yellow-700">シーズン終了間近 {inventoryAlerts.season_ending.count}件</span>
-                <span className="text-xs text-yellow-600">{formatCurrency(inventoryAlerts.season_ending.amount)}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 group-hover:bg-amber-500 transition-colors" />
+                <span className="text-[12px] font-medium text-amber-700">シーズン終了間近</span>
+                <span className="text-[11px] font-semibold text-amber-600 tabular-nums">{inventoryAlerts.season_ending.count}</span>
               </button>
             )}
             {inventoryAlerts.season_exceeded.count > 0 && (
               <button
                 onClick={() => router.push('/inventory?alert=season_exceeded')}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200/60 rounded-full hover:bg-red-100 hover:border-red-300 transition-all duration-200 group"
               >
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-sm font-medium text-red-700">シーズン超過 {inventoryAlerts.season_exceeded.count}件</span>
-                <span className="text-xs text-red-500">{formatCurrency(inventoryAlerts.season_exceeded.amount)}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 group-hover:bg-red-500 transition-colors" />
+                <span className="text-[12px] font-medium text-red-700">シーズン超過</span>
+                <span className="text-[11px] font-semibold text-red-500 tabular-nums">{inventoryAlerts.season_exceeded.count}</span>
               </button>
             )}
           </div>
@@ -396,7 +400,7 @@ function DashboardPageContent() {
                 {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : customerSummary ? (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-5">
                 <KPICard
                   title="新規顧客数"
                   value={`${formatNumber(customerSummary.new_customers)}人`}
