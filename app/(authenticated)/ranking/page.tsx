@@ -741,7 +741,7 @@ export default function RankingPage() {
                             </div>
                             <div>
                               <div className="text-[10px] text-gray-400">初回ランクイン</div>
-                              <div className="text-sm font-medium text-gray-600">{formatDateTime(product.first_ranked_at)}</div>
+                              <div className="text-sm font-medium text-gray-600">{formatDate(product.first_ranked_at)}</div>
                             </div>
                           </div>
 
@@ -844,6 +844,13 @@ export default function RankingPage() {
                                           {sales.gross_profit_rate != null ? `${(sales.gross_profit_rate * 100).toFixed(1)}%` : '-'}
                                         </div>
                                       </div>
+                                      <div className="bg-white rounded-lg px-3 py-2 border border-gray-100">
+                                        <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                          <Calendar className="w-3 h-3" />
+                                          販売開始日
+                                        </div>
+                                        <div className="text-sm font-bold text-gray-800">{sales.sales_start_date ? formatDate(sales.sales_start_date) : '-'}</div>
+                                      </div>
                                     </>
                                   ) : salesDataMap[product.matched_product_code] === null ? (
                                     <div className="col-span-3 bg-white rounded-lg px-3 py-2 border border-gray-100 text-xs text-gray-400 flex items-center justify-center">
@@ -874,7 +881,7 @@ export default function RankingPage() {
                                         <td className="px-4 py-2 text-gray-600">
                                           <div className="flex items-center gap-1.5">
                                             <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                                            {formatDateTime(h.date)}
+                                            {formatDate(h.date)}
                                           </div>
                                         </td>
                                         <td className="px-4 py-2 text-gray-500 text-xs">{h.genre_id ? getGenreLabel(h.genre_id) : '-'}</td>
