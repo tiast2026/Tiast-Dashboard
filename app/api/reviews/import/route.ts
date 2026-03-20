@@ -53,23 +53,19 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
 
 /**
  * POST /api/reviews/import
- * Body: { fileId?: string, fileName?: string, folderId?: string, mode?: 'replace' | 'append' }
+ * Body: { fileId?, fileName?, folderId?, mode: 'replace' | 'append' | 'scan' }
  *
- * Reads review CSV from Google Drive and imports to BigQuery.
- * Matches reviews to products via Google Sheets mapping (楽天商品番号 → 品番).
+ * mode='scan': CSVから楽天商品番号と商品名を抽出して返す（インポートしない）
+ * mode='replace'/'append': BigQueryにインポート
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!isBigQueryConfigured()) {
-      return NextResponse.json({ error: 'BigQuery未設定' }, { status: 500 })
-    }
-
     const body = await request.json().catch(() => ({}))
     const { fileId, fileName, folderId, mode = 'replace' } = body as {
       fileId?: string
       fileName?: string
       folderId?: string
-      mode?: 'replace' | 'append'
+      mode?: 'replace' | 'append' | 'scan'
     }
 
     // 1. Read CSV from Google Drive
@@ -78,6 +74,45 @@ export async function POST(request: NextRequest) {
 
     if (reviews.length === 0) {
       return NextResponse.json({ error: 'レビューデータが見つかりません', imported: 0 })
+    }
+
+    // --- scan mode: extract unique Rakuten item IDs with product names ---
+    if (mode === 'scan') {
+      const itemMap = new Map<string, { product_names: Set<string>; count: number }>()
+      for (const r of reviews) {
+        const itemId = extractRakutenItemId(r.review_url)
+        if (!itemId) continue
+        const entry = itemMap.get(itemId) || { product_names: new Set(), count: 0 }
+        if (r.product_name) entry.product_names.add(r.product_name)
+        entry.count++
+        itemMap.set(itemId, entry)
+      }
+
+      // Check which are already mapped
+      let existingMapping = new Map<string, string>()
+      try {
+        existingMapping = await getReviewMappingMap()
+      } catch { /* ignore if sheet doesn't exist */ }
+
+      const items = Array.from(itemMap.entries()).map(([id, info]) => ({
+        rakuten_item_id: id,
+        product_names: Array.from(info.product_names),
+        review_count: info.count,
+        mapped_product_code: existingMapping.get(id) || null,
+      }))
+
+      return NextResponse.json({
+        total_reviews: reviews.length,
+        product_reviews: reviews.filter(r => r.review_type === '商品レビュー').length,
+        shop_reviews: reviews.filter(r => r.review_type === 'ショップレビュー').length,
+        items,
+        unmapped: items.filter(i => !i.mapped_product_code).length,
+      })
+    }
+
+    // --- import mode ---
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json({ error: 'BigQuery未設定' }, { status: 500 })
     }
 
     const bq = getBigQueryClient()
