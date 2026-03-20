@@ -4,7 +4,7 @@
 -- Dataset: analytics_mart
 --
 -- Google Drive上のCSVからインポートしたレビューデータ
--- 注文番号でNE受注データとマッチングし商品コードを紐付け
+-- Google Sheets「レビューマッピング」シートで楽天商品番号→品番を紐付け
 -- ============================================================
 
 -- レビュー生データテーブル
@@ -19,8 +19,9 @@ CREATE TABLE IF NOT EXISTS `tiast-data-platform.analytics_mart.rakuten_reviews` 
   flag                INT64,        -- フラグ (0 or 1)
   order_number        STRING,       -- 注文番号
   unhandled_flag      INT64,        -- 未対応フラグ (0 or 1)
-  -- マッチング結果
-  matched_product_code STRING,      -- マッチした自社品番
+  -- マッチング用
+  rakuten_item_id     STRING,       -- 楽天商品番号（URLから抽出: 例 10002317）
+  matched_product_code STRING,      -- マッチした自社品番（マッピングシート経由）
   _imported_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 )
 CLUSTER BY matched_product_code, review_type

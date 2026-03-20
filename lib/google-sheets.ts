@@ -396,3 +396,87 @@ export function invalidateSheetCache(): void {
   cachedRawHeaders = null
   cacheTimestamp = 0
 }
+
+// ============================================================
+// レビューマッピングシート（楽天商品番号 → 品番）
+// ============================================================
+
+const REVIEW_MAPPING_SHEET_NAME = 'レビューマッピング'
+
+export interface ReviewMappingRow {
+  rakuten_item_id: string   // 楽天商品番号 (例: 10002114)
+  product_code: string      // 品番 (例: nltp506-2602)
+}
+
+let cachedReviewMapping: ReviewMappingRow[] | null = null
+let reviewMappingCacheTimestamp = 0
+
+/**
+ * Fetch review mapping data from the レビューマッピング sheet.
+ * Expected columns: 楽天商品番号, 品番
+ */
+export async function fetchReviewMapping(forceRefresh = false): Promise<ReviewMappingRow[]> {
+  if (!forceRefresh && cachedReviewMapping && Date.now() - reviewMappingCacheTimestamp < CACHE_TTL_MS) {
+    return cachedReviewMapping
+  }
+
+  const client = getSheetsClient()
+
+  try {
+    const res = await client.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${REVIEW_MAPPING_SHEET_NAME}`,
+    })
+
+    const rows = res.data.values
+    if (!rows || rows.length < 2) {
+      cachedReviewMapping = []
+      reviewMappingCacheTimestamp = Date.now()
+      return []
+    }
+
+    // First row = headers, find column indices
+    const headers = (rows[0] as string[]).map(h => h.trim())
+    const itemIdIdx = headers.findIndex(h => h === '楽天商品番号' || h === 'rakuten_item_id')
+    const codeIdx = headers.findIndex(h => h === '品番' || h === 'product_code')
+
+    if (itemIdIdx === -1 || codeIdx === -1) {
+      console.warn('[レビューマッピング] ヘッダーが見つかりません。「楽天商品番号」「品番」列が必要です')
+      cachedReviewMapping = []
+      reviewMappingCacheTimestamp = Date.now()
+      return []
+    }
+
+    const items: ReviewMappingRow[] = []
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] as string[]
+      const rakutenItemId = (row[itemIdIdx] || '').trim()
+      const productCode = (row[codeIdx] || '').trim()
+      if (rakutenItemId && productCode) {
+        items.push({ rakuten_item_id: rakutenItemId, product_code: productCode })
+      }
+    }
+
+    cachedReviewMapping = items
+    reviewMappingCacheTimestamp = Date.now()
+    console.log(`[レビューマッピング] ${items.length}件のマッピング読み込み完了`)
+    return items
+  } catch (error) {
+    console.warn('[レビューマッピング] シート読み込みエラー:', error)
+    cachedReviewMapping = []
+    reviewMappingCacheTimestamp = Date.now()
+    return []
+  }
+}
+
+/**
+ * Build a map of rakuten_item_id → product_code
+ */
+export async function getReviewMappingMap(): Promise<Map<string, string>> {
+  const data = await fetchReviewMapping()
+  const map = new Map<string, string>()
+  for (const row of data) {
+    map.set(row.rakuten_item_id, row.product_code)
+  }
+  return map
+}
