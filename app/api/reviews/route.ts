@@ -19,6 +19,26 @@ function escapeSQL(v: string): string {
   return v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
 
+/**
+ * Extract the core product keyword from a goods_name like:
+ * "ドットニットカーディガン ミント×ブラック F(M)フリー" → "ドットニットカーディガン"
+ * Strips color/size suffixes and takes the first meaningful word.
+ */
+function extractProductKeyword(name: string): string {
+  // Remove common size patterns: F(M)フリー, Mサイズ, etc.
+  let cleaned = name
+    .replace(/\s+[A-Z]+\([A-Z]+\)\S*/g, '') // F(M)フリー
+    .replace(/\s+[SMLXF]+サイズ/g, '')
+    .replace(/\s+フリーサイズ/g, '')
+    .replace(/\s+フリー$/g, '')
+    .trim()
+
+  // Take first token (the product name before color/size)
+  const parts = cleaned.split(/\s+/)
+  // Return the first part which is typically the product type name
+  return parts[0] || name
+}
+
 const REVIEW_COLUMNS = `
   review_type, product_name, review_url, rating, posted_at,
   title, review_body, flag, order_number, unhandled_flag, matched_product_code
@@ -61,10 +81,11 @@ export async function GET(request: NextRequest) {
     `)
 
     // Fallback: if product_code returned no results and product_name is available,
-    // search by product_name
+    // search by product_name keyword (partial match)
     if (reviews.length === 0 && productName) {
-      const escaped = escapeSQL(productName)
-      productFilter = `AND product_name = '${escaped}'`
+      const keyword = extractProductKeyword(productName)
+      const escaped = escapeSQL(keyword)
+      productFilter = `AND product_name LIKE '%${escaped}%'`
 
       reviews = await runQuery<ReviewRecord>(`
         SELECT ${REVIEW_COLUMNS}
