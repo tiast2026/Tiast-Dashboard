@@ -9,11 +9,14 @@ function getDriveClient(): drive_v3.Drive {
   const credentials = JSON.parse(credJson)
   const authClient = new gauth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+    scopes: ['https://www.googleapis.com/auth/drive'],
   })
 
   return drive({ version: 'v3', auth: authClient })
 }
+
+/** Default folder for review CSVs */
+export const REVIEW_CSV_FOLDER_ID = process.env.REVIEW_CSV_FOLDER_ID || '1B4QMfyfgoh7I3D5n2pGLBNFSSmHudmEk'
 
 export interface ReviewRow {
   review_type: string
@@ -243,4 +246,89 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
     name: f.name!,
     modifiedTime: f.modifiedTime!,
   }))
+}
+
+/**
+ * Find all "reviews*" CSV files in the specified folder,
+ * read and merge all reviews, then return file IDs for deletion.
+ */
+export async function fetchAllReviewCSVsFromFolder(
+  folderId: string = REVIEW_CSV_FOLDER_ID,
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[] }> {
+  const client = getDriveClient()
+
+  const queryParts: string[] = [
+    "(mimeType='text/csv' or mimeType='text/tab-separated-values')",
+    "trashed=false",
+    `name contains 'reviews'`,
+    `'${folderId}' in parents`,
+  ]
+
+  const res = await client.files.list({
+    q: queryParts.join(' and '),
+    fields: 'files(id, name, mimeType, modifiedTime)',
+    orderBy: 'modifiedTime desc',
+    pageSize: 50,
+  })
+
+  const files = res.data.files || []
+  if (files.length === 0) {
+    return { reviews: [], fileIds: [] }
+  }
+
+  console.log(`[レビュー] ${files.length}件のreviews CSVファイルを発見`)
+
+  const allReviews: ReviewRow[] = []
+  const fileIds: { id: string; name: string }[] = []
+
+  for (const file of files) {
+    if (!file.id || !file.name) continue
+    // Only process files whose name starts with "reviews" (case-insensitive)
+    if (!file.name.toLowerCase().startsWith('reviews')) continue
+
+    console.log(`[レビュー] 読み込み中: ${file.name}`)
+    try {
+      const dlRes = await client.files.get(
+        { fileId: file.id, alt: 'media' },
+        { responseType: 'text' },
+      )
+      const content = dlRes.data as string
+      const rows = parseReviewCSV(content)
+      console.log(`[レビュー] ${file.name}: ${rows.length}件`)
+      allReviews.push(...rows)
+      fileIds.push({ id: file.id, name: file.name })
+    } catch (e) {
+      console.warn(`[レビュー] ${file.name} 読み込みエラー:`, e)
+    }
+  }
+
+  console.log(`[レビュー] 合計 ${allReviews.length}件のレビュー（${fileIds.length}ファイル）`)
+  return { reviews: allReviews, fileIds }
+}
+
+/**
+ * Delete a file from Google Drive
+ */
+export async function deleteDriveFile(fileId: string): Promise<void> {
+  const client = getDriveClient()
+  await client.files.delete({ fileId })
+}
+
+/**
+ * Delete multiple files from Google Drive
+ */
+export async function deleteDriveFiles(fileIds: string[]): Promise<{ deleted: number; errors: string[] }> {
+  let deleted = 0
+  const errors: string[] = []
+
+  for (const id of fileIds) {
+    try {
+      await deleteDriveFile(id)
+      deleted++
+    } catch (e) {
+      errors.push(`${id}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return { deleted, errors }
 }

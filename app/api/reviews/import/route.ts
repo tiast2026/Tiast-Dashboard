@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
-import { fetchReviewCSVFromDrive } from '@/lib/google-drive'
+import {
+  fetchAllReviewCSVsFromFolder,
+  deleteDriveFiles,
+  REVIEW_CSV_FOLDER_ID,
+} from '@/lib/google-drive'
 import { getReviewMappingMap } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
 
@@ -9,14 +13,9 @@ const DATASET = 'analytics_mart'
 const TABLE = 'rakuten_reviews'
 
 function sqlStr(v: string): string {
-  return `'${v.replace(/'/g, "\\'").replace(/\\/g, '\\\\')}'`
+  return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
-/**
- * Extract the Rakuten item number from a review URL.
- * Example: "https://review.rakuten.co.jp/item/1/338335_10002317/..." → "10002317"
- * Shop reviews: "https://review.rakuten.co.jp/shop/4/338335_338335/..." → null
- */
 function extractRakutenItemId(reviewUrl: string): string | null {
   if (!reviewUrl) return null
   const match = reviewUrl.match(/review\.rakuten\.co\.jp\/item\/\d+\/\d+_(\d+)\//)
@@ -52,114 +51,136 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
 }
 
 /**
+ * Get all existing review_urls from BigQuery to detect duplicates.
+ */
+async function getExistingReviewUrls(
+  bq: ReturnType<typeof getBigQueryClient>,
+): Promise<Set<string>> {
+  try {
+    const [rows] = await bq.query({
+      query: `SELECT DISTINCT review_url FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE review_url IS NOT NULL`,
+      location: 'asia-northeast1',
+    })
+    const set = new Set<string>()
+    for (const row of rows as { review_url: string }[]) {
+      if (row.review_url) set.add(row.review_url)
+    }
+    return set
+  } catch {
+    // Table might not exist yet
+    return new Set()
+  }
+}
+
+/**
  * POST /api/reviews/import
- * Body: { fileId?, fileName?, folderId?, mode: 'replace' | 'append' | 'scan' }
  *
- * mode='scan':   CSVの楽天商品番号一覧 + スクレイピングで品番を取得して返す
- * mode='replace'/'append': BigQueryにインポート（スクレイピングで品番マッチング）
+ * Reads all "reviews*" CSV files from Google Drive folder,
+ * imports new reviews (skipping duplicates), scrapes product codes,
+ * and deletes the CSV files after successful import.
+ *
+ * Body: { folderId?: string, dryRun?: boolean }
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}))
-    const { fileId, fileName, folderId, mode = 'replace' } = body as {
-      fileId?: string
-      fileName?: string
-      folderId?: string
-      mode?: 'replace' | 'append' | 'scan'
+    if (!isBigQueryConfigured()) {
+      return NextResponse.json({ error: 'BigQuery未設定' }, { status: 500 })
     }
 
-    // 1. Read CSV from Google Drive
-    console.log('[レビューインポート] Google DriveからCSV取得中...')
-    const reviews = await fetchReviewCSVFromDrive(fileId, fileName || 'レビュー', folderId)
+    const body = await request.json().catch(() => ({}))
+    const { folderId = REVIEW_CSV_FOLDER_ID, dryRun = false } = body as {
+      folderId?: string
+      dryRun?: boolean
+    }
+
+    // 1. Fetch all "reviews*" CSVs from the Drive folder
+    console.log(`[レビューインポート] Google Driveフォルダからreviews CSVを取得中...`)
+    const { reviews, fileIds } = await fetchAllReviewCSVsFromFolder(folderId)
 
     if (reviews.length === 0) {
-      return NextResponse.json({ error: 'レビューデータが見つかりません', imported: 0 })
+      return NextResponse.json({
+        success: true,
+        message: 'reviews CSVファイルが見つかりません',
+        imported: 0,
+        skipped_duplicates: 0,
+        files_found: 0,
+      })
     }
 
-    // Collect product review URLs for scraping
-    const productReviewUrls = reviews
+    console.log(`[レビューインポート] ${reviews.length}件のレビュー（${fileIds.length}ファイル）`)
+
+    const bq = getBigQueryClient()
+    await ensureTableExists(bq)
+
+    // 2. Get existing review URLs to skip duplicates
+    console.log('[レビューインポート] 既存レビューURL取得中（重複チェック用）...')
+    const existingUrls = await getExistingReviewUrls(bq)
+    console.log(`[レビューインポート] 既存レビュー: ${existingUrls.size}件`)
+
+    // 3. Filter out duplicates
+    const newReviews = reviews.filter(r => !r.review_url || !existingUrls.has(r.review_url))
+    const skipped = reviews.length - newReviews.length
+    console.log(`[レビューインポート] 新規: ${newReviews.length}件, 重複スキップ: ${skipped}件`)
+
+    if (newReviews.length === 0) {
+      // No new reviews, but still delete the files
+      if (!dryRun && fileIds.length > 0) {
+        console.log(`[レビューインポート] 新規レビューなし。CSVファイルを削除中...`)
+        const delResult = await deleteDriveFiles(fileIds.map(f => f.id))
+        console.log(`[レビューインポート] ${delResult.deleted}ファイル削除完了`)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: '新規レビューはありません（全て取り込み済み）',
+        imported: 0,
+        skipped_duplicates: skipped,
+        files_found: fileIds.length,
+        files_deleted: dryRun ? 0 : fileIds.length,
+      })
+    }
+
+    // 4. Scrape product codes from review pages
+    const productReviewUrls = newReviews
       .map(r => r.review_url)
       .filter(url => url && url.includes('review.rakuten.co.jp/item/'))
 
-    // Load existing manual mapping (as fallback / cache)
     let manualMapping = new Map<string, string>()
     try {
       manualMapping = await getReviewMappingMap()
     } catch { /* ignore */ }
 
-    // --- scan mode ---
-    if (mode === 'scan') {
-      // Scrape product codes from review pages
-      console.log('[スキャン] レビューページから品番をスクレイピング中...')
-      const scrapedMapping = await batchScrapeProductCodes(productReviewUrls, manualMapping)
-
-      const itemMap = new Map<string, { product_names: Set<string>; count: number }>()
-      for (const r of reviews) {
-        const itemId = extractRakutenItemId(r.review_url)
-        if (!itemId) continue
-        const entry = itemMap.get(itemId) || { product_names: new Set(), count: 0 }
-        if (r.product_name) entry.product_names.add(r.product_name)
-        entry.count++
-        itemMap.set(itemId, entry)
-      }
-
-      const items = Array.from(itemMap.entries()).map(([id, info]) => ({
-        rakuten_item_id: id,
-        product_names: Array.from(info.product_names),
-        review_count: info.count,
-        matched_product_code: scrapedMapping.get(id) || manualMapping.get(id) || null,
-        match_source: scrapedMapping.has(id) ? 'scrape' : manualMapping.has(id) ? 'manual' : null,
-      }))
-
-      return NextResponse.json({
-        total_reviews: reviews.length,
-        product_reviews: reviews.filter(r => r.review_type === '商品レビュー').length,
-        shop_reviews: reviews.filter(r => r.review_type === 'ショップレビュー').length,
-        items,
-        mapped: items.filter(i => i.matched_product_code).length,
-        unmapped: items.filter(i => !i.matched_product_code).length,
-      })
-    }
-
-    // --- import mode ---
-    if (!isBigQueryConfigured()) {
-      return NextResponse.json({ error: 'BigQuery未設定' }, { status: 500 })
-    }
-
-    const bq = getBigQueryClient()
-    await ensureTableExists(bq)
-
-    // 2. Scrape product codes from review pages (main matching method)
     console.log('[レビューインポート] レビューページから品番をスクレイピング中...')
     const scrapedMapping = await batchScrapeProductCodes(productReviewUrls, manualMapping)
     console.log(`[レビューインポート] スクレイピング結果: ${scrapedMapping.size}件マッチ`)
 
-    // 3. Assign matched_product_code
-    const enrichedReviews = reviews.map(r => {
+    // 5. Enrich reviews with product codes
+    const enrichedReviews = newReviews.map(r => {
       const rakutenItemId = extractRakutenItemId(r.review_url)
       let matchedCode: string | null = null
 
-      // Priority 1: スクレイピング結果（レビューページ→商品URL→品番）
       if (rakutenItemId && scrapedMapping.has(rakutenItemId)) {
         matchedCode = scrapedMapping.get(rakutenItemId)!
-      }
-
-      // Priority 2: 手動マッピングシート（フォールバック）
-      if (!matchedCode && rakutenItemId && manualMapping.has(rakutenItemId)) {
+      } else if (rakutenItemId && manualMapping.has(rakutenItemId)) {
         matchedCode = manualMapping.get(rakutenItemId)!
       }
 
       return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matchedCode }
     })
 
-    // 4. Clear existing data if mode is 'replace'
-    if (mode === 'replace') {
-      const deleteQuery = `DELETE FROM \`${PROJECT}.${DATASET}.${TABLE}\` WHERE TRUE`
-      await bq.query({ query: deleteQuery, location: 'asia-northeast1' })
-      console.log('[レビューインポート] 既存データをクリア')
+    if (dryRun) {
+      const matched = enrichedReviews.filter(r => r.matched_product_code).length
+      return NextResponse.json({
+        success: true,
+        dry_run: true,
+        would_import: enrichedReviews.length,
+        would_match: matched,
+        skipped_duplicates: skipped,
+        files_found: fileIds.map(f => f.name),
+      })
     }
 
-    // 5. Insert reviews in batches
+    // 6. Insert new reviews into BigQuery
     const batchSize = 50
     let inserted = 0
     for (let i = 0; i < enrichedReviews.length; i += batchSize) {
@@ -183,21 +204,29 @@ export async function POST(request: NextRequest) {
       inserted += batch.length
     }
 
+    // 7. Delete CSV files from Drive
+    console.log(`[レビューインポート] CSVファイルを削除中...`)
+    const delResult = await deleteDriveFiles(fileIds.map(f => f.id))
+    console.log(`[レビューインポート] ${delResult.deleted}ファイル削除完了`)
+    if (delResult.errors.length > 0) {
+      console.warn(`[レビューインポート] 削除エラー:`, delResult.errors)
+    }
+
     const matched = enrichedReviews.filter(r => r.matched_product_code).length
-    const unmatched = enrichedReviews.filter(r => r.rakuten_item_id && !r.matched_product_code)
-    const unmatchedItemIds = Array.from(new Set(unmatched.map(r => r.rakuten_item_id!)))
     const productReviews = enrichedReviews.filter(r => r.review_type === '商品レビュー').length
     const shopReviews = enrichedReviews.filter(r => r.review_type === 'ショップレビュー').length
 
-    console.log(`[レビューインポート] 完了: ${inserted}件 (商品: ${productReviews}, ショップ: ${shopReviews}, マッチ: ${matched})`)
+    console.log(`[レビューインポート] 完了: ${inserted}件新規インポート (商品: ${productReviews}, ショップ: ${shopReviews}, マッチ: ${matched}, 重複スキップ: ${skipped})`)
 
     return NextResponse.json({
       success: true,
       imported: inserted,
       matched,
+      skipped_duplicates: skipped,
       product_reviews: productReviews,
       shop_reviews: shopReviews,
-      unmatched_item_ids: unmatchedItemIds,
+      files_processed: fileIds.map(f => f.name),
+      files_deleted: delResult.deleted,
     })
   } catch (error) {
     console.error('[レビューインポート] エラー:', error)
