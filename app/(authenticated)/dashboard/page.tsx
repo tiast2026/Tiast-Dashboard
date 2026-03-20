@@ -6,7 +6,6 @@ import Header from '@/components/layout/Header'
 import { getBrandDisplayName, BRAND_COLORS, CHANNEL_GROUP_COLORS } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
 import KPICard from '@/components/cards/KPICard'
-import AlertCard from '@/components/cards/AlertCard'
 import {
   LazyDailySalesChart as DailySalesChart,
   LazyBarChart as BarChart,
