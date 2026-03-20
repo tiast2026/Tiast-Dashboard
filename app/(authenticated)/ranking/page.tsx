@@ -101,28 +101,34 @@ function groupByProduct(records: RankingRecord[]): ProductRankingSummary[] {
     }
     const entry = map.get(key)!
     const fetchedAt = toDateStr(r.fetched_at)
-    entry.history.push({
-      date: fetchedAt,
-      rank: r.rank,
-    })
+    // 同一日付は最高順位のみ保持（ranking_type違いや複数回取得の重複を排除）
+    const dateKey = fetchedAt.slice(0, 10) // YYYY-MM-DD
+    const existingForDate = entry.history.find(h => h.date.slice(0, 10) === dateKey)
+    if (existingForDate) {
+      if (r.rank < existingForDate.rank) {
+        existingForDate.rank = r.rank
+      }
+    } else {
+      entry.history.push({
+        date: fetchedAt,
+        rank: r.rank,
+      })
+    }
     if (r.rank < entry.best_rank) {
       entry.best_rank = r.rank
     }
     if (fetchedAt > entry.latest_fetched_at) {
-      entry.latest_rank = r.rank
       entry.latest_fetched_at = fetchedAt
-      entry.item_name = r.item_name
-      entry.image_url = r.image_url
-      entry.item_url = r.item_url
     }
   }
 
-  // rank_count と first_ranked_at を履歴から算出
+  // latest_rank, rank_count, first_ranked_at を重複排除後の履歴から算出
   for (const entry of map.values()) {
+    entry.history.sort((a, b) => b.date.localeCompare(a.date)) // 新しい順
     entry.rank_count = entry.history.length
     if (entry.history.length > 0) {
-      const oldest = entry.history.reduce((a, b) => (a.date < b.date ? a : b))
-      entry.first_ranked_at = oldest.date
+      entry.latest_rank = entry.history[0].rank
+      entry.first_ranked_at = entry.history[entry.history.length - 1].date
     }
   }
 
