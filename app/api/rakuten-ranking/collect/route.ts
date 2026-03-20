@@ -8,11 +8,16 @@ import {
 } from '@/lib/rakuten-ranking'
 import type { RankingCollectResult } from '@/types/ranking'
 
+// Vercel Pro: 最大300秒、Hobby: 最大60秒
+export const maxDuration = 300
+
 /**
  * 楽天ランキング取得 & BigQuery保存
  *
  * GET /api/rakuten-ranking/collect
  *   ?genre=all (default) | 100371 | 110729 | ...
+ *   &batch=0 (default) — バッチ番号（genre=all時、ジャンルを分割取得）
+ *   &batch_size=10 (default) — 1バッチあたりのジャンル数
  *
  * genre=all の場合、全サブジャンルを順次取得
  * Vercel Cron または手動実行で呼ばれる
@@ -39,13 +44,31 @@ export async function GET(request: NextRequest) {
     }
 
     // 取得対象ジャンルを決定
-    const targetGenres = genreParam === 'all'
+    const allTargetGenres = genreParam === 'all'
       ? RAKUTEN_GENRES
       : RAKUTEN_GENRES.filter((g) => g.id === genreParam)
 
-    if (targetGenres.length === 0) {
+    if (allTargetGenres.length === 0) {
       return NextResponse.json({ error: `不明なジャンルID: ${genreParam}` }, { status: 400 })
     }
+
+    // バッチ分割: genre=all 時にジャンルを分割して取得
+    const batchIndex = parseInt(sp.get('batch') || '0', 10)
+    const batchSize = parseInt(sp.get('batch_size') || '10', 10)
+    const start = batchIndex * batchSize
+    const targetGenres = genreParam === 'all'
+      ? allTargetGenres.slice(start, start + batchSize)
+      : allTargetGenres
+
+    if (targetGenres.length === 0) {
+      return NextResponse.json({
+        message: 'このバッチには処理対象のジャンルがありません',
+        batch: batchIndex,
+        total_genres: allTargetGenres.length,
+      })
+    }
+
+    const totalBatches = genreParam === 'all' ? Math.ceil(allTargetGenres.length / batchSize) : 1
 
     // 自社商品マスタの品番リスト取得（1回だけ）
     const masterCodes = await fetchMasterProductCodes()
@@ -130,10 +153,30 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(
-      `[楽天ランキング] 全体: ${targetGenres.length}ジャンル、${totalItems}件取得、自社商品${totalOwn}件`
+      `[楽天ランキング] バッチ${batchIndex + 1}/${totalBatches}: ${targetGenres.length}ジャンル、${totalItems}件取得、自社商品${totalOwn}件`
     )
 
-    return NextResponse.json({ ...result, genre_results: genreResults, skipped_genres: skippedGenres })
+    // 次のバッチがある場合、自動チェーン呼び出し
+    const nextBatch = batchIndex + 1
+    const hasMore = genreParam === 'all' && nextBatch < totalBatches
+    if (hasMore) {
+      const baseUrl = request.nextUrl.clone()
+      baseUrl.searchParams.set('batch', String(nextBatch))
+      baseUrl.searchParams.set('batch_size', String(batchSize))
+      // fire-and-forget で次バッチを開始（待たずにレスポンスを返す）
+      fetch(baseUrl.toString(), {
+        headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
+      }).catch((err) => console.error(`[楽天ランキング] 次バッチ(${nextBatch})の呼び出しに失敗:`, err))
+    }
+
+    return NextResponse.json({
+      ...result,
+      genre_results: genreResults,
+      skipped_genres: skippedGenres,
+      batch: batchIndex,
+      total_batches: totalBatches,
+      has_more: hasMore,
+    })
   } catch (e) {
     console.error('楽天ランキング取得エラー:', e)
     const message = e instanceof Error ? e.message : 'ランキング取得に失敗しました'
