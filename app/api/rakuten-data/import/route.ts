@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
-import { fetchRakutenDataCSVsFromDrive, deleteDriveFiles } from '@/lib/google-drive'
+import { fetchRakutenDataCSVsFromDrive, moveDriveFilesToImported } from '@/lib/google-drive'
 import { parseRakutenCSV, getDataTypeLabel, type RakutenDataType } from '@/lib/rakuten-csv-parser'
 
 export const maxDuration = 300
@@ -307,23 +307,23 @@ async function runImport(): Promise<{
   success: boolean
   files: ImportFileResult[]
   totalInserted: number
-  filesDeleted: number
+  filesMoved: number
   error?: string
 }> {
   if (!isBigQueryConfigured()) {
-    return { success: false, files: [], totalInserted: 0, filesDeleted: 0, error: 'BigQuery未設定' }
+    return { success: false, files: [], totalInserted: 0, filesMoved: 0, error: 'BigQuery未設定' }
   }
 
   const { files: driveFiles } = await fetchRakutenDataCSVsFromDrive()
 
   if (driveFiles.length === 0) {
-    return { success: true, files: [], totalInserted: 0, filesDeleted: 0, error: '楽天データCSVファイルが見つかりません' }
+    return { success: true, files: [], totalInserted: 0, filesMoved: 0, error: '楽天データCSVファイルが見つかりません' }
   }
 
   console.log(`[楽天データ] ${driveFiles.length}ファイル検出`)
   const bq = getBigQueryClient()
   const results: ImportFileResult[] = []
-  const fileIdsToDelete: string[] = []
+  const filesToMove: { id: string; name: string; parentFolderId: string }[] = []
 
   for (const { entry, content } of driveFiles) {
     try {
@@ -361,7 +361,7 @@ async function runImport(): Promise<{
         rowCount: parsed.rowCount,
         inserted,
       })
-      fileIdsToDelete.push(entry.id)
+      filesToMove.push({ id: entry.id, name: entry.name, parentFolderId: entry.parentFolderId })
     } catch (e) {
       console.error(`[楽天データ] ${entry.name} エラー:`, e)
       results.push({
@@ -376,18 +376,21 @@ async function runImport(): Promise<{
     }
   }
 
-  // 処理完了したファイルをDriveから削除
-  let filesDeleted = 0
-  if (fileIdsToDelete.length > 0) {
-    const delResult = await deleteDriveFiles(fileIdsToDelete)
-    filesDeleted = delResult.deleted
-    console.log(`[楽天データ] ${filesDeleted}ファイル削除完了`)
+  // 処理完了したファイルをimportedフォルダへ移動
+  let filesMoved = 0
+  if (filesToMove.length > 0) {
+    const moveResult = await moveDriveFilesToImported(filesToMove)
+    filesMoved = moveResult.moved
+    console.log(`[楽天データ] ${filesMoved}ファイル移動完了`)
+    if (moveResult.errors.length > 0) {
+      console.warn(`[楽天データ] 移動エラー:`, moveResult.errors)
+    }
   }
 
   const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0)
-  console.log(`[楽天データ] 完了: ${totalInserted}件インポート, ${filesDeleted}ファイル削除`)
+  console.log(`[楽天データ] 完了: ${totalInserted}件インポート, ${filesMoved}ファイル移動`)
 
-  return { success: true, files: results, totalInserted, filesDeleted }
+  return { success: true, files: results, totalInserted, filesMoved }
 }
 
 // ---------- ハンドラ ----------
