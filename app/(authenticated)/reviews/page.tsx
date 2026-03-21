@@ -130,14 +130,15 @@ function ReviewsContent() {
     setRematchLoading(false)
   }
 
-  const handleImport = async () => {
+  const handleImport = async (reprocess = false) => {
+    if (reprocess && !confirm('既存レビューを全削除して再取り込みします。よろしいですか？')) return
     setImportLoading(true)
     setImportResult(null)
     try {
       const res = await fetch('/api/reviews/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: false }),
+        body: JSON.stringify({ dry_run: false, reprocess }),
       })
       const text = await res.text()
       try {
@@ -181,12 +182,20 @@ function ReviewsContent() {
           </span>
         )}
         <button
-          onClick={handleImport}
+          onClick={() => handleImport(false)}
           disabled={importLoading}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
         >
           <Download className="w-3.5 h-3.5" />
           {importLoading ? '処理中...' : 'インポート'}
+        </button>
+        <button
+          onClick={() => handleImport(true)}
+          disabled={importLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-orange-300 text-orange-600 rounded-md hover:bg-orange-50 transition disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${importLoading ? 'animate-spin' : ''}`} />
+          再取り込み
         </button>
         <button
           onClick={handleRematch}
