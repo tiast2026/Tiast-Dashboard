@@ -190,7 +190,7 @@ async function runImport(dryRun = false, reprocess = false) {
 
   // 3.5 Scrape product codes for reviews that have no matched_product_code
   const unmatchedUrls = enrichedReviews
-    .filter(r => !r.matched_product_code && r.rakuten_item_id)
+    .filter(r => !r.matched_product_code && r.rakuten_item_id && r.review_type === '商品レビュー')
     .map(r => r.review_url)
 
   if (unmatchedUrls.length > 0) {

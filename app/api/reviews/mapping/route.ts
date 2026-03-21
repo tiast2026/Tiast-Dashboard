@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
         FROM ${tableName('rakuten_reviews')}
         WHERE (matched_product_code IS NULL OR matched_product_code = '')
           AND rakuten_item_id IS NOT NULL
+          AND review_type = '商品レビュー'
         GROUP BY rakuten_item_id
       `)
 
