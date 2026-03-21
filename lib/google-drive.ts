@@ -137,6 +137,10 @@ function normalizeDate(raw: string): string {
 }
 
 function parseReviewCSV(content: string, shopName: string = '', fileName: string = ''): ReviewRow[] {
+  // Strip BOM if present
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1)
+  }
   const lowerName = fileName.toLowerCase()
   // reviews_ (with s) = 楽天, review_ (without s) = 公式
   const isOfficial = lowerName.startsWith('review_') && !lowerName.startsWith('reviews_')
@@ -386,7 +390,19 @@ async function fetchReviewCSVsFromFolder(
       const isOfficialFile = file.name.toLowerCase().startsWith('review_') && !file.name.toLowerCase().startsWith('reviews_')
       let content: string
       if (isOfficialFile) {
+        // Try UTF-8 first, fall back to Shift_JIS if no rows parsed
         content = new TextDecoder('utf-8').decode(buffer)
+        const testRows = parseReviewCSV(content, shopName, file.name)
+        if (testRows.length === 0) {
+          try {
+            const sjisContent = new TextDecoder('shift_jis').decode(buffer)
+            const sjisRows = parseReviewCSV(sjisContent, shopName, file.name)
+            if (sjisRows.length > 0) {
+              console.log(`[レビュー][${shopName}] ${file.name}: UTF-8で0件、Shift_JISで${sjisRows.length}件 → Shift_JIS使用`)
+              content = sjisContent
+            }
+          } catch { /* Shift_JIS decode failed, keep UTF-8 */ }
+        }
       } else {
         try {
           const sjisDecoder = new TextDecoder('shift_jis')
@@ -398,14 +414,22 @@ async function fetchReviewCSVsFromFolder(
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
       const rows = parseReviewCSV(content, shopName, file.name)
+      // Debug: show which headers were matched
+      const rawHeaders = headerLine.split(headerLine.includes('\t') ? '\t' : ',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''))
+      const matchedHeaders = rawHeaders.filter(h => h in REVIEW_HEADER_MAP)
+      const unmatchedHeaders = rawHeaders.filter(h => !(h in REVIEW_HEADER_MAP))
       csvDebug.push({
         fileName: file.name,
+        isOfficial: isOfficialFile,
         mimeType: file.mimeType,
         contentLength: content.length,
         totalLines: contentLines.length,
         headerLine: headerLine.substring(0, 500),
         secondLine: (contentLines[1] || '').substring(0, 500),
         parsedRows: rows.length,
+        matchedHeaders,
+        unmatchedHeaders,
+        reviewSource: isOfficialFile ? '公式' : '楽天',
       })
       console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
       allReviews.push(...rows)

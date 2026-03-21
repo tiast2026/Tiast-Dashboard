@@ -157,6 +157,10 @@ function ReviewsContent() {
           }
           if (json.skipped_duplicates) parts.push(`重複スキップ: ${json.skipped_duplicates}件`)
           if (json.files_processed) parts.push(`ファイル: ${json.files_processed.join(', ')}`)
+          // Show CSV debug info in console for troubleshooting
+          if (json.csvDebug) {
+            console.log('[レビューインポート] CSV詳細:', JSON.stringify(json.csvDebug, null, 2))
+          }
           setImportResult(parts.join(' / '))
           fetchReviews()
         } else {
