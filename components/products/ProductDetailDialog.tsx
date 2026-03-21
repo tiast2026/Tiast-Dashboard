@@ -705,6 +705,7 @@ export default function ProductDetailDialog({
   const [reviews, setReviews] = useState<ReviewRecord[]>([])
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null)
   const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [productImageUrl, setProductImageUrl] = useState<string>('')
 
   const allSkus = allSkusProp || fetchedSkus
   const isSkuView = !!selectedSku
@@ -713,6 +714,7 @@ export default function ProductDetailDialog({
   useEffect(() => {
     if (open) {
       setSelectedSku(mode === 'sku' ? (skuProp || null) : null)
+      setProductImageUrl('')
     }
   }, [open, mode, skuProp])
 
@@ -726,7 +728,10 @@ export default function ProductDetailDialog({
 
     fetch(`/api/products/${encodeURIComponent(productCode)}/skus?${params}`)
       .then(res => res.ok ? res.json() : null)
-      .then(data => setFetchedSkus(data?.data || []))
+      .then(data => {
+        setFetchedSkus(data?.data || [])
+        if (data?.product_image_url) setProductImageUrl(data.product_image_url)
+      })
       .catch(() => {})
       .finally(() => setSkusLoading(false))
   }, [open, productCode, allSkusProp, period, month])
@@ -908,7 +913,7 @@ export default function ProductDetailDialog({
   const subtitle = isSkuView
     ? [selectedSku.color, selectedSku.size].filter(Boolean).join(' / ') || '-'
     : productCode
-  const imageUrl = isSkuView ? selectedSku.sku_image_url : prodData?.image_url
+  const imageUrl = isSkuView ? selectedSku.sku_image_url : (productImageUrl || prodData?.image_url)
 
   // Gross profit rate
   const grossProfitRate = isSkuView

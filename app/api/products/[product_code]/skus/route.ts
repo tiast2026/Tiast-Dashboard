@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runQuery, isBigQueryConfigured } from '@/lib/bigquery'
 import { buildCacheKey, cachedQuery } from '@/lib/cache'
-import { getSkuImagesForProduct, isSheetsConfigured } from '@/lib/google-sheets'
+import { getSkuImagesForProduct, getSheetProduct, isSheetsConfigured } from '@/lib/google-sheets'
 
 interface SkuBaseRow {
   goods_id: string
@@ -282,7 +282,18 @@ export async function GET(
       }
     })
 
-    return NextResponse.json({ data: result })
+    // Get product master image
+    let product_image_url = ''
+    if (isSheetsConfigured()) {
+      try {
+        const master = await getSheetProduct(product_code)
+        product_image_url = master?.image_url || ''
+      } catch (e) {
+        console.error('Failed to fetch product master image:', e)
+      }
+    }
+
+    return NextResponse.json({ data: result, product_image_url })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('SKU list error:', message)

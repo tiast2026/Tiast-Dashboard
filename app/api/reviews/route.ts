@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN rating >= 4 THEN 1 END) AS positive_count,
           COUNT(CASE WHEN rating <= 2 THEN 1 END) AS negative_count,
           COUNT(CASE WHEN matched_product_code IS NOT NULL AND matched_product_code != '' THEN 1 END) AS matched_count,
-          COUNT(CASE WHEN matched_product_code IS NULL OR matched_product_code = '' THEN 1 END) AS unmatched_count
+          COUNT(CASE WHEN review_type = '商品レビュー' AND (matched_product_code IS NULL OR matched_product_code = '') THEN 1 END) AS unmatched_count
         FROM ${tableName('rakuten_reviews')}
         WHERE ${whereClause} ${productFilter}
       `)
