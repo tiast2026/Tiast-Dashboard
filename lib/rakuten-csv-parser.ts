@@ -1,12 +1,9 @@
 /**
  * 楽天RMS データダウンロード CSV パーサー
  *
- * 対応データ種類（5種）:
+ * 対応データ種類（2種）:
  *   1. 店舗データ                          → store_data
- *   2. SKU別売上データ                      → sku_sales
- *   3. 新規・リピート購入者数（店舗別）        → new_repeat_store
- *   4. 新規・リピート購入者数（商品別）        → new_repeat_product
- *   5. 新規・リピート購入者数（商品ジャンル別）  → new_repeat_genre
+ *   2. 新規・リピート購入者数（店舗別）        → new_repeat_store
  *
  * CSVフォーマット:
  *   - エンコーディング: Shift_JIS
@@ -21,10 +18,7 @@
 
 export type RakutenDataType =
   | 'store_data'
-  | 'sku_sales'
   | 'new_repeat_store'
-  | 'new_repeat_product'
-  | 'new_repeat_genre'
 
 export interface ParseResult {
   dataType: RakutenDataType
@@ -39,10 +33,7 @@ export interface ParseResult {
 
 const DATA_TYPE_LABELS: Record<RakutenDataType, string> = {
   store_data: '店舗データ',
-  sku_sales: 'SKU別売上データ',
   new_repeat_store: '新規・リピート購入者数（店舗別）',
-  new_repeat_product: '新規・リピート購入者数（商品別）',
-  new_repeat_genre: '新規・リピート購入者数（商品ジャンル別）',
 }
 
 export function getDataTypeLabel(type: RakutenDataType): string {
@@ -55,10 +46,7 @@ export function detectDataTypeFromFilename(filename: string): RakutenDataType | 
   // macOSからアップロードされたファイル名はNFD（濁点分離）の場合があるためNFCに正規化
   const fn = filename.normalize('NFC')
   if (fn.includes('店舗データ')) return 'store_data'
-  if (fn.includes('SKU別売上')) return 'sku_sales'
   if (fn.includes('新規') && fn.includes('店舗別')) return 'new_repeat_store'
-  if (fn.includes('新規') && fn.includes('商品別')) return 'new_repeat_product'
-  if (fn.includes('新規') && fn.includes('商品ジャンル別')) return 'new_repeat_genre'
   return null
 }
 
@@ -215,29 +203,7 @@ function parseStoreData(lines: string[], period: { start: string; end: string },
   return { dataType: 'store_data', periodStart: period.start, periodEnd: period.end, rows, rowCount: rows.length }
 }
 
-// ---------- 2. SKU別売上データ ----------
-
-function parseSkuSales(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
-  const rows: Record<string, unknown>[] = []
-  for (let i = 3; i < lines.length; i++) {
-    const c = parseCSVLine(lines[i], delim)
-    if (!c[1]) continue
-    rows.push({
-      catalog_id: c[0] || null,
-      product_code: c[1] || '', product_number: c[2] || '',
-      product_name: c[3] || '', sku_code: c[4] || '',
-      sku_system_code: c[5] || null,
-      sku_option_1: c[6] || null, sku_option_2: c[7] || null,
-      sku_option_3: c[8] || null, sku_option_4: c[9] || null,
-      sku_option_5: c[10] || null, sku_option_6: c[11] || null,
-      sales_amount: parseInt_(c[12]), sales_count: parseInt_(c[13]),
-      sales_quantity: parseInt_(c[14]),
-    })
-  }
-  return { dataType: 'sku_sales', periodStart: period.start, periodEnd: period.end, rows, rowCount: rows.length }
-}
-
-// ---------- 3. 新規・リピート購入者数（店舗別） ----------
+// ---------- 2. 新規・リピート購入者数（店舗別） ----------
 
 function parseNewRepeatStore(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
   const rows: Record<string, unknown>[] = []
@@ -262,47 +228,6 @@ function parseNewRepeatStore(lines: string[], period: { start: string; end: stri
   return { dataType: 'new_repeat_store', periodStart: period.start, periodEnd: period.end, rows, rowCount: rows.length }
 }
 
-// ---------- 4. 新規・リピート購入者数（商品別） ----------
-
-function parseNewRepeatProduct(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
-  const rows: Record<string, unknown>[] = []
-  for (let i = 3; i < lines.length; i++) {
-    const c = parseCSVLine(lines[i], delim)
-    if (!c[0]) continue
-    rows.push({
-      product_name: c[0],
-      product_url: c[1] || '',
-      product_price: parseInt_(c[2]),
-      is_discontinued: c[3] === '販売停止',
-      new_buyers: parseInt_(c[3] === '販売停止' ? c[4] : c[3]),
-      repeat_buyers: parseInt_(c[3] === '販売停止' ? c[5] : c[4]),
-      repeat_rate: parseFloat_(c[3] === '販売停止' ? c[6] : c[5]),
-    })
-  }
-  return { dataType: 'new_repeat_product', periodStart: period.start, periodEnd: period.end, rows, rowCount: rows.length }
-}
-
-// ---------- 5. 新規・リピート購入者数（商品ジャンル別） ----------
-
-function parseNewRepeatGenre(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
-  const rows: Record<string, unknown>[] = []
-  for (let i = 3; i < lines.length; i++) {
-    const c = parseCSVLine(lines[i], delim)
-    if (!c[0]) continue
-    rows.push({
-      genre_name: c[0],
-      new_buyers: parseInt_(c[1]),
-      repeat_buyers: parseInt_(c[2]),
-      repeat_rate: parseFloat_(c[3]),
-      new_avg_purchase: parseInt_(c[4]),
-      repeat_avg_purchase: parseInt_(c[5]),
-      avg_purchase_count: parseFloat_(c[6]),
-      avg_purchase_amount: parseInt_(c[7]),
-    })
-  }
-  return { dataType: 'new_repeat_genre', periodStart: period.start, periodEnd: period.end, rows, rowCount: rows.length }
-}
-
 // ---------- メインパーサー ----------
 
 export function parseRakutenCSV(text: string, filename: string): ParseResult {
@@ -322,13 +247,7 @@ export function parseRakutenCSV(text: string, filename: string): ParseResult {
   switch (dataType) {
     case 'store_data':
       return parseStoreData(lines, period, delim)
-    case 'sku_sales':
-      return parseSkuSales(lines, period, delim)
     case 'new_repeat_store':
       return parseNewRepeatStore(lines, period, delim)
-    case 'new_repeat_product':
-      return parseNewRepeatProduct(lines, period, delim)
-    case 'new_repeat_genre':
-      return parseNewRepeatGenre(lines, period, delim)
   }
 }

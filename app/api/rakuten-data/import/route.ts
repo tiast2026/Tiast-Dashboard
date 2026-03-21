@@ -18,11 +18,6 @@ function sqlNum(v: number | null | undefined): string {
   return String(v)
 }
 
-function sqlBool(v: boolean | null | undefined): string {
-  if (v === null || v === undefined) return 'NULL'
-  return v ? 'TRUE' : 'FALSE'
-}
-
 // ---------- テーブル作成 ----------
 
 const TABLE_SCHEMAS: Record<RakutenDataType, { table: string; fields: { name: string; type: string; mode?: string }[] }> = {
@@ -51,23 +46,6 @@ const TABLE_SCHEMAS: Record<RakutenDataType, { table: string; fields: { name: st
       { name: '_imported_at', type: 'TIMESTAMP' },
     ],
   },
-  sku_sales: {
-    table: 'rakuten_sku_sales',
-    fields: [
-      { name: 'shop_name', type: 'STRING', mode: 'REQUIRED' },
-      { name: 'period_start', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'period_end', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'catalog_id', type: 'STRING' }, { name: 'product_code', type: 'STRING' },
-      { name: 'product_number', type: 'STRING' }, { name: 'product_name', type: 'STRING' },
-      { name: 'sku_code', type: 'STRING' }, { name: 'sku_system_code', type: 'STRING' },
-      { name: 'sku_option_1', type: 'STRING' }, { name: 'sku_option_2', type: 'STRING' },
-      { name: 'sku_option_3', type: 'STRING' }, { name: 'sku_option_4', type: 'STRING' },
-      { name: 'sku_option_5', type: 'STRING' }, { name: 'sku_option_6', type: 'STRING' },
-      { name: 'sales_amount', type: 'INT64' }, { name: 'sales_count', type: 'INT64' },
-      { name: 'sales_quantity', type: 'INT64' },
-      { name: '_imported_at', type: 'TIMESTAMP' },
-    ],
-  },
   new_repeat_store: {
     table: 'rakuten_new_repeat_store',
     fields: [
@@ -80,33 +58,6 @@ const TABLE_SCHEMAS: Record<RakutenDataType, { table: string; fields: { name: st
       { name: 'repeat_buyers', type: 'INT64' }, { name: 'repeat_avg_order_value', type: 'INT64' },
       { name: 'repeat_sales', type: 'INT64' }, { name: 'repeat_sales_count', type: 'INT64' },
       { name: 'repeat_sales_quantity', type: 'INT64' },
-      { name: '_imported_at', type: 'TIMESTAMP' },
-    ],
-  },
-  new_repeat_product: {
-    table: 'rakuten_new_repeat_product',
-    fields: [
-      { name: 'shop_name', type: 'STRING', mode: 'REQUIRED' },
-      { name: 'period_start', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'period_end', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'product_name', type: 'STRING' }, { name: 'product_url', type: 'STRING' },
-      { name: 'product_price', type: 'INT64' }, { name: 'is_discontinued', type: 'BOOL' },
-      { name: 'new_buyers', type: 'INT64' }, { name: 'repeat_buyers', type: 'INT64' },
-      { name: 'repeat_rate', type: 'FLOAT64' },
-      { name: '_imported_at', type: 'TIMESTAMP' },
-    ],
-  },
-  new_repeat_genre: {
-    table: 'rakuten_new_repeat_genre',
-    fields: [
-      { name: 'shop_name', type: 'STRING', mode: 'REQUIRED' },
-      { name: 'period_start', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'period_end', type: 'DATE', mode: 'REQUIRED' },
-      { name: 'genre_name', type: 'STRING' },
-      { name: 'new_buyers', type: 'INT64' }, { name: 'repeat_buyers', type: 'INT64' },
-      { name: 'repeat_rate', type: 'FLOAT64' },
-      { name: 'new_avg_purchase', type: 'INT64' }, { name: 'repeat_avg_purchase', type: 'INT64' },
-      { name: 'avg_purchase_count', type: 'FLOAT64' }, { name: 'avg_purchase_amount', type: 'INT64' },
       { name: '_imported_at', type: 'TIMESTAMP' },
     ],
   },
@@ -218,28 +169,6 @@ async function importStoreData(bq: ReturnType<typeof getBigQueryClient>, shopNam
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function importSkuSales(bq: ReturnType<typeof getBigQueryClient>, shopName: string, parsed: { periodStart: string; periodEnd: string; rows: any[] }) {
-  await deletePeriodData(bq, 'rakuten_sku_sales', shopName, parsed.periodStart, parsed.periodEnd)
-  const cols = [
-    'shop_name', 'period_start', 'period_end',
-    'catalog_id', 'product_code', 'product_number', 'product_name',
-    'sku_code', 'sku_system_code',
-    'sku_option_1', 'sku_option_2', 'sku_option_3',
-    'sku_option_4', 'sku_option_5', 'sku_option_6',
-    'sales_amount', 'sales_count', 'sales_quantity', '_imported_at',
-  ]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return batchInsert(bq, 'rakuten_sku_sales', cols, parsed.rows, (r: any) =>
-    `(${sqlStr(shopName)}, DATE '${parsed.periodStart}', DATE '${parsed.periodEnd}', ` +
-    `${sqlStr(r.catalog_id)}, ${sqlStr(r.product_code)}, ${sqlStr(r.product_number)}, ${sqlStr(r.product_name)}, ` +
-    `${sqlStr(r.sku_code)}, ${sqlStr(r.sku_system_code)}, ` +
-    `${sqlStr(r.sku_option_1)}, ${sqlStr(r.sku_option_2)}, ${sqlStr(r.sku_option_3)}, ` +
-    `${sqlStr(r.sku_option_4)}, ${sqlStr(r.sku_option_5)}, ${sqlStr(r.sku_option_6)}, ` +
-    `${sqlNum(r.sales_amount)}, ${sqlNum(r.sales_count)}, ${sqlNum(r.sales_quantity)}, CURRENT_TIMESTAMP())`
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function importNewRepeatStore(bq: ReturnType<typeof getBigQueryClient>, shopName: string, parsed: { rows: any[] }) {
   await deletePeriodData(bq, 'rakuten_new_repeat_store', shopName, '', '', 'month')
   const cols = [
@@ -253,40 +182,6 @@ async function importNewRepeatStore(bq: ReturnType<typeof getBigQueryClient>, sh
     `(${sqlStr(shopName)}, ${sqlStr(r.month)}, ${r.month_date ? `DATE '${r.month_date}'` : 'NULL'}, ` +
     `${sqlNum(r.new_buyers)}, ${sqlNum(r.new_avg_order_value)}, ${sqlNum(r.new_sales)}, ${sqlNum(r.new_sales_count)}, ${sqlNum(r.new_sales_quantity)}, ` +
     `${sqlNum(r.repeat_buyers)}, ${sqlNum(r.repeat_avg_order_value)}, ${sqlNum(r.repeat_sales)}, ${sqlNum(r.repeat_sales_count)}, ${sqlNum(r.repeat_sales_quantity)}, ` +
-    `CURRENT_TIMESTAMP())`
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function importNewRepeatProduct(bq: ReturnType<typeof getBigQueryClient>, shopName: string, parsed: { periodStart: string; periodEnd: string; rows: any[] }) {
-  await deletePeriodData(bq, 'rakuten_new_repeat_product', shopName, parsed.periodStart, parsed.periodEnd)
-  const cols = [
-    'shop_name', 'period_start', 'period_end',
-    'product_name', 'product_url', 'product_price', 'is_discontinued',
-    'new_buyers', 'repeat_buyers', 'repeat_rate', '_imported_at',
-  ]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return batchInsert(bq, 'rakuten_new_repeat_product', cols, parsed.rows, (r: any) =>
-    `(${sqlStr(shopName)}, DATE '${parsed.periodStart}', DATE '${parsed.periodEnd}', ` +
-    `${sqlStr(r.product_name)}, ${sqlStr(r.product_url)}, ${sqlNum(r.product_price)}, ${sqlBool(r.is_discontinued)}, ` +
-    `${sqlNum(r.new_buyers)}, ${sqlNum(r.repeat_buyers)}, ${sqlNum(r.repeat_rate)}, CURRENT_TIMESTAMP())`
-  )
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function importNewRepeatGenre(bq: ReturnType<typeof getBigQueryClient>, shopName: string, parsed: { periodStart: string; periodEnd: string; rows: any[] }) {
-  await deletePeriodData(bq, 'rakuten_new_repeat_genre', shopName, parsed.periodStart, parsed.periodEnd)
-  const cols = [
-    'shop_name', 'period_start', 'period_end',
-    'genre_name', 'new_buyers', 'repeat_buyers', 'repeat_rate',
-    'new_avg_purchase', 'repeat_avg_purchase', 'avg_purchase_count', 'avg_purchase_amount',
-    '_imported_at',
-  ]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return batchInsert(bq, 'rakuten_new_repeat_genre', cols, parsed.rows, (r: any) =>
-    `(${sqlStr(shopName)}, DATE '${parsed.periodStart}', DATE '${parsed.periodEnd}', ` +
-    `${sqlStr(r.genre_name)}, ${sqlNum(r.new_buyers)}, ${sqlNum(r.repeat_buyers)}, ${sqlNum(r.repeat_rate)}, ` +
-    `${sqlNum(r.new_avg_purchase)}, ${sqlNum(r.repeat_avg_purchase)}, ${sqlNum(r.avg_purchase_count)}, ${sqlNum(r.avg_purchase_amount)}, ` +
     `CURRENT_TIMESTAMP())`
   )
 }
@@ -394,17 +289,8 @@ async function runImport(): Promise<{
         case 'store_data':
           inserted = await importStoreData(bq, entry.shopName, parsed)
           break
-        case 'sku_sales':
-          inserted = await importSkuSales(bq, entry.shopName, parsed)
-          break
         case 'new_repeat_store':
           inserted = await importNewRepeatStore(bq, entry.shopName, parsed)
-          break
-        case 'new_repeat_product':
-          inserted = await importNewRepeatProduct(bq, entry.shopName, parsed)
-          break
-        case 'new_repeat_genre':
-          inserted = await importNewRepeatGenre(bq, entry.shopName, parsed)
           break
       }
 

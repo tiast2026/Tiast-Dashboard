@@ -94,7 +94,7 @@ export default function RakutenDataPage() {
             <li>処理完了後、CSVファイルはフォルダ内の「imported」フォルダに自動移動されます</li>
           </ol>
           <div className="mt-3 flex flex-wrap gap-2">
-            {['店舗データ', 'SKU別売上データ', '新規・リピート購入者数（店舗別）', '新規・リピート購入者数（商品別）', '新規・リピート購入者数（商品ジャンル別）'].map(label => (
+            {['店舗データ', '新規・リピート購入者数（店舗別）'].map(label => (
               <span key={label} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[11px] rounded-full">{label}</span>
             ))}
           </div>
