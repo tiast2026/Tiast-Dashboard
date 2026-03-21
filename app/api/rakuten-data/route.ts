@@ -59,34 +59,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data, total: countResult?.cnt || 0, summary })
     }
 
-    if (type === 'sku_sales') {
-      const where: string[] = []
-      const params: Record<string, string | number> = {}
-
-      if (shopName) {
-        where.push('shop_name = @shopName')
-        params.shopName = shopName
-      }
-
-      const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
-
-      const data = await runQuery(
-        `SELECT * FROM \`${PROJECT}.${DATASET}.rakuten_sku_sales\`
-         ${whereClause}
-         ORDER BY sales_amount DESC
-         LIMIT @limit OFFSET @offset`,
-        { ...params, limit, offset },
-      )
-
-      const [countResult] = await runQuery<{ cnt: number }>(
-        `SELECT COUNT(*) as cnt FROM \`${PROJECT}.${DATASET}.rakuten_sku_sales\`
-         ${whereClause}`,
-        params,
-      ).catch(() => [{ cnt: 0 }])
-
-      return NextResponse.json({ data, total: countResult?.cnt || 0 })
-    }
-
     return NextResponse.json({ error: '不明なtypeです' }, { status: 400 })
   } catch (error) {
     console.error('[楽天データ取得] エラー:', error)

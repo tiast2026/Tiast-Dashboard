@@ -256,7 +256,8 @@ function ProductsPageContent() {
   const searchParams = useSearchParams()
   const urlBrand = searchParams.get('brand')
   const [search, setSearch] = useState('')
-  const [brand, setBrand] = useState(urlBrand || '全て')
+  const [localBrand, setLocalBrand] = useState('全て')
+  const brand = urlBrand || localBrand
   const [category, setCategory] = useState('全て')
   const [season, setSeason] = useState('全て')
   const [priceTier] = useState('全て')
@@ -602,7 +603,7 @@ function ProductsPageContent() {
             )}
           </div>
           {!urlBrand && (
-            <Select value={brand} onValueChange={(v) => v && setBrand(v)}>
+            <Select value={localBrand} onValueChange={(v) => v && setLocalBrand(v)}>
               <SelectTrigger className="w-36 bg-white"><SelectValue placeholder="ブランド" /></SelectTrigger>
               <SelectContent>
                 {BRAND_OPTIONS.map((b) => (<SelectItem key={b} value={b}>{getBrandDisplayName(b)}</SelectItem>))}

@@ -76,7 +76,7 @@ function CustomersPageContent() {
   const searchParams = useSearchParams()
   const urlBrand = searchParams.get('brand')
   const [month, setMonth] = useState(getCurrentMonth())
-  const [brand, setBrand] = useState(urlBrand || '全て')
+  const brand = urlBrand || '全て'
   const brandParam = brand === '全て' ? '' : `&brand=${brand}`
   const cacheKey = `customers:${month}:${brandParam}`
 
@@ -198,7 +198,7 @@ function CustomersPageContent() {
     <>
       <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 顧客分析` : '顧客分析'} />
       <div className="p-6 space-y-6">
-        <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={setBrand} />
+        <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
 
         {/* KPI Cards */}
         {loading ? (
