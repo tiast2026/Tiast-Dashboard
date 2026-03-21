@@ -13,6 +13,15 @@ interface FileResult {
   period: string
   rowCount: number
   inserted: number
+  error?: string
+  debug?: {
+    totalLines: number
+    line1: string
+    line2: string
+    line3: string
+    delimiter: string
+    contentLength: number
+  }
 }
 
 interface ImportResponse {
@@ -120,11 +129,29 @@ export default function RakutenDataPage() {
               </TableHeader>
               <TableBody>
                 {result.files.map((f, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="text-xs px-4 font-mono text-gray-600 max-w-[300px] truncate">{f.fileName}</TableCell>
+                  <TableRow key={i} className={f.error || (f.rowCount === 0 && f.inserted === 0) ? 'bg-red-50/50' : ''}>
+                    <TableCell className="text-xs px-4 font-mono text-gray-600 max-w-[300px] truncate">
+                      {f.fileName}
+                      {f.error && (
+                        <div className="text-[10px] text-red-500 mt-0.5 font-sans">{f.error}</div>
+                      )}
+                      {f.debug && (
+                        <details className="text-[10px] text-gray-400 mt-0.5 font-sans">
+                          <summary className="cursor-pointer hover:text-gray-600">デバッグ情報</summary>
+                          <div className="mt-1 space-y-0.5 bg-gray-50 p-1.5 rounded text-[9px] font-mono">
+                            <div>{f.debug.totalLines}行, {f.debug.delimiter}区切り, {f.debug.contentLength.toLocaleString()}B</div>
+                            <div className="truncate">1: {f.debug.line1}</div>
+                            <div className="truncate">2: {f.debug.line2}</div>
+                            <div className="truncate">3: {f.debug.line3}</div>
+                          </div>
+                        </details>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs px-4">{f.shopName}</TableCell>
                     <TableCell className="text-xs px-4">
-                      <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[10px] font-medium">{f.dataTypeLabel}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        f.dataTypeLabel === 'エラー' ? 'bg-red-100 text-red-600' : 'bg-amber-50 text-amber-700'
+                      }`}>{f.dataTypeLabel}</span>
                     </TableCell>
                     <TableCell className="text-xs px-4 text-gray-500">{f.period}</TableCell>
                     <TableCell className="text-xs px-4 text-right">{f.rowCount.toLocaleString()}</TableCell>
