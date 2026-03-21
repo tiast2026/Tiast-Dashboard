@@ -513,7 +513,7 @@ export default function RankingPage() {
         {/* Controls */}
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={genre} onValueChange={setGenre}>
-            <SelectTrigger className="w-64 bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-48 sm:w-64 bg-white"><SelectValue /></SelectTrigger>
             <SelectContent>
               {FILTER_GENRES.map((g) => (
                 <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
@@ -551,7 +551,7 @@ export default function RankingPage() {
         {/* ランキングの説明 */}
         <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <p>楽天市場レディースファッション各カテゴリの<strong>デイリーランキング</strong>（前日の売上に基づき毎日更新）を取得しています。毎日自動で全カテゴリを収集し、フィルタでカテゴリ別に絞り込めます。商品をクリックすると詳細な履歴が確認できます。</p>
+          <p>楽天市場レディースファッション各カテゴリの<strong>デイリーランキング</strong>（前日の売上に基づき毎日更新）を取得しています。<strong>毎日正午（12:00）に自動収集</strong>されます。フィルタでカテゴリ別に絞り込めます。商品をクリックすると詳細な履歴が確認できます。</p>
         </div>
 
         {historyError && (
@@ -730,7 +730,7 @@ export default function RankingPage() {
                           </div>
 
                           {/* Stats */}
-                          <div className="flex gap-5 flex-shrink-0 text-center">
+                          <div className="hidden lg:flex gap-5 flex-shrink-0 text-center">
                             <div>
                               <div className="text-[10px] text-gray-400">現在順位</div>
                               <div className="text-lg font-semibold text-gray-700">{product.latest_rank}位</div>
@@ -747,7 +747,7 @@ export default function RankingPage() {
 
                           {/* Sparkline + Expand */}
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="w-28">
+                            <div className="hidden xl:block w-28">
                               <RankSparkline history={product.history} />
                             </div>
                             <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
