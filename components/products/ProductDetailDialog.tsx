@@ -560,6 +560,7 @@ interface ReviewRecord {
   flag: number
   order_number: string
   unhandled_flag: number
+  review_source?: string
 }
 
 interface ReviewSummary {
@@ -652,6 +653,11 @@ function ReviewSection({ reviews, summary, loading }: {
               <div className="flex items-center gap-2">
                 <StarRating rating={r.rating} />
                 <span className="text-xs text-gray-400">{r.posted_at || '-'}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  r.review_source === '公式'
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-red-50 text-red-600'
+                }`}>{r.review_source === '公式' ? '公式' : '楽天'}</span>
                 {r.review_type === 'ショップレビュー' && (
                   <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">ショップ</span>
                 )}
