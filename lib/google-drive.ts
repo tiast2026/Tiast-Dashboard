@@ -29,6 +29,7 @@ export interface DriveFileEntry {
   id: string
   name: string
   shopName: string
+  parentFolderId: string
 }
 
 /**
@@ -69,7 +70,7 @@ export async function fetchRakutenDataCSVsFromDrive(): Promise<{
           content = new TextDecoder('utf-8').decode(buffer)
         }
         results.push({
-          entry: { id: file.id, name: file.name, shopName: shop.shopName },
+          entry: { id: file.id, name: file.name, shopName: shop.shopName, parentFolderId: shop.folderId },
           content,
         })
       } catch (e) {

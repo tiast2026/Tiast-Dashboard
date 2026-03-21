@@ -19,7 +19,7 @@ interface ImportResponse {
   success: boolean
   files: FileResult[]
   totalInserted: number
-  filesDeleted: number
+  filesMoved: number
   error?: string
 }
 
@@ -82,7 +82,7 @@ export default function RakutenDataPage() {
             <li>楽天RMSの「データダウンロード」からCSVをダウンロード</li>
             <li>Google Driveの <span className="font-medium">【csvデータ】NOAHL</span>（または BLACKQUEEN）フォルダにアップロード</li>
             <li>上の「インポート」ボタンをクリック</li>
-            <li>処理完了後、CSVファイルはDriveから自動削除されます</li>
+            <li>処理完了後、CSVファイルはフォルダ内の「imported」フォルダに自動移動されます</li>
           </ol>
           <div className="mt-3 flex flex-wrap gap-2">
             {['店舗データ', 'SKU別売上データ', '新規・リピート購入者数（店舗別）', '新規・リピート購入者数（商品別）', '新規・リピート購入者数（商品ジャンル別）'].map(label => (
@@ -104,7 +104,7 @@ export default function RakutenDataPage() {
                 インポート結果 — {result.totalInserted.toLocaleString()}件
               </h3>
               <span className="text-xs text-gray-400 ml-auto">
-                {result.filesDeleted}ファイル削除済み
+                {result.filesMoved}ファイル移動済み
               </span>
             </div>
             <Table>
