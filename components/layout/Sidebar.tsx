@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
-  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload,
+  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload, CircleDollarSign,
 } from 'lucide-react'
 
 interface BrandSection {
@@ -161,6 +161,22 @@ export default function Sidebar() {
 
         {/* Separator */}
         <div className="my-3 mx-2 h-px bg-white/8" />
+
+        {/* 価格分析 */}
+        <Link
+          href="/pricing"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all duration-200 ${
+            isActive('/pricing')
+              ? 'bg-white/12 text-white font-medium shadow-sm'
+              : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
+          }`}
+        >
+          <CircleDollarSign className="w-[18px] h-[18px]" style={{ color: '#C4A882' }} />
+          <span>価格分析</span>
+          {isActive('/pricing') && (
+            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C4A882]" />
+          )}
+        </Link>
 
         {/* 楽天ランキング */}
         <Link
