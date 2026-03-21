@@ -15,11 +15,71 @@ function getDriveClient(): drive_v3.Drive {
   return drive({ version: 'v3', auth: authClient })
 }
 
-/** Review CSV folders per shop */
+/** CSV folders per shop (shared for reviews + Rakuten data) */
 export const REVIEW_CSV_FOLDERS: { shopName: string; folderId: string }[] = [
   { shopName: 'NOAHL',      folderId: '1B4QMfyfgoh7I3D5n2pGLBNFSSmHudmEk' },
   { shopName: 'BLACKQUEEN', folderId: '1uLw0fGWu6I0YGHduENPYoUOObQ3J_7ox' },
 ]
+
+// ---- 楽天データCSV取得 (Google Drive) ----
+
+import { isRakutenDataCSV } from '@/lib/rakuten-csv-parser'
+
+export interface DriveFileEntry {
+  id: string
+  name: string
+  shopName: string
+}
+
+/**
+ * Fetch all Rakuten data CSVs (non-review) from Drive folders.
+ * Detects by filename pattern (店舗データ, SKU別売上, etc.)
+ */
+export async function fetchRakutenDataCSVsFromDrive(): Promise<{
+  files: { entry: DriveFileEntry; content: string }[]
+}> {
+  const client = getDriveClient()
+  const results: { entry: DriveFileEntry; content: string }[] = []
+
+  for (const shop of REVIEW_CSV_FOLDERS) {
+    const res = await client.files.list({
+      q: `'${shop.folderId}' in parents and trashed=false`,
+      fields: 'files(id, name, mimeType)',
+      pageSize: 50,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    })
+
+    const files = res.data.files || []
+    for (const file of files) {
+      if (!file.id || !file.name) continue
+      if (!isRakutenDataCSV(file.name)) continue
+
+      console.log(`[楽天データ][${shop.shopName}] 読み込み中: ${file.name}`)
+      try {
+        const dlRes = await client.files.get(
+          { fileId: file.id, alt: 'media', supportsAllDrives: true },
+          { responseType: 'arraybuffer' },
+        )
+        const buffer = dlRes.data as ArrayBuffer
+        let content: string
+        try {
+          content = new TextDecoder('shift_jis').decode(buffer)
+        } catch {
+          content = new TextDecoder('utf-8').decode(buffer)
+        }
+        results.push({
+          entry: { id: file.id, name: file.name, shopName: shop.shopName },
+          content,
+        })
+      } catch (e) {
+        console.warn(`[楽天データ][${shop.shopName}] ${file.name} 読み込みエラー:`, e)
+      }
+    }
+  }
+
+  return { files: results }
+}
 
 export interface ReviewRow {
   shop_name: string
