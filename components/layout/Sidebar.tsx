@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
-  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare,
+  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload,
 } from 'lucide-react'
 
 interface BrandSection {
@@ -174,6 +174,22 @@ export default function Sidebar() {
           <Trophy className="w-[18px] h-[18px]" style={{ color: '#BF0000' }} />
           <span>楽天ランキング</span>
           {isActive('/ranking') && (
+            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#BF0000]" />
+          )}
+        </Link>
+
+        {/* 楽天データ */}
+        <Link
+          href="/rakuten-data"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all duration-200 ${
+            isActive('/rakuten-data')
+              ? 'bg-white/12 text-white font-medium shadow-sm'
+              : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
+          }`}
+        >
+          <Upload className="w-[18px] h-[18px]" style={{ color: '#BF0000' }} />
+          <span>楽天データ</span>
+          {isActive('/rakuten-data') && (
             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#BF0000]" />
           )}
         </Link>
