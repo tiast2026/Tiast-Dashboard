@@ -14,6 +14,7 @@ interface ReviewRecord {
   order_number: string
   unhandled_flag: number
   matched_product_code: string | null
+  review_source: string | null
 }
 
 function escapeSQL(v: string): string {
@@ -33,17 +34,21 @@ function extractProductKeyword(name: string): string {
 
 const REVIEW_COLUMNS = `
   review_type, product_name, review_url, rating, posted_at,
-  title, review_body, flag, order_number, unhandled_flag, matched_product_code
+  title, review_body, flag, order_number, unhandled_flag, matched_product_code, review_source
 `
 
 /** Combined view of both product and shop review tables */
 function allReviewsTable(): string {
   return `(
-    SELECT ${REVIEW_COLUMNS}, shop_name FROM ${tableName('rakuten_reviews')}
+    SELECT review_type, product_name, review_url, rating, posted_at,
+           title, review_body, flag, order_number, unhandled_flag,
+           matched_product_code, IFNULL(review_source, '楽天') AS review_source, shop_name
+    FROM ${tableName('rakuten_reviews')}
     UNION ALL
     SELECT review_type, product_name, review_url, rating, posted_at,
            title, review_body, flag, order_number, unhandled_flag,
-           CAST(NULL AS STRING) AS matched_product_code, shop_name
+           CAST(NULL AS STRING) AS matched_product_code,
+           IFNULL(review_source, '楽天') AS review_source, shop_name
     FROM ${tableName('rakuten_shop_reviews')}
   ) AS all_reviews`
 }

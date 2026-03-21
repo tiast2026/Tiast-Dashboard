@@ -34,10 +34,12 @@ export interface ReviewRow {
   order_number: string
   unhandled_flag: number
   manage_number: string
+  review_source: '楽天' | '公式'
 }
 
-// CSV header → internal key mapping
+// CSV header → internal key mapping (supports both Rakuten and official store CSVs)
 const REVIEW_HEADER_MAP: Record<string, keyof ReviewRow> = {
+  // Rakuten CSV headers
   'レビュータイプ': 'review_type',
   '商品名': 'product_name',
   '商品管理番号': 'manage_number',
@@ -49,6 +51,13 @@ const REVIEW_HEADER_MAP: Record<string, keyof ReviewRow> = {
   'フラグ': 'flag',
   '注文番号': 'order_number',
   '未対応フラグ': 'unhandled_flag',
+  // Official store (futureshop) CSV headers
+  '商品番号（投稿時）': 'manage_number',
+  '商品名（投稿時）': 'product_name',
+  '商品URL': 'review_url',
+  'おすすめ度区分': 'rating',
+  '投稿日': 'posted_at',
+  '内容': 'review_body',
 }
 
 function parseCSVLine(line: string): string[] {
@@ -127,7 +136,9 @@ function normalizeDate(raw: string): string {
   return raw
 }
 
-function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
+function parseReviewCSV(content: string, shopName: string = '', fileName: string = ''): ReviewRow[] {
+  const isOfficial = fileName.toLowerCase().startsWith('review_')
+  const reviewSource: '楽天' | '公式' = isOfficial ? '公式' : '楽天'
   // Detect delimiter from first line
   const firstNewline = content.indexOf('\n')
   const headerLine = (firstNewline >= 0 ? content.slice(0, firstNewline) : content).replace(/\r$/, '')
@@ -169,12 +180,12 @@ function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
       }
     }
 
-    // Skip rows without review_type and review_url
-    if (!obj.review_type && !obj.review_url) continue
+    // Skip rows without review_url and no useful data
+    if (!obj.review_url && !obj.product_name) continue
 
     rows.push({
       shop_name: shopName,
-      review_type: String(obj.review_type || ''),
+      review_type: String(obj.review_type || '商品レビュー'),
       product_name: String(obj.product_name || ''),
       review_url: String(obj.review_url || ''),
       rating: Number(obj.rating) || 0,
@@ -185,6 +196,7 @@ function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
       order_number: String(obj.order_number || ''),
       unhandled_flag: Number(obj.unhandled_flag) || 0,
       manage_number: String(obj.manage_number || ''),
+      review_source: reviewSource,
     })
   }
 
@@ -310,7 +322,7 @@ async function fetchReviewCSVsFromFolder(
 
   const queryParts: string[] = [
     "trashed=false",
-    `name contains 'reviews'`,
+    `(name contains 'reviews' or name contains 'review_')`,
     `'${folderId}' in parents`,
   ]
 
@@ -358,7 +370,7 @@ async function fetchReviewCSVsFromFolder(
 
   for (const file of files) {
     if (!file.id || !file.name) continue
-    if (!file.name.toLowerCase().startsWith('reviews')) continue
+    if (!file.name.toLowerCase().startsWith('review')) continue
 
     console.log(`[レビュー][${shopName}] 読み込み中: ${file.name}`)
     try {
@@ -379,7 +391,7 @@ async function fetchReviewCSVsFromFolder(
       }
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
-      const rows = parseReviewCSV(content, shopName)
+      const rows = parseReviewCSV(content, shopName, file.name)
       csvDebug.push({
         fileName: file.name,
         mimeType: file.mimeType,
