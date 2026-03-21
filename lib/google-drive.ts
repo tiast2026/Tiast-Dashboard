@@ -382,14 +382,18 @@ async function fetchReviewCSVsFromFolder(
         { responseType: 'arraybuffer' },
       )
       const buffer = dlRes.data as ArrayBuffer
-      // Try Shift_JIS first (Rakuten CSVs are typically Shift_JIS), fall back to UTF-8
+      // Official CSVs (review_) are UTF-8, Rakuten CSVs (reviews_) are Shift_JIS
+      const isOfficialFile = file.name.toLowerCase().startsWith('review_') && !file.name.toLowerCase().startsWith('reviews_')
       let content: string
-      try {
-        const sjisDecoder = new TextDecoder('shift_jis')
-        content = sjisDecoder.decode(buffer)
-      } catch {
-        const utf8Decoder = new TextDecoder('utf-8')
-        content = utf8Decoder.decode(buffer)
+      if (isOfficialFile) {
+        content = new TextDecoder('utf-8').decode(buffer)
+      } else {
+        try {
+          const sjisDecoder = new TextDecoder('shift_jis')
+          content = sjisDecoder.decode(buffer)
+        } catch {
+          content = new TextDecoder('utf-8').decode(buffer)
+        }
       }
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
