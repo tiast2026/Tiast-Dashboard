@@ -10,7 +10,7 @@
  *
  * CSVフォーマット:
  *   - エンコーディング: Shift_JIS
- *   - 区切り文字: タブ
+ *   - 区切り文字: カンマまたはタブ（自動検出）
  *   - 1行目: 注意書き
  *   - 2行目: データ対象期間
  *   - 3行目: ヘッダー
@@ -65,16 +65,63 @@ export function isRakutenDataCSV(filename: string): boolean {
   return detectDataTypeFromFilename(filename) !== null
 }
 
+// ---------- CSV行パーサー（カンマ区切り＋引用符対応） ----------
+
+function parseCSVLine(line: string, delimiter: string): string[] {
+  if (delimiter === '\t') {
+    return line.split('\t')
+  }
+
+  // カンマ区切り: 引用符対応
+  const fields: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"'
+          i++ // skip escaped quote
+        } else {
+          inQuotes = false
+        }
+      } else {
+        current += ch
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true
+      } else if (ch === ',') {
+        fields.push(current)
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+  }
+  fields.push(current)
+  return fields
+}
+
+/** 区切り文字を自動検出: ヘッダー行（3行目）にタブがあればタブ、なければカンマ */
+function detectDelimiter(lines: string[]): string {
+  const headerLine = lines[2] || ''
+  if (headerLine.includes('\t')) return '\t'
+  return ','
+}
+
 // ---------- ユーティリティ ----------
 
-function parseInt_(v: string): number | null {
+function parseInt_(v: string | undefined): number | null {
   if (!v || v === '-' || v === '') return null
   const cleaned = v.replace(/,/g, '')
   const n = parseInt(cleaned, 10)
   return isNaN(n) ? null : n
 }
 
-function parseFloat_(v: string): number | null {
+function parseFloat_(v: string | undefined): number | null {
   if (!v || v === '-' || v === '') return null
   const cleaned = v.replace(/,/g, '').replace(/%/g, '')
   const n = parseFloat(cleaned)
@@ -92,12 +139,12 @@ function normalizeDate(dateStr: string): string {
 
 function parsePeriod(line: string): { start: string; end: string } {
   // 日次: "データ対象期間 2026/03/01 ～ 2026/03/31"
-  const matchFull = line.match(/(\d{4}\/\d{1,2}\/\d{1,2})\s*[～~]\s*(\d{4}\/\d{1,2}\/\d{1,2})/)
+  const matchFull = line.match(new RegExp(`(\\d{4}\\/\\d{1,2}\\/\\d{1,2})\\s*[～〜~]\\s*(\\d{4}\\/\\d{1,2}\\/\\d{1,2})`))
   if (matchFull) {
     return { start: normalizeDate(matchFull[1]), end: normalizeDate(matchFull[2]) }
   }
   // 月次: "データ対象期間 2024/04 ～ 2026/03"
-  const matchMonth = line.match(/(\d{4}\/\d{1,2})\s*[～~]\s*(\d{4}\/\d{1,2})/)
+  const matchMonth = line.match(new RegExp(`(\\d{4}\\/\\d{1,2})\\s*[～〜~]\\s*(\\d{4}\\/\\d{1,2})`))
   if (matchMonth) {
     return {
       start: normalizeDate(matchMonth[1] + '/01'),
@@ -124,15 +171,15 @@ function findColumnIndex(headers: string[], keyword: string): number {
   return headers.findIndex(h => h === keyword)
 }
 
-function parseStoreData(lines: string[], period: { start: string; end: string }): ParseResult {
-  const headers = lines[2].split('\t')
+function parseStoreData(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
+  const headers = parseCSVLine(lines[2], delim)
 
   const dealIdx = findColumnIndex(headers, '楽天スーパーDEAL 売上金額')
   const pointsIdx = findColumnIndex(headers, '運用型ポイント変倍経由売上金額')
 
   const rows: Record<string, unknown>[] = []
   for (let i = 3; i < lines.length; i++) {
-    const c = lines[i].split('\t')
+    const c = parseCSVLine(lines[i], delim)
     if (!c[0] || !c[0].match(/\d{4}\//)) continue
     rows.push({
       date: normalizeDate(c[0]),
@@ -167,10 +214,10 @@ function parseStoreData(lines: string[], period: { start: string; end: string })
 
 // ---------- 2. SKU別売上データ ----------
 
-function parseSkuSales(lines: string[], period: { start: string; end: string }): ParseResult {
+function parseSkuSales(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
   const rows: Record<string, unknown>[] = []
   for (let i = 3; i < lines.length; i++) {
-    const c = lines[i].split('\t')
+    const c = parseCSVLine(lines[i], delim)
     if (!c[1]) continue
     rows.push({
       catalog_id: c[0] || null,
@@ -189,10 +236,10 @@ function parseSkuSales(lines: string[], period: { start: string; end: string }):
 
 // ---------- 3. 新規・リピート購入者数（店舗別） ----------
 
-function parseNewRepeatStore(lines: string[], period: { start: string; end: string }): ParseResult {
+function parseNewRepeatStore(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
   const rows: Record<string, unknown>[] = []
   for (let i = 3; i < lines.length; i++) {
-    const c = lines[i].split('\t')
+    const c = parseCSVLine(lines[i], delim)
     if (!c[0] || !c[0].includes('年')) continue
     rows.push({
       month: c[0],
@@ -214,10 +261,10 @@ function parseNewRepeatStore(lines: string[], period: { start: string; end: stri
 
 // ---------- 4. 新規・リピート購入者数（商品別） ----------
 
-function parseNewRepeatProduct(lines: string[], period: { start: string; end: string }): ParseResult {
+function parseNewRepeatProduct(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
   const rows: Record<string, unknown>[] = []
   for (let i = 3; i < lines.length; i++) {
-    const c = lines[i].split('\t')
+    const c = parseCSVLine(lines[i], delim)
     if (!c[0]) continue
     rows.push({
       product_name: c[0],
@@ -234,10 +281,10 @@ function parseNewRepeatProduct(lines: string[], period: { start: string; end: st
 
 // ---------- 5. 新規・リピート購入者数（商品ジャンル別） ----------
 
-function parseNewRepeatGenre(lines: string[], period: { start: string; end: string }): ParseResult {
+function parseNewRepeatGenre(lines: string[], period: { start: string; end: string }, delim: string): ParseResult {
   const rows: Record<string, unknown>[] = []
   for (let i = 3; i < lines.length; i++) {
-    const c = lines[i].split('\t')
+    const c = parseCSVLine(lines[i], delim)
     if (!c[0]) continue
     rows.push({
       genre_name: c[0],
@@ -266,18 +313,19 @@ export function parseRakutenCSV(text: string, filename: string): ParseResult {
     throw new Error(`対応していないCSVファイルです: ${filename}`)
   }
 
+  const delim = detectDelimiter(lines)
   const period = parsePeriod(lines[1])
 
   switch (dataType) {
     case 'store_data':
-      return parseStoreData(lines, period)
+      return parseStoreData(lines, period, delim)
     case 'sku_sales':
-      return parseSkuSales(lines, period)
+      return parseSkuSales(lines, period, delim)
     case 'new_repeat_store':
-      return parseNewRepeatStore(lines, period)
+      return parseNewRepeatStore(lines, period, delim)
     case 'new_repeat_product':
-      return parseNewRepeatProduct(lines, period)
+      return parseNewRepeatProduct(lines, period, delim)
     case 'new_repeat_genre':
-      return parseNewRepeatGenre(lines, period)
+      return parseNewRepeatGenre(lines, period, delim)
   }
 }
