@@ -37,7 +37,7 @@ interface Summary {
   unmatched_count: number
 }
 
-const PAGE_SIZE = 50
+const PAGE_SIZE_OPTIONS = [20, 50, 100, 200]
 
 export default function ReviewsPage() {
   return (
@@ -64,14 +64,15 @@ function ReviewsContent() {
   const [rematchResult, setRematchResult] = useState<string | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<string | null>(null)
+  const [pageSize, setPageSize] = useState(50)
   const [dialogProductCode, setDialogProductCode] = useState<string | null>(null)
 
   const fetchReviews = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      params.set('limit', String(PAGE_SIZE))
-      params.set('offset', String(page * PAGE_SIZE))
+      params.set('limit', String(pageSize))
+      params.set('offset', String(page * pageSize))
       if (brand) params.set('brand', brand)
       if (search) params.set('search', search)
       if (typeFilter !== '全て') params.set('type', typeFilter)
@@ -88,7 +89,7 @@ function ReviewsContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, typeFilter, ratingFilter, matchStatus, brand])
+  }, [page, pageSize, search, typeFilter, ratingFilter, matchStatus, brand])
 
   useEffect(() => { fetchReviews() }, [fetchReviews])
 
@@ -159,7 +160,7 @@ function ReviewsContent() {
     }
   }
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const totalPages = Math.ceil(total / pageSize)
   const headerTitle = brand ? `${getBrandDisplayName(brand)} レビュー管理` : 'レビュー管理'
 
   const renderStars = (rating: number) => (
@@ -249,7 +250,16 @@ function ReviewsContent() {
               <SelectItem value="unmatched">未マッチ</SelectItem>
             </SelectContent>
           </Select>
-
+          <div className="ml-auto">
+            <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(0) }}>
+              <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map(n => (
+                  <SelectItem key={n} value={String(n)}>{n}件表示</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Table */}
@@ -359,7 +369,7 @@ function ReviewsContent() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between py-2">
             <span className="text-xs text-gray-500">
-              全{total.toLocaleString()}件中 {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)}件
+              全{total.toLocaleString()}件中 {page * pageSize + 1}-{Math.min((page + 1) * pageSize, total)}件
             </span>
             <div className="flex items-center gap-1.5">
               <button
