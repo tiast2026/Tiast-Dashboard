@@ -377,6 +377,7 @@ async function runImport(dryRun = false, reprocess = false) {
     files_moved: moveResult.moved,
     move_errors: moveResult.errors.length > 0 ? moveResult.errors : undefined,
     brandMismatchWarnings,
+    csvDebug,
   }
 }
 
