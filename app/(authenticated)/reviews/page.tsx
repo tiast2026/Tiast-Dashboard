@@ -174,7 +174,29 @@ function ReviewsContent() {
 
   return (
     <>
-      <Header title={headerTitle} />
+      <Header title={headerTitle}>
+        {(importResult || rematchResult) && (
+          <span className="text-xs text-gray-500 max-w-[300px] truncate">
+            {importResult || rematchResult}
+          </span>
+        )}
+        <button
+          onClick={handleImport}
+          disabled={importLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
+        >
+          <Download className="w-3.5 h-3.5" />
+          {importLoading ? '処理中...' : 'インポート'}
+        </button>
+        <button
+          onClick={handleRematch}
+          disabled={rematchLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#2C2420] text-white rounded-md hover:bg-[#3d332d] transition disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${rematchLoading ? 'animate-spin' : ''}`} />
+          {rematchLoading ? '処理中...' : '再マッチング'}
+        </button>
+      </Header>
       <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
         {/* Summary row */}
         {summary && (
@@ -227,30 +249,6 @@ function ReviewsContent() {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Status toast */}
-            {(importResult || rematchResult) && (
-              <span className="text-xs text-gray-500 max-w-[300px] truncate">
-                {importResult || rematchResult}
-              </span>
-            )}
-            <button
-              onClick={handleImport}
-              disabled={importLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {importLoading ? '処理中...' : 'インポート'}
-            </button>
-            <button
-              onClick={handleRematch}
-              disabled={rematchLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#2C2420] text-white rounded-md hover:bg-[#3d332d] transition disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${rematchLoading ? 'animate-spin' : ''}`} />
-              {rematchLoading ? '処理中...' : '再マッチング'}
-            </button>
-          </div>
         </div>
 
         {/* Table */}
@@ -306,9 +304,11 @@ function ReviewsContent() {
                             <div className="text-[11px] text-gray-500 line-clamp-1" title={review.product_name}>
                               {review.product_name}
                             </div>
-                            <span className="text-[10px] px-1 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
-                              未マッチ
-                            </span>
+                            {review.review_type === '商品レビュー' && (
+                              <span className="text-[10px] px-1 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
+                                未マッチ
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
