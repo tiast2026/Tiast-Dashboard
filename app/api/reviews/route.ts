@@ -36,6 +36,18 @@ const REVIEW_COLUMNS = `
   title, review_body, flag, order_number, unhandled_flag, matched_product_code
 `
 
+/** Combined view of both product and shop review tables */
+function allReviewsTable(): string {
+  return `(
+    SELECT ${REVIEW_COLUMNS}, shop_name FROM ${tableName('rakuten_reviews')}
+    UNION ALL
+    SELECT review_type, product_name, review_url, rating, posted_at,
+           title, review_body, flag, order_number, unhandled_flag,
+           CAST(NULL AS STRING) AS matched_product_code, shop_name
+    FROM ${tableName('rakuten_shop_reviews')}
+  ) AS all_reviews`
+}
+
 /**
  * GET /api/reviews?product_code=xxx&product_name=xxx&limit=50&offset=0&search=xxx&rating=4
  */
@@ -88,7 +100,7 @@ export async function GET(request: NextRequest) {
     // Fetch reviews
     let reviews = await runQuery<ReviewRecord>(`
       SELECT ${REVIEW_COLUMNS}
-      FROM ${tableName('rakuten_reviews')}
+      FROM ${allReviewsTable()}
       WHERE ${whereClause} ${productFilter}
       ORDER BY posted_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -102,7 +114,7 @@ export async function GET(request: NextRequest) {
 
       reviews = await runQuery<ReviewRecord>(`
         SELECT ${REVIEW_COLUMNS}
-        FROM ${tableName('rakuten_reviews')}
+        FROM ${allReviewsTable()}
         WHERE ${whereClause} ${productFilter}
         ORDER BY posted_at DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -112,7 +124,7 @@ export async function GET(request: NextRequest) {
     // Get total count for pagination
     const [countRow] = await runQuery<{ cnt: number }>(`
       SELECT COUNT(*) AS cnt
-      FROM ${tableName('rakuten_reviews')}
+      FROM ${allReviewsTable()}
       WHERE ${whereClause} ${productFilter}
     `)
     const total = countRow?.cnt || 0
@@ -134,7 +146,7 @@ export async function GET(request: NextRequest) {
           COUNT(CASE WHEN rating <= 2 THEN 1 END) AS negative_count,
           COUNT(CASE WHEN matched_product_code IS NOT NULL AND matched_product_code != '' THEN 1 END) AS matched_count,
           COUNT(CASE WHEN review_type = '商品レビュー' AND (matched_product_code IS NULL OR matched_product_code = '') THEN 1 END) AS unmatched_count
-        FROM ${tableName('rakuten_reviews')}
+        FROM ${allReviewsTable()}
         WHERE ${whereClause} ${productFilter}
       `)
       summary = row || null
