@@ -8,6 +8,7 @@ import {
   getRmsNameToCodeMap,
   getReviewMappingMap,
   appendReviewMappings,
+  ensureReviewMappingSheet,
   type RmsItemRow,
 } from '@/lib/google-sheets'
 
@@ -81,28 +82,34 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      console.log(`[rematch] ${unmatchedRows.length}件の未マッチ商品を処理中...`)
-
-      // 2. 既存マッピングを取得
+      // 2. 既存マッピングを取得（シートが無ければ自動作成）
       const existingMap = await getReviewMappingMap()
+      await ensureReviewMappingSheet()
 
-      // 3. レビューページをスクレイピングして品番を取得
-      const reviewUrls = unmatchedRows.map(r => r.review_url)
+      // 3. 既存マッピングで解決できるものを先に適用
+      const stillUnmatched = unmatchedRows.filter(r => !existingMap.has(r.rakuten_item_id))
+      console.log(`[rematch] 未マッチ: ${unmatchedRows.length}件中、既存マッピングで解決済み: ${unmatchedRows.length - stillUnmatched.length}件、スクレイピング対象: ${stillUnmatched.length}件`)
+
+      // 4. スクレイピング (タイムアウト対策: 最大40件/バッチ)
+      const MAX_SCRAPE = 40
+      const scrapeTargets = stillUnmatched.slice(0, MAX_SCRAPE)
+      const reviewUrls = scrapeTargets.map(r => r.review_url)
       const scrapedMap = await batchScrapeProductCodes(reviewUrls, existingMap)
 
-      // 4. 新しいマッピングをシートに保存
+      // 5. 新しいマッピングをシートに保存
       const newMappings = Array.from(scrapedMap.entries())
         .filter(([id]) => !existingMap.has(id))
         .map(([id, code]) => ({ rakuten_item_id: id, product_code: code }))
       const added = await appendReviewMappings(newMappings)
       console.log(`[rematch] マッピングシート: ${added}件追加`)
 
-      // 5. BigQueryのmatched_product_codeを一括UPDATE
+      // 6. BigQueryのmatched_product_codeを一括UPDATE
       const allMappings = await fetchReviewMapping(true)
       if (allMappings.length === 0) {
+        const remaining = stillUnmatched.length - scrapedMap.size
         return NextResponse.json({
           success: true,
-          message: 'スクレイピングで品番を取得できませんでした',
+          message: `スクレイピングで品番を取得できませんでした${remaining > 0 ? `（残り${remaining}件）` : ''}`,
           scraped: scrapedMap.size,
           sheet_added: added,
           bq_updated: 0,
@@ -138,7 +145,7 @@ export async function POST(request: NextRequest) {
         scraped: scrapedMap.size,
         sheet_added: added,
         total_mappings: allMappings.length,
-        message: `${scrapedMap.size}件の品番をスクレイピングで取得し、BigQueryを更新しました`,
+        message: `${scrapedMap.size}件の品番を取得しBigQueryを更新しました${stillUnmatched.length > MAX_SCRAPE ? `（残り${stillUnmatched.length - scrapedMap.size}件 - もう一度実行してください）` : ''}`,
       })
     }
 

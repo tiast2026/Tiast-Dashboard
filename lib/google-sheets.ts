@@ -482,6 +482,43 @@ export async function getReviewMappingMap(): Promise<Map<string, string>> {
 }
 
 /**
+ * Ensure the レビューマッピング sheet exists with headers.
+ */
+export async function ensureReviewMappingSheet(): Promise<void> {
+  const client = getSheetsClient()
+  try {
+    await client.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${REVIEW_MAPPING_SHEET_NAME}!A1`,
+    })
+  } catch {
+    try {
+      await client.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+          requests: [{
+            addSheet: {
+              properties: { title: REVIEW_MAPPING_SHEET_NAME },
+            },
+          }],
+        },
+      })
+    } catch {
+      // Already exists
+    }
+    await client.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${REVIEW_MAPPING_SHEET_NAME}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['楽天商品番号', '品番']],
+      },
+    })
+    console.log('[レビューマッピング] シートを自動作成しました')
+  }
+}
+
+/**
  * Append new mappings to the レビューマッピング sheet (skip duplicates).
  * Automatically creates the sheet + headers if it doesn't exist.
  */
