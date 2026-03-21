@@ -189,15 +189,7 @@ function ReviewsContent() {
           <Download className="w-3.5 h-3.5" />
           {importLoading ? '処理中...' : 'インポート'}
         </button>
-        <button
-          onClick={() => handleImport(true)}
-          disabled={importLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-orange-300 text-orange-600 rounded-md hover:bg-orange-50 transition disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${importLoading ? 'animate-spin' : ''}`} />
-          再取り込み
-        </button>
-        <button
+<button
           onClick={handleRematch}
           disabled={rematchLoading}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#2C2420] text-white rounded-md hover:bg-[#3d332d] transition disabled:opacity-50"
