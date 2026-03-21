@@ -64,10 +64,16 @@ export async function fetchRakutenDataCSVsFromDrive(): Promise<{
         )
         const buffer = dlRes.data as ArrayBuffer
         let content: string
+        // UTF-8を先に試す（fatal: trueで無効なUTF-8バイト列の場合はエラー）
+        // 楽天CSVはUTF-8またはShift_JISの可能性がある
         try {
-          content = new TextDecoder('shift_jis').decode(buffer)
+          content = new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+          // BOM除去
+          if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.slice(1)
+          }
         } catch {
-          content = new TextDecoder('utf-8').decode(buffer)
+          content = new TextDecoder('shift_jis').decode(buffer)
         }
         results.push({
           entry: { id: file.id, name: file.name, shopName: shop.shopName, parentFolderId: shop.folderId },
