@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import {
   fetchAllShopReviewCSVs,
-  deleteDriveFiles,
+  moveDriveFilesToImported,
 } from '@/lib/google-drive'
 import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
@@ -148,7 +148,7 @@ async function runImport(dryRun = false, reprocess = false) {
 
   // 1. Fetch all "reviews*" CSVs from both shop folders
   console.log(`[レビューインポート] NOAHL + BLACKQUEEN のDriveフォルダからreviews CSVを取得中...`)
-  const { reviews, fileIds, debug, csvDebug } = await fetchAllShopReviewCSVs()
+  const { reviews, fileIds, debug, csvDebug, brandMismatchWarnings } = await fetchAllShopReviewCSVs()
 
   if (reviews.length === 0) {
     return {
@@ -161,6 +161,7 @@ async function runImport(dryRun = false, reprocess = false) {
       files_found: fileIds.length,
       debug,
       csvDebug,
+      brandMismatchWarnings,
     }
   }
 
@@ -193,9 +194,9 @@ async function runImport(dryRun = false, reprocess = false) {
 
   if (newReviews.length === 0) {
     if (!dryRun && fileIds.length > 0) {
-      console.log(`[レビューインポート] 新規レビューなし。CSVファイルを削除中...`)
-      const delResult = await deleteDriveFiles(fileIds.map(f => f.id))
-      console.log(`[レビューインポート] ${delResult.deleted}ファイル削除完了`)
+      console.log(`[レビューインポート] 新規レビューなし。CSVファイルをimportedフォルダへ移動中...`)
+      const moveResult = await moveDriveFilesToImported(fileIds)
+      console.log(`[レビューインポート] ${moveResult.moved}ファイル移動完了`)
     }
     return {
       success: true,
@@ -203,7 +204,7 @@ async function runImport(dryRun = false, reprocess = false) {
       imported: 0,
       skipped_duplicates: skipped,
       files_found: fileIds.length,
-      files_deleted: dryRun ? 0 : fileIds.length,
+      files_moved: dryRun ? 0 : fileIds.length,
     }
   }
 
@@ -352,12 +353,12 @@ async function runImport(dryRun = false, reprocess = false) {
     inserted += batch.length
   }
 
-  // 5. Delete CSV files from Drive
-  console.log(`[レビューインポート] CSVファイルを削除中...`)
-  const delResult = await deleteDriveFiles(fileIds.map(f => f.id))
-  console.log(`[レビューインポート] ${delResult.deleted}ファイル削除完了`)
-  if (delResult.errors.length > 0) {
-    console.warn(`[レビューインポート] 削除エラー:`, delResult.errors)
+  // 5. Move CSV files to "imported" subfolder
+  console.log(`[レビューインポート] CSVファイルをimportedフォルダへ移動中...`)
+  const moveResult = await moveDriveFilesToImported(fileIds)
+  console.log(`[レビューインポート] ${moveResult.moved}ファイル移動完了`)
+  if (moveResult.errors.length > 0) {
+    console.warn(`[レビューインポート] 移動エラー:`, moveResult.errors)
   }
 
   const matched = [...rakutenProductList, ...officialReviewList].filter(r => r.matched_product_code).length
@@ -373,8 +374,9 @@ async function runImport(dryRun = false, reprocess = false) {
     shop_reviews: rakutenShopList.length,
     official_reviews: officialReviewList.length,
     files_processed: fileIds.map(f => f.name),
-    files_deleted: delResult.deleted,
-    delete_errors: delResult.errors.length > 0 ? delResult.errors : undefined,
+    files_moved: moveResult.moved,
+    move_errors: moveResult.errors.length > 0 ? moveResult.errors : undefined,
+    brandMismatchWarnings,
     csvDebug,
   }
 }

@@ -15,11 +15,87 @@ function getDriveClient(): drive_v3.Drive {
   return drive({ version: 'v3', auth: authClient })
 }
 
-/** Review CSV folders per shop */
+/** CSV folders per shop (shared for reviews + Rakuten data) */
 export const REVIEW_CSV_FOLDERS: { shopName: string; folderId: string }[] = [
   { shopName: 'NOAHL',      folderId: '1B4QMfyfgoh7I3D5n2pGLBNFSSmHudmEk' },
   { shopName: 'BLACKQUEEN', folderId: '1uLw0fGWu6I0YGHduENPYoUOObQ3J_7ox' },
 ]
+
+// ---- 楽天データCSV取得 (Google Drive) ----
+
+import { isRakutenDataCSV } from '@/lib/rakuten-csv-parser'
+
+export interface DriveFileEntry {
+  id: string
+  name: string
+  shopName: string
+  parentFolderId: string
+}
+
+/**
+ * Fetch all Rakuten data CSVs (non-review) from Drive folders.
+ * Detects by filename pattern (店舗データ, SKU別売上, etc.)
+ */
+export async function fetchRakutenDataCSVsFromDrive(): Promise<{
+  files: { entry: DriveFileEntry; content: string }[]
+  errors: { fileName: string; shopName: string; error: string }[]
+}> {
+  const client = getDriveClient()
+  const results: { entry: DriveFileEntry; content: string }[] = []
+  const errors: { fileName: string; shopName: string; error: string }[] = []
+
+  for (const shop of REVIEW_CSV_FOLDERS) {
+    const res = await client.files.list({
+      q: `'${shop.folderId}' in parents and trashed=false`,
+      fields: 'files(id, name, mimeType)',
+      pageSize: 50,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    })
+
+    const files = res.data.files || []
+    console.log(`[楽天データ][${shop.shopName}] フォルダ内ファイル数: ${files.length}`)
+    for (const file of files) {
+      console.log(`[楽天データ][${shop.shopName}]   - ${file.name} (${file.mimeType}) → 楽天CSV: ${file.name ? isRakutenDataCSV(file.name) : false}`)
+    }
+
+    for (const file of files) {
+      if (!file.id || !file.name) continue
+      if (!isRakutenDataCSV(file.name)) continue
+
+      console.log(`[楽天データ][${shop.shopName}] 読み込み中: ${file.name}`)
+      try {
+        const dlRes = await client.files.get(
+          { fileId: file.id, alt: 'media', supportsAllDrives: true },
+          { responseType: 'arraybuffer' },
+        )
+        const buffer = dlRes.data as ArrayBuffer
+        let content: string
+        // UTF-8を先に試す（fatal: trueで無効なUTF-8バイト列の場合はエラー）
+        // 楽天CSVはUTF-8またはShift_JISの可能性がある
+        try {
+          content = new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+          // BOM除去
+          if (content.charCodeAt(0) === 0xFEFF) {
+            content = content.slice(1)
+          }
+        } catch {
+          content = new TextDecoder('shift_jis').decode(buffer)
+        }
+        results.push({
+          entry: { id: file.id, name: file.name, shopName: shop.shopName, parentFolderId: shop.folderId },
+          content,
+        })
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e)
+        console.error(`[楽天データ][${shop.shopName}] ${file.name} 読み込みエラー:`, e)
+        errors.push({ fileName: file.name, shopName: shop.shopName, error: errorMsg })
+      }
+    }
+  }
+
+  return { files: results, errors }
+}
 
 export interface ReviewRow {
   shop_name: string
@@ -35,6 +111,58 @@ export interface ReviewRow {
   unhandled_flag: number
   manage_number: string
   review_source: '楽天' | '公式'
+}
+
+export interface BrandMismatchWarning {
+  fileName: string
+  folderBrand: string
+  detectedBrand: string
+  mismatchCount: number
+  totalRows: number
+  sampleManageNumbers: string[]
+}
+
+/**
+ * 品番の先頭文字からブランドを判定する。
+ * n → NOAHL, b → BLACKQUEEN（SQLのCASE文と同じロジック）
+ */
+function detectBrandFromManageNumber(manageNumber: string): string | null {
+  if (!manageNumber) return null
+  const first = manageNumber.charAt(0).toLowerCase()
+  if (first === 'n') return 'NOAHL'
+  if (first === 'b') return 'BLACKQUEEN'
+  return null
+}
+
+/**
+ * CSVの品番からブランドを推定し、フォルダのブランドと一致するか検証する。
+ */
+function validateBrandMatch(
+  rows: ReviewRow[],
+  folderBrand: string,
+  fileName: string,
+): BrandMismatchWarning | null {
+  const mismatched: string[] = []
+  let detectedOtherBrand: string | null = null
+
+  for (const row of rows) {
+    const detected = detectBrandFromManageNumber(row.manage_number)
+    if (detected && detected !== folderBrand) {
+      mismatched.push(row.manage_number)
+      if (!detectedOtherBrand) detectedOtherBrand = detected
+    }
+  }
+
+  if (mismatched.length === 0 || !detectedOtherBrand) return null
+
+  return {
+    fileName,
+    folderBrand,
+    detectedBrand: detectedOtherBrand,
+    mismatchCount: mismatched.length,
+    totalRows: rows.length,
+    sampleManageNumbers: Array.from(new Set(mismatched)).slice(0, 5),
+  }
 }
 
 // CSV header → internal key mapping (supports both Rakuten and official store CSVs)
@@ -323,7 +451,7 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 async function fetchReviewCSVsFromFolder(
   folderId: string,
   shopName: string,
-): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[] }> {
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string; parentFolderId: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[]; brandMismatchWarnings?: BrandMismatchWarning[] }> {
   const client = getDriveClient()
 
   const queryParts: string[] = [
@@ -371,8 +499,9 @@ async function fetchReviewCSVsFromFolder(
   console.log(`[レビュー][${shopName}] ${files.length}件のreviews CSVファイルを発見`)
 
   const allReviews: ReviewRow[] = []
-  const fileIds: { id: string; name: string }[] = []
+  const fileIds: { id: string; name: string; parentFolderId: string }[] = []
   const csvDebug: Record<string, unknown>[] = []
+  const brandMismatchWarnings: BrandMismatchWarning[] = []
 
   for (const file of files) {
     if (!file.id || !file.name) continue
@@ -426,6 +555,17 @@ async function fetchReviewCSVsFromFolder(
       const rawHeaders = headerLine.split(headerLine.includes('\t') ? '\t' : ',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''))
       const matchedHeaders = rawHeaders.filter(h => h in REVIEW_HEADER_MAP)
       const unmatchedHeaders = rawHeaders.filter(h => !(h in REVIEW_HEADER_MAP))
+
+      // ブランド誤フォルダ検証: 品番プレフィックスでブランドを判定
+      const mismatch = validateBrandMatch(rows, shopName, file.name)
+      if (mismatch) {
+        brandMismatchWarnings.push(mismatch)
+        console.warn(
+          `[レビュー][${shopName}] ⚠️ ブランド不一致: ${file.name} は${mismatch.detectedBrand}の品番を含んでいます` +
+          `（${mismatch.mismatchCount}/${mismatch.totalRows}件、例: ${mismatch.sampleManageNumbers.join(', ')}）`
+        )
+      }
+
       csvDebug.push({
         fileName: file.name,
         isOfficial: isOfficialFile,
@@ -439,14 +579,15 @@ async function fetchReviewCSVsFromFolder(
         matchedHeaders,
         unmatchedHeaders,
         reviewSource: isOfficialFile ? '公式' : '楽天',
+        brandMismatch: mismatch ? { detectedBrand: mismatch.detectedBrand, mismatchCount: mismatch.mismatchCount } : null,
       })
       console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件 (${isOfficialFile ? '公式' : '楽天'})`)
       allReviews.push(...rows)
-      // Only mark file for deletion if it had parsed rows (don't delete unparseable files)
+      // Only mark file for processing if it had parsed rows (don't move unparseable files)
       if (rows.length > 0) {
-        fileIds.push({ id: file.id, name: file.name })
+        fileIds.push({ id: file.id, name: file.name, parentFolderId: folderId })
       } else {
-        console.warn(`[レビュー][${shopName}] ${file.name}: 0件パース - ファイルは削除しません`)
+        console.warn(`[レビュー][${shopName}] ${file.name}: 0件パース - ファイルは移動しません`)
       }
     } catch (e) {
       csvDebug.push({ fileName: file.name, error: e instanceof Error ? e.message : String(e) })
@@ -454,7 +595,12 @@ async function fetchReviewCSVsFromFolder(
     }
   }
 
-  return { reviews: allReviews, fileIds, csvDebug: csvDebug.length > 0 ? csvDebug : undefined }
+  return {
+    reviews: allReviews,
+    fileIds,
+    csvDebug: csvDebug.length > 0 ? csvDebug : undefined,
+    brandMismatchWarnings: brandMismatchWarnings.length > 0 ? brandMismatchWarnings : undefined,
+  }
 }
 
 /**
@@ -462,21 +608,28 @@ async function fetchReviewCSVsFromFolder(
  */
 export async function fetchAllShopReviewCSVs(): Promise<{
   reviews: ReviewRow[]
-  fileIds: { id: string; name: string }[]
+  fileIds: { id: string; name: string; parentFolderId: string }[]
   debug?: Record<string, unknown>[]
   csvDebug?: Record<string, unknown>[]
+  brandMismatchWarnings?: BrandMismatchWarning[]
 }> {
   const allReviews: ReviewRow[] = []
-  const allFileIds: { id: string; name: string }[] = []
+  const allFileIds: { id: string; name: string; parentFolderId: string }[] = []
   const debugInfo: Record<string, unknown>[] = []
   const allCsvDebug: Record<string, unknown>[] = []
+  const allBrandMismatchWarnings: BrandMismatchWarning[] = []
 
   for (const shop of REVIEW_CSV_FOLDERS) {
-    const { reviews, fileIds, debug, csvDebug } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
+    const { reviews, fileIds, debug, csvDebug, brandMismatchWarnings } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
     allReviews.push(...reviews)
     allFileIds.push(...fileIds)
     if (debug) debugInfo.push(debug)
     if (csvDebug) allCsvDebug.push(...csvDebug)
+    if (brandMismatchWarnings) allBrandMismatchWarnings.push(...brandMismatchWarnings)
+  }
+
+  if (allBrandMismatchWarnings.length > 0) {
+    console.warn(`[レビュー] ⚠️ ${allBrandMismatchWarnings.length}件のCSVファイルでブランド不一致を検出`)
   }
 
   console.log(`[レビュー] 全店舗合計: ${allReviews.length}件（${allFileIds.length}ファイル）`)
@@ -485,6 +638,7 @@ export async function fetchAllShopReviewCSVs(): Promise<{
     fileIds: allFileIds,
     debug: debugInfo.length > 0 ? debugInfo : undefined,
     csvDebug: allCsvDebug.length > 0 ? allCsvDebug : undefined,
+    brandMismatchWarnings: allBrandMismatchWarnings.length > 0 ? allBrandMismatchWarnings : undefined,
   }
 }
 
@@ -513,4 +667,74 @@ export async function deleteDriveFiles(fileIds: string[]): Promise<{ deleted: nu
   }
 
   return { deleted, errors }
+}
+
+/**
+ * 指定フォルダ内の「imported」サブフォルダを取得、なければ作成する。
+ */
+async function getOrCreateImportedFolder(parentFolderId: string): Promise<string> {
+  const client = getDriveClient()
+  const subfolderName = 'imported'
+
+  // 既存の「imported」フォルダを検索
+  const res = await client.files.list({
+    q: `name='${subfolderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  })
+
+  const existing = res.data.files?.[0]
+  if (existing?.id) return existing.id
+
+  // なければ作成
+  const createRes = await client.files.create({
+    requestBody: {
+      name: subfolderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    },
+    fields: 'id',
+    supportsAllDrives: true,
+  })
+
+  console.log(`[Drive] 「imported」フォルダを作成: ${parentFolderId}`)
+  return createRes.data.id!
+}
+
+/**
+ * ファイルを「imported」サブフォルダに移動する。
+ * parentFolderIdごとにグルーピングして移動先を取得する。
+ */
+export async function moveDriveFilesToImported(
+  files: { id: string; name: string; parentFolderId: string }[],
+): Promise<{ moved: number; errors: string[] }> {
+  const client = getDriveClient()
+  let moved = 0
+  const errors: string[] = []
+
+  // 親フォルダごとにimportedフォルダIDをキャッシュ
+  const importedFolderCache = new Map<string, string>()
+
+  for (const file of files) {
+    try {
+      let importedFolderId = importedFolderCache.get(file.parentFolderId)
+      if (!importedFolderId) {
+        importedFolderId = await getOrCreateImportedFolder(file.parentFolderId)
+        importedFolderCache.set(file.parentFolderId, importedFolderId)
+      }
+
+      await client.files.update({
+        fileId: file.id,
+        addParents: importedFolderId,
+        removeParents: file.parentFolderId,
+        supportsAllDrives: true,
+      })
+      moved++
+    } catch (e) {
+      errors.push(`${file.name}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return { moved, errors }
 }
