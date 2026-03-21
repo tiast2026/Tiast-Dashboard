@@ -139,12 +139,13 @@ function normalizeDate(dateStr: string): string {
 
 function parsePeriod(line: string): { start: string; end: string } {
   // 日次: "データ対象期間 2026/03/01 ～ 2026/03/31"
-  const matchFull = line.match(new RegExp(`(\\d{4}\\/\\d{1,2}\\/\\d{1,2})\\s*[～〜~]\\s*(\\d{4}\\/\\d{1,2}\\/\\d{1,2})`))
+  // 波ダッシュ文字はエンコーディングにより変化するため、日付間の任意セパレータにマッチ
+  const matchFull = line.match(/(\d{4}\/\d{1,2}\/\d{1,2})\s*[^\d\/]+\s*(\d{4}\/\d{1,2}\/\d{1,2})/)
   if (matchFull) {
     return { start: normalizeDate(matchFull[1]), end: normalizeDate(matchFull[2]) }
   }
   // 月次: "データ対象期間 2024/04 ～ 2026/03"
-  const matchMonth = line.match(new RegExp(`(\\d{4}\\/\\d{1,2})\\s*[～〜~]\\s*(\\d{4}\\/\\d{1,2})`))
+  const matchMonth = line.match(/(\d{4}\/\d{2})\s*[^\d\/]+\s*(\d{4}\/\d{2})/)
   if (matchMonth) {
     return {
       start: normalizeDate(matchMonth[1] + '/01'),
