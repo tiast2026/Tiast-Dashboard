@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fetchAllRmsItems, isRmsConfigured, fetchItemNumberMappings } from '@/lib/rakuten-rms'
-import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
+import { fetchAllRmsItems, isRmsConfigured } from '@/lib/rakuten-rms'
+import { getBigQueryClient, isBigQueryConfigured, runQuery, tableName } from '@/lib/bigquery'
+import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
 import {
   writeRmsItemsToSheet,
   fetchReviewMapping,
   getRmsNameToCodeMap,
+  getReviewMappingMap,
   appendReviewMappings,
   type RmsItemRow,
 } from '@/lib/google-sheets'
 
+// Allow up to 60s for scraping (Vercel Pro)
+export const maxDuration = 60
+
 /**
  * POST /api/reviews/mapping
- * Body: { action: 'sync' | 'status' }
+ * Body: { action: 'sync' | 'rematch' | 'status' }
  *
- * action='sync':   RMS API v2.0から全商品を取得 → Google Sheets「RMS商品マスタ」に書き込み
- * action='status': 現在のマッピング状況を返す
+ * action='sync':     RMS API v2.0から全商品を取得 → Google Sheets「RMS商品マスタ」に書き込み
+ * action='rematch':  レビューページをスクレイピングして品番を取得 → マッピングシート + BQ更新
+ * action='status':   現在のマッピング状況を返す
  */
 export async function POST(request: NextRequest) {
   try {
@@ -52,50 +58,65 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'rematch') {
-      // 1. RMS APIから楽天商品番号→品番マッピングを取得
-      if (!isRmsConfigured()) {
-        return NextResponse.json({
-          error: 'RMS API未設定。RAKUTEN_RMS_SHOPS 環境変数を設定してください',
-        }, { status: 400 })
-      }
       if (!isBigQueryConfigured()) {
         return NextResponse.json({ error: 'BigQuery未設定' }, { status: 400 })
       }
 
-      console.log('[rematch] RMS APIから楽天商品番号マッピングを取得中...')
-      const rmsMappings = await fetchItemNumberMappings()
-      console.log(`[rematch] RMS APIから ${rmsMappings.length}件のマッピング取得`)
+      // 1. BQからmatched_product_codeがNULLのレビューURLを取得
+      console.log('[rematch] matched_product_code未設定のレビューを取得中...')
+      const unmatchedRows = await runQuery<{ rakuten_item_id: string; review_url: string }>(`
+        SELECT DISTINCT rakuten_item_id, MIN(review_url) AS review_url
+        FROM ${tableName('rakuten_reviews')}
+        WHERE (matched_product_code IS NULL OR matched_product_code = '')
+          AND rakuten_item_id IS NOT NULL
+        GROUP BY rakuten_item_id
+      `)
 
-      // 2. マッピングシートに書き込み
-      const sheetMappings = rmsMappings.map(m => ({
-        rakuten_item_id: m.itemNumber,
-        product_code: m.manageNumber,
-      }))
-      const added = await appendReviewMappings(sheetMappings)
-      console.log(`[rematch] マッピングシートに ${added}件追加`)
+      if (unmatchedRows.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: '未マッチのレビューはありません',
+          scraped: 0,
+          bq_updated: 0,
+        })
+      }
 
-      // 3. BigQueryのmatched_product_codeを更新
-      const bq = getBigQueryClient()
-      const PROJECT = 'tiast-data-platform'
-      const DATASET = 'analytics_mart'
-      const TABLE = 'rakuten_reviews'
+      console.log(`[rematch] ${unmatchedRows.length}件の未マッチ商品を処理中...`)
 
-      // Build CASE WHEN for bulk UPDATE
+      // 2. 既存マッピングを取得
+      const existingMap = await getReviewMappingMap()
+
+      // 3. レビューページをスクレイピングして品番を取得
+      const reviewUrls = unmatchedRows.map(r => r.review_url)
+      const scrapedMap = await batchScrapeProductCodes(reviewUrls, existingMap)
+
+      // 4. 新しいマッピングをシートに保存
+      const newMappings = Array.from(scrapedMap.entries())
+        .filter(([id]) => !existingMap.has(id))
+        .map(([id, code]) => ({ rakuten_item_id: id, product_code: code }))
+      const added = await appendReviewMappings(newMappings)
+      console.log(`[rematch] マッピングシート: ${added}件追加`)
+
+      // 5. BigQueryのmatched_product_codeを一括UPDATE
       const allMappings = await fetchReviewMapping(true)
       if (allMappings.length === 0) {
         return NextResponse.json({
           success: true,
-          message: 'マッピングデータが見つかりません',
-          rms_mappings: rmsMappings.length,
+          message: 'スクレイピングで品番を取得できませんでした',
+          scraped: scrapedMap.size,
           sheet_added: added,
           bq_updated: 0,
         })
       }
 
+      const bq = getBigQueryClient()
+      const PROJECT = 'tiast-data-platform'
+      const DATASET = 'analytics_mart'
+      const TABLE = 'rakuten_reviews'
+
       const caseWhen = allMappings
         .map(m => `WHEN '${m.rakuten_item_id}' THEN '${m.product_code}'`)
         .join('\n          ')
-
       const itemIds = allMappings.map(m => `'${m.rakuten_item_id}'`).join(', ')
 
       const updateQuery = `
@@ -108,21 +129,16 @@ export async function POST(request: NextRequest) {
           AND (matched_product_code IS NULL OR matched_product_code = '')
       `
 
-      const [, job] = await bq.query({ query: updateQuery, location: 'asia-northeast1' })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const jobMeta = job as any
-      const stats = jobMeta?.metadata?.statistics
-      const updatedRows = stats?.numDmlAffectedRows || stats?.query?.numDmlAffectedRows || '不明'
-
-      console.log(`[rematch] BigQuery更新完了: ${updatedRows}行`)
+      await bq.query({ query: updateQuery, location: 'asia-northeast1' })
+      console.log(`[rematch] BigQuery更新完了`)
 
       return NextResponse.json({
         success: true,
-        rms_mappings: rmsMappings.length,
+        unmatched_items: unmatchedRows.length,
+        scraped: scrapedMap.size,
         sheet_added: added,
-        bq_updated: updatedRows,
         total_mappings: allMappings.length,
-        message: `${updatedRows}件のレビューにmatched_product_codeを設定しました`,
+        message: `${scrapedMap.size}件の品番をスクレイピングで取得し、BigQueryを更新しました`,
       })
     }
 
