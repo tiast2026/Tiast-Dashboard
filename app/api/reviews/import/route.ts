@@ -3,7 +3,6 @@ import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import {
   fetchAllShopReviewCSVs,
   moveDriveFilesToImported,
-  type BrandMismatchWarning,
 } from '@/lib/google-drive'
 import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
