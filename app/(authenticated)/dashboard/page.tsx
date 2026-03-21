@@ -31,7 +31,7 @@ import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, Cate
 import type { CustomerSummary } from '@/types/customer'
 import type { InventoryAlerts } from '@/types/inventory'
 import DataSourceBadge from '@/components/ui/data-source-badge'
-import { Users, UserPlus, Repeat, TrendingUp, ShoppingCart, Percent, CreditCard, Monitor, Smartphone, ArrowDown, AlertTriangle, CheckCircle2, Info, TrendingDown } from 'lucide-react'
+import { Users, UserPlus, Repeat, TrendingUp, ShoppingCart, Percent, CreditCard, Monitor, Smartphone, ArrowDown, AlertTriangle, CheckCircle2, Info, TrendingDown, Calendar, Truck, Package, Gift } from 'lucide-react'
 
 interface RakutenDailyItem {
   date: string
@@ -79,11 +79,52 @@ interface NewRepeatStoreItem {
   month: string
   new_buyers: number
   new_sales: number
+  new_sales_count: number
+  new_sales_quantity: number
   new_avg_order_value: number
+  new_items_per_order: number
   repeat_buyers: number
   repeat_sales: number
+  repeat_sales_count: number
+  repeat_sales_quantity: number
   repeat_avg_order_value: number
+  repeat_items_per_order: number
   repeat_rate: number
+}
+
+interface DayOfWeekItem {
+  day_of_week: string
+  sales_amount: number
+  order_count: number
+  access_count: number
+  unique_users: number
+  conversion_rate: number
+  avg_order_value: number
+  day_count: number
+}
+
+interface CostBreakdown {
+  total_sales: number
+  tax_amount: number
+  shipping_fee: number
+  payment_fee: number
+  wrapping_fee: number
+  coupon_discount_store: number
+  coupon_discount_rakuten: number
+  free_shipping_coupon: number
+  points_cost: number
+}
+
+interface MemberAnalysis {
+  buyers_member: number
+  buyers_non_member: number
+  deal_new_buyers: number
+  deal_repeat_buyers: number
+  deal_access_count: number
+  deal_buyers_member: number
+  deal_buyers_non_member: number
+  points_sales_count: number
+  total_order_count: number
 }
 
 interface RakutenAnalyticsData {
@@ -92,6 +133,9 @@ interface RakutenAnalyticsData {
   device: RakutenDeviceItem[]
   coupon: CouponAnalysis | null
   newRepeat: NewRepeatStoreItem[]
+  dayOfWeek: DayOfWeekItem[]
+  costBreakdown: CostBreakdown | null
+  memberAnalysis: MemberAnalysis | null
   availability: { rakuten: boolean; official: boolean }
 }
 
@@ -136,7 +180,7 @@ function DashboardPageContent() {
   const rakutenCacheKey = `rakuten-store-analytics:${month}:${brandParam}`
   const cachedRakuten = getCached<RakutenAnalyticsData>(rakutenCacheKey)
   const [rakutenData, setRakutenData] = useState<RakutenAnalyticsData>(
-    cachedRakuten ?? { daily: [], funnel: null, device: [], coupon: null, newRepeat: [], availability: { rakuten: false, official: false } }
+    cachedRakuten ?? { daily: [], funnel: null, device: [], coupon: null, newRepeat: [], dayOfWeek: [], costBreakdown: null, memberAnalysis: null, availability: { rakuten: false, official: false } }
   )
   const [rakutenLoading, setRakutenLoading] = useState(false)
   const rakutenFetchedRef = useRef('')
@@ -147,21 +191,27 @@ function DashboardPageContent() {
     setRakutenLoading(true)
     try {
       const shopParam = urlBrand ? `&shop_name=${urlBrand}` : ''
-      const [dailyRes, funnelRes, deviceRes, couponRes, nrRes, availRes] = await Promise.all([
+      const [dailyRes, funnelRes, deviceRes, couponRes, nrRes, availRes, dowRes, costRes, memberRes] = await Promise.all([
         fetch(`/api/rakuten-analytics/store-daily?month=${month}${shopParam}`),
         fetch(`/api/rakuten-analytics/conversion-funnel?month=${month}${shopParam}`),
         fetch(`/api/rakuten-analytics/device-breakdown?month=${month}${shopParam}`),
         fetch(`/api/rakuten-analytics/coupon-analysis?month=${month}${shopParam}`),
         fetch(`/api/rakuten-analytics/new-repeat-store?${urlBrand ? `shop_name=${urlBrand}` : ''}`),
         fetch(`/api/rakuten-analytics/data-availability?${urlBrand ? `shop_name=${urlBrand}` : ''}`),
+        fetch(`/api/rakuten-analytics/day-of-week?month=${month}${shopParam}`),
+        fetch(`/api/rakuten-analytics/cost-breakdown?month=${month}${shopParam}`),
+        fetch(`/api/rakuten-analytics/member-analysis?month=${month}${shopParam}`),
       ])
-      const [dailyData, funnelData, deviceData, couponData, nrData, availData] = await Promise.all([
+      const [dailyData, funnelData, deviceData, couponData, nrData, availData, dowData, costData, memberData] = await Promise.all([
         dailyRes.ok ? dailyRes.json() : [],
         funnelRes.ok ? funnelRes.json() : null,
         deviceRes.ok ? deviceRes.json() : [],
         couponRes.ok ? couponRes.json() : null,
         nrRes.ok ? nrRes.json() : [],
         availRes.ok ? availRes.json() : { rakuten: false, official: false },
+        dowRes.ok ? dowRes.json() : [],
+        costRes.ok ? costRes.json() : null,
+        memberRes.ok ? memberRes.json() : null,
       ])
       const result: RakutenAnalyticsData = {
         daily: Array.isArray(dailyData) ? dailyData : [],
@@ -169,6 +219,9 @@ function DashboardPageContent() {
         device: Array.isArray(deviceData) ? deviceData : [],
         coupon: couponData,
         newRepeat: Array.isArray(nrData) ? nrData : [],
+        dayOfWeek: Array.isArray(dowData) ? dowData : [],
+        costBreakdown: costData,
+        memberAnalysis: memberData,
         availability: availData,
       }
       if (mountedRef.current) {
@@ -746,6 +799,49 @@ function DashboardPageContent() {
                       insights.push({ type: 'info', title: `客単価 ${formatCurrency(aov)}`, detail: aov >= 5000 ? 'セット売りやまとめ買い促進で更なる向上が見込めます。' : 'クロスセル・アップセルの仕組みを導入し、客単価向上を図りましょう。' })
                     }
                   }
+                  // 曜日分析
+                  if (rakutenData.dayOfWeek.length > 0) {
+                    const sorted = [...rakutenData.dayOfWeek].sort((a, b) => (Number(b.sales_amount) || 0) - (Number(a.sales_amount) || 0))
+                    const top = sorted[0]
+                    const bottom = sorted[sorted.length - 1]
+                    if (top && bottom) {
+                      insights.push({ type: 'info', title: `${top.day_of_week}曜が売上最大`, detail: `${top.day_of_week}曜 ${formatCurrency(Number(top.sales_amount) || 0)} vs ${bottom.day_of_week}曜 ${formatCurrency(Number(bottom.sales_amount) || 0)}。広告・クーポン配信は${top.day_of_week}曜前後が効果的です。` })
+                    }
+                  }
+                  // コスト比率
+                  if (rakutenData.costBreakdown) {
+                    const cb = rakutenData.costBreakdown
+                    const totalSales = Number(cb.total_sales) || 1
+                    const shippingRate = (Number(cb.shipping_fee) || 0) / totalSales
+                    if (shippingRate > 0.1) {
+                      insights.push({ type: 'warning', title: '送料コストが高い', detail: `送料が売上の${(shippingRate * 100).toFixed(1)}%を占めています。送料無料ラインの設定やまとめ買い促進で改善しましょう。` })
+                    }
+                  }
+                  // DEAL新規獲得効果
+                  if (rakutenData.memberAnalysis) {
+                    const ma = rakutenData.memberAnalysis
+                    const dealNew = Number(ma.deal_new_buyers) || 0
+                    const dealRepeat = Number(ma.deal_repeat_buyers) || 0
+                    const dealTotal = dealNew + dealRepeat
+                    if (dealTotal > 0) {
+                      const dealNewRate = dealNew / dealTotal
+                      if (dealNewRate < 0.4) {
+                        insights.push({ type: 'danger', title: 'DEALがリピーター値引きに', detail: `DEAL購入者の${((1 - dealNewRate) * 100).toFixed(0)}%がリピーター。新規獲得目的なら別施策（広告・SNS）も検討を。` })
+                      } else if (dealNewRate >= 0.6) {
+                        insights.push({ type: 'success', title: 'DEALの新規獲得が好調', detail: `DEAL購入者の${(dealNewRate * 100).toFixed(0)}%が新規。新規獲得チャネルとして有効に機能しています。` })
+                      }
+                    }
+                  }
+                  // 会員比率
+                  if (rakutenData.memberAnalysis) {
+                    const ma = rakutenData.memberAnalysis
+                    const member = Number(ma.buyers_member) || 0
+                    const nonMember = Number(ma.buyers_non_member) || 0
+                    const total = member + nonMember
+                    if (total > 0 && nonMember / total > 0.3) {
+                      insights.push({ type: 'info', title: '非会員比率が高い', detail: `非会員が${((nonMember / total) * 100).toFixed(0)}%。会員登録促進でリピート率改善・ポイント活用が見込めます。` })
+                    }
+                  }
 
                   if (insights.length === 0) return null
                   const iconMap = { success: CheckCircle2, warning: AlertTriangle, danger: TrendingDown, info: Info }
@@ -891,6 +987,226 @@ function DashboardPageContent() {
                   </Card>
                 </div>
 
+                {/* 曜日別パフォーマンス + コスト内訳 */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* 曜日別パフォーマンス */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-indigo-500" />
+                        曜日別パフォーマンス
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {rakutenData.dayOfWeek.length > 0 ? (() => {
+                        const maxSales = Math.max(...rakutenData.dayOfWeek.map(d => Number(d.sales_amount) || 0))
+                        const dayColors: Record<string, string> = { '土': 'bg-blue-500', '日': 'bg-red-500' }
+                        return (
+                          <div className="space-y-2">
+                            {rakutenData.dayOfWeek.map((d) => {
+                              const sales = Number(d.sales_amount) || 0
+                              const barWidth = maxSales > 0 ? (sales / maxSales) * 100 : 0
+                              const barColor = dayColors[d.day_of_week] || 'bg-gray-400'
+                              const isTop = sales === maxSales
+                              return (
+                                <div key={d.day_of_week} className={`p-3 rounded-xl border transition-all ${isTop ? 'bg-indigo-50/50 border-indigo-200/60' : 'bg-gray-50/50 border-gray-100/60'}`}>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-[13px] font-bold ${d.day_of_week === '土' ? 'text-blue-600' : d.day_of_week === '日' ? 'text-red-600' : 'text-[#3D352F]'}`}>
+                                        {d.day_of_week}曜
+                                      </span>
+                                      {isTop && <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">TOP</span>}
+                                    </div>
+                                    <span className="text-[13px] font-bold text-[#3D352F] tabular-nums">{formatCurrency(sales)}</span>
+                                  </div>
+                                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mb-1.5">
+                                    <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${barWidth}%` }} />
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                                    <span>CVR <span className="font-medium text-[#5A524B]">{formatPercent(Number(d.conversion_rate) || 0)}</span></span>
+                                    <span>客単価 <span className="font-medium text-[#5A524B]">{formatCurrency(Number(d.avg_order_value) || 0)}</span></span>
+                                    <span>UU <span className="font-medium text-[#5A524B]">{formatNumber(Number(d.unique_users) || 0)}</span></span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })() : (
+                        <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* コスト内訳 */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-orange-500" />
+                        コスト内訳
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {rakutenData.costBreakdown ? (() => {
+                        const cb = rakutenData.costBreakdown
+                        const totalSales = Number(cb.total_sales) || 1
+                        const costs = [
+                          { label: '送料', value: Number(cb.shipping_fee) || 0, icon: Truck, color: 'text-orange-600', bg: 'bg-orange-50' },
+                          { label: '決済手数料', value: Number(cb.payment_fee) || 0, icon: CreditCard, color: 'text-purple-600', bg: 'bg-purple-50' },
+                          { label: '税額', value: Number(cb.tax_amount) || 0, icon: Percent, color: 'text-slate-600', bg: 'bg-slate-50' },
+                          { label: 'ラッピング', value: Number(cb.wrapping_fee) || 0, icon: Gift, color: 'text-pink-600', bg: 'bg-pink-50' },
+                          { label: 'ポイント原資', value: Number(cb.points_cost) || 0, icon: Package, color: 'text-red-600', bg: 'bg-red-50' },
+                          { label: '店舗クーポン', value: Number(cb.coupon_discount_store) || 0, icon: ShoppingCart, color: 'text-amber-600', bg: 'bg-amber-50' },
+                          { label: '楽天クーポン', value: Number(cb.coupon_discount_rakuten) || 0, icon: ShoppingCart, color: 'text-amber-600', bg: 'bg-amber-50' },
+                          { label: '送料無料クーポン', value: Number(cb.free_shipping_coupon) || 0, icon: Truck, color: 'text-teal-600', bg: 'bg-teal-50' },
+                        ]
+                        const totalCost = costs.reduce((s, c) => s + c.value, 0)
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-100/60">
+                              <span className="text-[12px] font-semibold text-red-700">コスト合計 / 売上比率</span>
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-red-800 tabular-nums">{formatCurrency(totalCost)}</div>
+                                <div className="text-[11px] text-red-600 tabular-nums">{formatPercent(totalCost / totalSales)}</div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {costs.filter(c => c.value > 0).map((cost) => {
+                                const Icon = cost.icon
+                                return (
+                                  <div key={cost.label} className="flex items-center gap-3 py-1.5">
+                                    <div className={`w-7 h-7 rounded-lg ${cost.bg} flex items-center justify-center`}>
+                                      <Icon className={`w-3.5 h-3.5 ${cost.color}`} />
+                                    </div>
+                                    <span className="text-[12px] text-gray-600 flex-1">{cost.label}</span>
+                                    <div className="text-right">
+                                      <span className="text-[12px] font-semibold text-[#3D352F] tabular-nums">{formatCurrency(cost.value)}</span>
+                                      <span className="text-[10px] text-gray-400 ml-2 tabular-nums">({formatPercent(cost.value / totalSales)})</span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })() : (
+                        <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* 会員分析 + DEAL新規獲得効果 */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* 会員/非会員分析 */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                        <Users className="w-4 h-4 text-teal-500" />
+                        会員 / 非会員分析
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {rakutenData.memberAnalysis ? (() => {
+                        const ma = rakutenData.memberAnalysis
+                        const totalBuyers = (Number(ma.buyers_member) || 0) + (Number(ma.buyers_non_member) || 0)
+                        const memberRate = totalBuyers > 0 ? (Number(ma.buyers_member) || 0) / totalBuyers : 0
+                        const pointsRate = (Number(ma.total_order_count) || 0) > 0 ? (Number(ma.points_sales_count) || 0) / (Number(ma.total_order_count) || 1) : 0
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border border-teal-100/60 text-center">
+                                <div className="text-[11px] font-semibold text-teal-600 uppercase tracking-wider">楽天会員</div>
+                                <div className="text-2xl font-bold text-teal-800 tabular-nums mt-1">{formatNumber(Number(ma.buyers_member) || 0)}</div>
+                                <div className="text-[11px] text-teal-600 mt-1 font-medium">{formatPercent(memberRate)}</div>
+                              </div>
+                              <div className="p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-100/60 text-center">
+                                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">非会員</div>
+                                <div className="text-2xl font-bold text-gray-800 tabular-nums mt-1">{formatNumber(Number(ma.buyers_non_member) || 0)}</div>
+                                <div className="text-[11px] text-gray-500 mt-1 font-medium">{formatPercent(1 - memberRate)}</div>
+                              </div>
+                            </div>
+                            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${memberRate * 100}%` }} />
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-amber-50/60 rounded-xl border border-amber-100/60">
+                              <span className="text-[12px] text-amber-700 font-medium">ポイント利用率</span>
+                              <span className="text-[14px] font-bold text-amber-800 tabular-nums">{formatPercent(pointsRate)}</span>
+                            </div>
+                          </div>
+                        )
+                      })() : (
+                        <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* DEAL新規獲得効果 */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                        <UserPlus className="w-4 h-4 text-rose-500" />
+                        DEAL 新規獲得効果
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {rakutenData.memberAnalysis ? (() => {
+                        const ma = rakutenData.memberAnalysis
+                        const dealNew = Number(ma.deal_new_buyers) || 0
+                        const dealRepeat = Number(ma.deal_repeat_buyers) || 0
+                        const dealTotal = dealNew + dealRepeat
+                        const dealNewRate = dealTotal > 0 ? dealNew / dealTotal : 0
+                        const dealAccess = Number(ma.deal_access_count) || 0
+                        const dealMember = Number(ma.deal_buyers_member) || 0
+                        const dealNonMember = Number(ma.deal_buyers_non_member) || 0
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100/60 text-center">
+                                <div className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">DEAL新規</div>
+                                <div className="text-2xl font-bold text-blue-800 tabular-nums mt-1">{formatNumber(dealNew)}人</div>
+                                <div className="text-[11px] text-blue-600 mt-1 font-medium">{formatPercent(dealNewRate)}</div>
+                              </div>
+                              <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl border border-violet-100/60 text-center">
+                                <div className="text-[11px] font-semibold text-violet-600 uppercase tracking-wider">DEALリピート</div>
+                                <div className="text-2xl font-bold text-violet-800 tabular-nums mt-1">{formatNumber(dealRepeat)}人</div>
+                                <div className="text-[11px] text-violet-600 mt-1 font-medium">{formatPercent(1 - dealNewRate)}</div>
+                              </div>
+                            </div>
+                            {dealTotal > 0 && (
+                              <div>
+                                <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
+                                  <span className="font-medium">新規獲得率</span>
+                                  <span className={`tabular-nums font-semibold ${dealNewRate >= 0.5 ? 'text-emerald-600' : 'text-amber-600'}`}>{formatPercent(dealNewRate)}</span>
+                                </div>
+                                <div className="w-full h-3 bg-violet-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all duration-500" style={{ width: `${dealNewRate * 100}%` }} />
+                                </div>
+                              </div>
+                            )}
+                            <div className="border-t border-gray-100/80 pt-3 space-y-2">
+                              <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-gray-500">DEALアクセス数</span>
+                                <span className="font-semibold text-[#3D352F] tabular-nums">{formatNumber(dealAccess)}</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-gray-500">DEAL会員購入</span>
+                                <span className="font-semibold text-[#3D352F] tabular-nums">{formatNumber(dealMember)}人</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-gray-500">DEAL非会員購入</span>
+                                <span className="font-semibold text-[#3D352F] tabular-nums">{formatNumber(dealNonMember)}人</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })() : (
+                        <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">データがありません</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* 新規・リピート推移（月次） */}
                 {rakutenData.newRepeat.length > 0 && (
                   <Card className="border-0 shadow-sm">
@@ -906,9 +1222,11 @@ function DashboardPageContent() {
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">新規購入者</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">新規売上</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">新規客単価</th>
+                              <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">新規点数/注文</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">リピート購入者</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">リピート売上</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">リピート客単価</th>
+                              <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">リピ点数/注文</th>
                               <th className="text-right px-3 py-2 text-[11px] font-semibold text-[#8A7D72]">リピート率</th>
                             </tr>
                           </thead>
@@ -919,9 +1237,11 @@ function DashboardPageContent() {
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-blue-700">{formatNumber(Number(nr.new_buyers) || 0)}人</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#3D352F]">{formatCurrency(Number(nr.new_sales) || 0)}</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#8A7D72]">{formatCurrency(Number(nr.new_avg_order_value) || 0)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#8A7D72]">{(Number(nr.new_items_per_order) || 0).toFixed(1)}点</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-indigo-700">{formatNumber(Number(nr.repeat_buyers) || 0)}人</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#3D352F]">{formatCurrency(Number(nr.repeat_sales) || 0)}</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#8A7D72]">{formatCurrency(Number(nr.repeat_avg_order_value) || 0)}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-[12px] text-[#8A7D72]">{(Number(nr.repeat_items_per_order) || 0).toFixed(1)}点</td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-[12px]">
                                   <span className={(Number(nr.repeat_rate) || 0) >= 0.3 ? 'text-emerald-600 font-medium' : 'text-[#3D352F]'}>
                                     {formatPercent(Number(nr.repeat_rate) || 0)}

@@ -29,11 +29,15 @@ export async function GET(request: NextRequest) {
           SUM(new_buyers) as new_buyers,
           SUM(new_sales) as new_sales,
           SUM(new_sales_count) as new_sales_count,
+          SUM(new_sales_quantity) as new_sales_quantity,
           SAFE_DIVIDE(SUM(new_sales), NULLIF(SUM(new_sales_count), 0)) as new_avg_order_value,
+          SAFE_DIVIDE(SUM(new_sales_quantity), NULLIF(SUM(new_sales_count), 0)) as new_items_per_order,
           SUM(repeat_buyers) as repeat_buyers,
           SUM(repeat_sales) as repeat_sales,
           SUM(repeat_sales_count) as repeat_sales_count,
+          SUM(repeat_sales_quantity) as repeat_sales_quantity,
           SAFE_DIVIDE(SUM(repeat_sales), NULLIF(SUM(repeat_sales_count), 0)) as repeat_avg_order_value,
+          SAFE_DIVIDE(SUM(repeat_sales_quantity), NULLIF(SUM(repeat_sales_count), 0)) as repeat_items_per_order,
           SAFE_DIVIDE(SUM(repeat_buyers), NULLIF(SUM(new_buyers) + SUM(repeat_buyers), 0)) as repeat_rate
         FROM ${tableName('rakuten_new_repeat_store')}
         ${whereClause}
