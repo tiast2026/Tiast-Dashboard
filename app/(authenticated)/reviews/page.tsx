@@ -23,6 +23,7 @@ interface Review {
   order_number: string
   unhandled_flag: number
   matched_product_code: string | null
+  review_source: string | null
   image_url: string | null
 }
 
@@ -327,7 +328,11 @@ function ReviewsContent() {
                     <TableCell className="py-2 px-2 align-top">
                       <div className="flex items-center gap-1">
                         {renderStars(review.rating)}
-                        <span className="text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap bg-red-50 text-red-600">楽天</span>
+                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${
+                          review.review_source === '公式'
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : 'bg-red-50 text-red-600'
+                        }`}>{review.review_source || '楽天'}</span>
                         <span className={`text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${
                           review.review_type === '商品レビュー'
                             ? 'bg-blue-50 text-blue-600'

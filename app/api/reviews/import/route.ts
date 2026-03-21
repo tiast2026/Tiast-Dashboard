@@ -48,10 +48,26 @@ async function ensureTableExists(bq: ReturnType<typeof getBigQueryClient>): Prom
         { name: 'unhandled_flag', type: 'INT64', mode: 'NULLABLE' },
         { name: 'rakuten_item_id', type: 'STRING', mode: 'NULLABLE' },
         { name: 'matched_product_code', type: 'STRING', mode: 'NULLABLE' },
+        { name: 'review_source', type: 'STRING', mode: 'NULLABLE' },
         { name: '_imported_at', type: 'TIMESTAMP', mode: 'NULLABLE' },
       ],
     },
   })
+}
+
+async function ensureReviewSourceColumn(bq: ReturnType<typeof getBigQueryClient>): Promise<void> {
+  try {
+    await bq.query({
+      query: `ALTER TABLE \`${PROJECT}.${DATASET}.${TABLE}\` ADD COLUMN IF NOT EXISTS review_source STRING`,
+      location: 'asia-northeast1',
+    })
+    await bq.query({
+      query: `ALTER TABLE \`${PROJECT}.${DATASET}.${SHOP_TABLE}\` ADD COLUMN IF NOT EXISTS review_source STRING`,
+      location: 'asia-northeast1',
+    })
+  } catch {
+    // Column may already exist
+  }
 }
 
 async function ensureShopTableExists(bq: ReturnType<typeof getBigQueryClient>): Promise<void> {
@@ -75,6 +91,7 @@ async function ensureShopTableExists(bq: ReturnType<typeof getBigQueryClient>): 
         { name: 'flag', type: 'INT64', mode: 'NULLABLE' },
         { name: 'order_number', type: 'STRING', mode: 'NULLABLE' },
         { name: 'unhandled_flag', type: 'INT64', mode: 'NULLABLE' },
+        { name: 'review_source', type: 'STRING', mode: 'NULLABLE' },
         { name: '_imported_at', type: 'TIMESTAMP', mode: 'NULLABLE' },
       ],
     },
@@ -140,6 +157,7 @@ async function runImport(dryRun = false, reprocess = false) {
   const bq = getBigQueryClient()
   await ensureTableExists(bq)
   await ensureShopTableExists(bq)
+  await ensureReviewSourceColumn(bq)
 
   // 2. Reprocess: delete all existing reviews first
   if (reprocess) {
@@ -263,14 +281,15 @@ async function runImport(dryRun = false, reprocess = false) {
       `${r.rating}, ${sqlStr(r.posted_at)}, ${sqlStr(r.title)}, ${sqlStr(r.review_body)}, ` +
       `${r.flag}, ${sqlStr(r.order_number)}, ${r.unhandled_flag}, ` +
       `${r.rakuten_item_id ? sqlStr(r.rakuten_item_id) : 'NULL'}, ` +
-      `${r.matched_product_code ? sqlStr(r.matched_product_code) : 'NULL'}, CURRENT_TIMESTAMP())`
+      `${r.matched_product_code ? sqlStr(r.matched_product_code) : 'NULL'}, ` +
+      `${sqlStr(r.review_source)}, CURRENT_TIMESTAMP())`
     ).join(',\n')
 
     await bq.query({
       query: `
         INSERT INTO \`${PROJECT}.${DATASET}.${TABLE}\`
         (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
-         flag, order_number, unhandled_flag, rakuten_item_id, matched_product_code, _imported_at)
+         flag, order_number, unhandled_flag, rakuten_item_id, matched_product_code, review_source, _imported_at)
         VALUES ${values}
       `,
       location: 'asia-northeast1',
@@ -284,14 +303,14 @@ async function runImport(dryRun = false, reprocess = false) {
     const values = batch.map(r =>
       `(${sqlStr(r.shop_name)}, ${sqlStr(r.review_type)}, ${sqlStr(r.product_name)}, ${sqlStr(r.review_url)}, ` +
       `${r.rating}, ${sqlStr(r.posted_at)}, ${sqlStr(r.title)}, ${sqlStr(r.review_body)}, ` +
-      `${r.flag}, ${sqlStr(r.order_number)}, ${r.unhandled_flag}, CURRENT_TIMESTAMP())`
+      `${r.flag}, ${sqlStr(r.order_number)}, ${r.unhandled_flag}, ${sqlStr(r.review_source)}, CURRENT_TIMESTAMP())`
     ).join(',\n')
 
     await bq.query({
       query: `
         INSERT INTO \`${PROJECT}.${DATASET}.${SHOP_TABLE}\`
         (shop_name, review_type, product_name, review_url, rating, posted_at, title, review_body,
-         flag, order_number, unhandled_flag, _imported_at)
+         flag, order_number, unhandled_flag, review_source, _imported_at)
         VALUES ${values}
       `,
       location: 'asia-northeast1',
