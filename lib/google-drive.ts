@@ -137,7 +137,9 @@ function normalizeDate(raw: string): string {
 }
 
 function parseReviewCSV(content: string, shopName: string = '', fileName: string = ''): ReviewRow[] {
-  const isOfficial = fileName.toLowerCase().startsWith('review_')
+  const lowerName = fileName.toLowerCase()
+  // reviews_ (with s) = 楽天, review_ (without s) = 公式
+  const isOfficial = lowerName.startsWith('review_') && !lowerName.startsWith('reviews_')
   const reviewSource: '楽天' | '公式' = isOfficial ? '公式' : '楽天'
   // Detect delimiter from first line
   const firstNewline = content.indexOf('\n')
