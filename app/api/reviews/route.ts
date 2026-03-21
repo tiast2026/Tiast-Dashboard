@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
     const ratingFilter = searchParams.get('rating')
     const matchStatus = searchParams.get('match_status') // 'matched' | 'unmatched'
     const brand = searchParams.get('brand') // 'NOAHL' | 'BLACKQUEEN'
+    const source = searchParams.get('source') // '楽天' | '公式'
 
     const conditions: string[] = ['1=1']
 
@@ -94,6 +95,9 @@ export async function GET(request: NextRequest) {
       conditions.push(`matched_product_code IS NOT NULL AND matched_product_code != ''`)
     } else if (matchStatus === 'unmatched') {
       conditions.push(`(matched_product_code IS NULL OR matched_product_code = '')`)
+    }
+    if (source) {
+      conditions.push(`review_source = '${escapeSQL(source)}'`)
     }
 
     let productFilter = ''

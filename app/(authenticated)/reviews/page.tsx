@@ -61,6 +61,7 @@ function ReviewsContent() {
   const [typeFilter, setTypeFilter] = useState('全て')
   const [ratingFilter, setRatingFilter] = useState('全て')
   const [matchStatus, setMatchStatus] = useState('全て')
+  const [sourceFilter, setSourceFilter] = useState('全て')
   const [rematchLoading, setRematchLoading] = useState(false)
   const [rematchResult, setRematchResult] = useState<string | null>(null)
   const [importLoading, setImportLoading] = useState(false)
@@ -79,6 +80,7 @@ function ReviewsContent() {
       if (typeFilter !== '全て') params.set('type', typeFilter)
       if (ratingFilter !== '全て') params.set('rating', ratingFilter)
       if (matchStatus !== '全て') params.set('match_status', matchStatus)
+      if (sourceFilter !== '全て') params.set('source', sourceFilter)
 
       const res = await fetch(`/api/reviews?${params}`)
       const json = await res.json()
@@ -90,7 +92,7 @@ function ReviewsContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, typeFilter, ratingFilter, matchStatus, brand])
+  }, [page, pageSize, search, typeFilter, ratingFilter, matchStatus, sourceFilter, brand])
 
   useEffect(() => { fetchReviews() }, [fetchReviews])
 
@@ -140,16 +142,29 @@ function ReviewsContent() {
       const res = await fetch('/api/reviews/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: false, reprocess }),
+        body: JSON.stringify({ dryRun: false, reprocess }),
       })
       const text = await res.text()
       try {
         const json = JSON.parse(text)
         if (json.success) {
-          setImportResult(`${json.inserted || 0}件インポート完了`)
+          const parts: string[] = []
+          if (json.imported > 0) {
+            parts.push(`${json.imported}件インポート完了`)
+            if (json.official_reviews) parts.push(`(公式: ${json.official_reviews}件)`)
+          } else {
+            parts.push(json.message || '新規レビューなし')
+          }
+          if (json.skipped_duplicates) parts.push(`重複スキップ: ${json.skipped_duplicates}件`)
+          if (json.files_processed) parts.push(`ファイル: ${json.files_processed.join(', ')}`)
+          // Show CSV debug info in console for troubleshooting
+          if (json.csvDebug) {
+            console.log('[レビューインポート] CSV詳細:', JSON.stringify(json.csvDebug, null, 2))
+          }
+          setImportResult(parts.join(' / '))
           fetchReviews()
         } else {
-          setImportResult(json.error || 'エラー')
+          setImportResult(json.error || json.message || 'エラー')
         }
       } catch {
         setImportResult(`エラー: ${text.slice(0, 100)}`)
@@ -230,6 +245,14 @@ function ReviewsContent() {
               <SelectItem value="全て">タイプ: 全て</SelectItem>
               <SelectItem value="商品レビュー">商品レビュー</SelectItem>
               <SelectItem value="ショップレビュー">ショップレビュー</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sourceFilter} onValueChange={v => { setSourceFilter(v); setPage(0) }}>
+            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="全て">ソース: 全て</SelectItem>
+              <SelectItem value="楽天">楽天</SelectItem>
+              <SelectItem value="公式">公式</SelectItem>
             </SelectContent>
           </Select>
           <Select value={ratingFilter} onValueChange={v => { setRatingFilter(v); setPage(0) }}>

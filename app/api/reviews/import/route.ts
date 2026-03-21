@@ -375,6 +375,7 @@ async function runImport(dryRun = false, reprocess = false) {
     files_processed: fileIds.map(f => f.name),
     files_deleted: delResult.deleted,
     delete_errors: delResult.errors.length > 0 ? delResult.errors : undefined,
+    csvDebug,
   }
 }
 

@@ -51,16 +51,19 @@ const REVIEW_HEADER_MAP: Record<string, keyof ReviewRow> = {
   'フラグ': 'flag',
   '注文番号': 'order_number',
   '未対応フラグ': 'unhandled_flag',
-  // Official store (futureshop) CSV headers
+  // Official store (futureshop) CSV headers (full-width parentheses)
   '商品番号（投稿時）': 'manage_number',
   '商品名（投稿時）': 'product_name',
   '商品URL': 'review_url',
   'おすすめ度区分': 'rating',
   '投稿日': 'posted_at',
   '内容': 'review_body',
+  // Official store CSV headers (half-width parentheses variant)
+  '商品番号(投稿時)': 'manage_number',
+  '商品名(投稿時)': 'product_name',
 }
 
-function parseCSVLine(line: string): string[] {
+function parseCSVLine(line: string, delimiter: string = ','): string[] {
   const fields: string[] = []
   let current = ''
   let inQuotes = false
@@ -81,7 +84,7 @@ function parseCSVLine(line: string): string[] {
     } else {
       if (ch === '"') {
         inQuotes = true
-      } else if (ch === '\t' || ch === ',') {
+      } else if (ch === delimiter) {
         fields.push(current.trim())
         current = ''
       } else {
@@ -137,6 +140,10 @@ function normalizeDate(raw: string): string {
 }
 
 function parseReviewCSV(content: string, shopName: string = '', fileName: string = ''): ReviewRow[] {
+  // Strip BOM if present
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1)
+  }
   const lowerName = fileName.toLowerCase()
   // reviews_ (with s) = 楽天, review_ (without s) = 公式
   const isOfficial = lowerName.startsWith('review_') && !lowerName.startsWith('reviews_')
@@ -146,11 +153,8 @@ function parseReviewCSV(content: string, shopName: string = '', fileName: string
   const headerLine = (firstNewline >= 0 ? content.slice(0, firstNewline) : content).replace(/\r$/, '')
   const delimiter = headerLine.includes('\t') ? '\t' : ','
 
-  // TSV: simple line split (no quoted newlines in TSV)
-  // CSV: use quote-aware split to handle newlines inside quoted fields
-  const lines = delimiter === '\t'
-    ? content.split(/\r?\n/).filter(l => l.trim())
-    : splitCSVRows(content)
+  // Always use quote-aware split to handle newlines inside quoted fields (both CSV and TSV)
+  const lines = splitCSVRows(content)
   if (lines.length < 2) return []
 
   // Parse header
@@ -167,7 +171,7 @@ function parseReviewCSV(content: string, shopName: string = '', fileName: string
 
   const rows: ReviewRow[] = []
   for (let i = 1; i < lines.length; i++) {
-    const fields = delimiter === '\t' ? lines[i].split('\t') : parseCSVLine(lines[i])
+    const fields = parseCSVLine(lines[i], delimiter)
     if (fields.length < 3) continue
 
     const obj: Record<string, string | number> = {}
@@ -385,12 +389,32 @@ async function fetchReviewCSVsFromFolder(
       // Official CSVs (review_) are UTF-8, Rakuten CSVs (reviews_) are Shift_JIS
       const isOfficialFile = file.name.toLowerCase().startsWith('review_') && !file.name.toLowerCase().startsWith('reviews_')
       let content: string
+      let detectedEncoding = 'utf-8'
       if (isOfficialFile) {
+        // Try UTF-8 first, fall back to Shift_JIS if no rows parsed
         content = new TextDecoder('utf-8').decode(buffer)
+        const testRows = parseReviewCSV(content, shopName, file.name)
+        if (testRows.length === 0) {
+          console.log(`[レビュー][${shopName}] ${file.name}: UTF-8で0件パース。Shift_JISを試行中...`)
+          try {
+            const sjisContent = new TextDecoder('shift_jis').decode(buffer)
+            const sjisRows = parseReviewCSV(sjisContent, shopName, file.name)
+            if (sjisRows.length > 0) {
+              console.log(`[レビュー][${shopName}] ${file.name}: Shift_JISで${sjisRows.length}件 → Shift_JIS使用`)
+              content = sjisContent
+              detectedEncoding = 'shift_jis'
+            } else {
+              console.warn(`[レビュー][${shopName}] ${file.name}: Shift_JISでも0件。バッファ先頭bytes: ${Array.from(new Uint8Array(buffer).slice(0, 30)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`)
+            }
+          } catch (e) {
+            console.warn(`[レビュー][${shopName}] ${file.name}: Shift_JISデコード失敗:`, e instanceof Error ? e.message : e)
+          }
+        }
       } else {
         try {
           const sjisDecoder = new TextDecoder('shift_jis')
           content = sjisDecoder.decode(buffer)
+          detectedEncoding = 'shift_jis'
         } catch {
           content = new TextDecoder('utf-8').decode(buffer)
         }
@@ -398,18 +422,32 @@ async function fetchReviewCSVsFromFolder(
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
       const rows = parseReviewCSV(content, shopName, file.name)
+      // Debug: show which headers were matched
+      const rawHeaders = headerLine.split(headerLine.includes('\t') ? '\t' : ',').map(h => h.trim().replace(/^"|"$/g, '').replace(/^\uFEFF/, ''))
+      const matchedHeaders = rawHeaders.filter(h => h in REVIEW_HEADER_MAP)
+      const unmatchedHeaders = rawHeaders.filter(h => !(h in REVIEW_HEADER_MAP))
       csvDebug.push({
         fileName: file.name,
+        isOfficial: isOfficialFile,
+        encoding: detectedEncoding,
         mimeType: file.mimeType,
         contentLength: content.length,
         totalLines: contentLines.length,
         headerLine: headerLine.substring(0, 500),
         secondLine: (contentLines[1] || '').substring(0, 500),
         parsedRows: rows.length,
+        matchedHeaders,
+        unmatchedHeaders,
+        reviewSource: isOfficialFile ? '公式' : '楽天',
       })
-      console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
+      console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件 (${isOfficialFile ? '公式' : '楽天'})`)
       allReviews.push(...rows)
-      fileIds.push({ id: file.id, name: file.name })
+      // Only mark file for deletion if it had parsed rows (don't delete unparseable files)
+      if (rows.length > 0) {
+        fileIds.push({ id: file.id, name: file.name })
+      } else {
+        console.warn(`[レビュー][${shopName}] ${file.name}: 0件パース - ファイルは削除しません`)
+      }
     } catch (e) {
       csvDebug.push({ fileName: file.name, error: e instanceof Error ? e.message : String(e) })
       console.warn(`[レビュー][${shopName}] ${file.name} 読み込みエラー:`, e)
