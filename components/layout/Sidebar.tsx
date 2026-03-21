@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
-  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy,
+  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare,
 } from 'lucide-react'
 
 interface BrandSection {
@@ -23,6 +23,7 @@ const brandSections: BrandSection[] = [
       { label: '売上分析', href: '/dashboard', icon: TrendingUp },
       { label: '商品分析', href: '/products', icon: Tag },
       { label: '顧客分析', href: '/customers', icon: Users },
+      { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
     ],
   },
   {
@@ -33,6 +34,7 @@ const brandSections: BrandSection[] = [
       { label: '売上分析', href: '/dashboard', icon: TrendingUp },
       { label: '商品分析', href: '/products', icon: Tag },
       { label: '顧客分析', href: '/customers', icon: Users },
+      { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
     ],
   },
 ]
@@ -128,7 +130,7 @@ export default function Sidebar() {
               {/* Sub-items */}
               <div
                 className={`overflow-hidden transition-all duration-200 ${
-                  isExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+                  isExpanded ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
                 {section.items.map((item) => {
@@ -191,6 +193,7 @@ export default function Sidebar() {
             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C4A882]" />
           )}
         </Link>
+
       </nav>
 
       {/* Footer */}
