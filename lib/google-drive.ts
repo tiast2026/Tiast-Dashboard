@@ -84,6 +84,46 @@ function parseCSVLine(line: string): string[] {
   return fields
 }
 
+/**
+ * Split CSV content into logical rows, handling quoted fields that contain newlines.
+ */
+function splitCSVRows(content: string): string[] {
+  const rows: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i]
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < content.length && content[i + 1] === '"') {
+          current += '""'
+          i++
+        } else {
+          inQuotes = false
+          current += ch
+        }
+      } else {
+        current += ch
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true
+        current += ch
+      } else if (ch === '\n') {
+        const trimmed = current.replace(/\r$/, '')
+        if (trimmed.trim()) rows.push(trimmed)
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+  }
+  const trimmed = current.replace(/\r$/, '')
+  if (trimmed.trim()) rows.push(trimmed)
+  return rows
+}
+
 function normalizeDate(raw: string): string {
   if (!raw || raw === '##########') return ''
   // Try to parse various date formats
@@ -95,7 +135,7 @@ function normalizeDate(raw: string): string {
 }
 
 function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
-  const lines = content.split(/\r?\n/).filter(l => l.trim())
+  const lines = splitCSVRows(content)
   if (lines.length < 2) return []
 
   // Detect delimiter (tab or comma)
