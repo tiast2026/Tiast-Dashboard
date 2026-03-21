@@ -75,6 +75,19 @@ interface PriceHistoryItem {
   is_historical_low: boolean
 }
 
+interface GenreMonthlyItem {
+  order_month: string
+  category: string
+  avg_price: number
+  min_price: number
+  max_price: number
+  avg_list_price: number
+  avg_discount_rate: number
+  quantity: number
+  revenue: number
+  full_price_rate: number
+}
+
 function PricingPageContent() {
   const searchParams = useSearchParams()
   const urlBrand = searchParams.get('brand')
@@ -97,6 +110,13 @@ function PricingPageContent() {
   // Sort
   const [sortKey, setSortKey] = useState<'revenue' | 'discount' | 'min_price'>('revenue')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Genre × Month
+  const genreCacheKey = `pricing-genre-v1:${brandParam}`
+  const genreCached = getCached<GenreMonthlyItem[]>(genreCacheKey)
+  const [genreMonthly, setGenreMonthly] = useState<GenreMonthlyItem[]>(genreCached ?? [])
+  const [genreLoading, setGenreLoading] = useState(!genreCached)
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -130,6 +150,27 @@ function PricingPageContent() {
   }, [month, brandParam, cacheKey])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const fetchGenreData = useCallback(async () => {
+    if (isFresh(genreCacheKey)) return
+    if (!getCached(genreCacheKey)) setGenreLoading(true)
+    try {
+      const bParam = brandParam ? `?brand=${brandParam}` : ''
+      const res = await fetch(`/api/pricing-analysis/genre-monthly${bParam}`)
+      const data = res.ok ? await res.json() : []
+      if (mountedRef.current) {
+        const arr = Array.isArray(data) ? data : []
+        setGenreMonthly(arr)
+        setCache(genreCacheKey, arr)
+      }
+    } catch (e) {
+      console.error('Failed to fetch genre data:', e)
+    } finally {
+      if (mountedRef.current) setGenreLoading(false)
+    }
+  }, [brandParam, genreCacheKey])
+
+  useEffect(() => { fetchGenreData() }, [fetchGenreData])
 
   const fetchHistory = useCallback(async (productCode: string) => {
     setHistoryLoading(true)
@@ -580,6 +621,221 @@ function PricingPageContent() {
             </CardContent>
           </Card>
         )}
+
+        {/* Genre × Month Average Price */}
+        {genreLoading ? (
+          <Skeleton className="h-64 rounded-lg" />
+        ) : genreMonthly.length > 0 && (() => {
+          // Extract unique genres and months
+          const genres = Array.from(new Set(genreMonthly.map(g => g.category))).sort()
+          const months = Array.from(new Set(genreMonthly.map(g => g.order_month))).sort()
+          // Build lookup map
+          const lookup = new Map<string, GenreMonthlyItem>()
+          for (const g of genreMonthly) lookup.set(`${g.category}|${g.order_month}`, g)
+
+          // Top genres by total revenue
+          const genreRevenue = new Map<string, number>()
+          for (const g of genreMonthly) genreRevenue.set(g.category, (genreRevenue.get(g.category) || 0) + (Number(g.revenue) || 0))
+          const topGenres = genres.sort((a, b) => (genreRevenue.get(b) || 0) - (genreRevenue.get(a) || 0)).slice(0, 15)
+
+          // Color scale for discount rate heatmap
+          const getDiscountColor = (rate: number) => {
+            if (rate <= 0) return 'bg-emerald-50 text-emerald-700'
+            if (rate < 0.1) return 'bg-yellow-50 text-yellow-700'
+            if (rate < 0.2) return 'bg-orange-50 text-orange-700'
+            if (rate < 0.3) return 'bg-red-50 text-red-700'
+            return 'bg-red-100 text-red-800'
+          }
+
+          const displayGenres = selectedGenre ? [selectedGenre] : topGenres
+
+          return (
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                    <TrendingDown className="w-4 h-4 text-purple-500" />
+                    ジャンル × 月 平均価格推移
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {selectedGenre && (
+                      <button
+                        onClick={() => setSelectedGenre(null)}
+                        className="text-[11px] px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors font-medium"
+                      >
+                        全ジャンル表示
+                      </button>
+                    )}
+                    <span className="text-[10px] text-gray-400">過去12ヶ月 / クリックで絞り込み</span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto border border-black/[0.06] rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gradient-to-b from-[#FAFAF8] to-[#F6F4F1] border-b border-black/[0.08]">
+                        <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] sticky left-0 bg-[#FAFAF8] min-w-[140px]">ジャンル</th>
+                        {months.map(m => (
+                          <th key={m} className="text-center px-2 py-2.5 text-[10px] font-semibold text-[#8A7D72] min-w-[90px]">
+                            {m.split('-')[1]}月
+                          </th>
+                        ))}
+                        <th className="text-right px-3 py-2.5 text-[11px] font-semibold text-[#8A7D72] min-w-[80px]">合計売上</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayGenres.map((genre, gi) => {
+                        const totalRev = genreRevenue.get(genre) || 0
+                        return (
+                          <tr
+                            key={genre}
+                            className={`border-b border-black/[0.04] cursor-pointer transition-colors ${
+                              selectedGenre === genre ? 'bg-purple-50/50' : gi % 2 === 1 ? 'bg-[#FDFCFB]' : ''
+                            } hover:bg-[#FAFAF8]`}
+                            onClick={() => setSelectedGenre(selectedGenre === genre ? null : genre)}
+                          >
+                            <td className="px-3 py-2 text-[12px] font-medium text-[#3D352F] sticky left-0 bg-inherit">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                                <span className="truncate">{genre}</span>
+                              </div>
+                            </td>
+                            {months.map(m => {
+                              const item = lookup.get(`${genre}|${m}`)
+                              if (!item) return <td key={m} className="px-2 py-2 text-center text-[10px] text-gray-300">-</td>
+
+                              const avgPrice = Number(item.avg_price) || 0
+                              const discountRate = Number(item.avg_discount_rate) || 0
+                              const qty = Number(item.quantity) || 0
+
+                              return (
+                                <td key={m} className="px-1.5 py-1.5">
+                                  <div className={`rounded-lg px-2 py-1.5 text-center ${getDiscountColor(discountRate)}`}>
+                                    <div className="text-[11px] font-bold tabular-nums">{formatCurrency(avgPrice)}</div>
+                                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                                      {discountRate > 0 ? (
+                                        <span className="text-[9px] font-medium">
+                                          {formatPercent(discountRate)}OFF
+                                        </span>
+                                      ) : (
+                                        <span className="text-[9px] font-medium">定価</span>
+                                      )}
+                                    </div>
+                                    <div className="text-[8px] opacity-60 mt-0.5">{qty}点</div>
+                                  </div>
+                                </td>
+                              )
+                            })}
+                            <td className="px-3 py-2 text-right tabular-nums text-[11px] font-semibold text-[#3D352F]">
+                              {formatCurrency(totalRev)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Legend */}
+                <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-400">
+                  <span>値引率:</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200" />0%</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-yellow-50 border border-yellow-200" />&lt;10%</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-orange-50 border border-orange-200" />&lt;20%</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-50 border border-red-200" />&lt;30%</span>
+                  <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-300" />30%+</span>
+                </div>
+
+                {/* Expanded genre detail */}
+                {selectedGenre && (() => {
+                  const genreItems = genreMonthly
+                    .filter(g => g.category === selectedGenre)
+                    .sort((a, b) => a.order_month.localeCompare(b.order_month))
+
+                  if (genreItems.length === 0) return null
+
+                  // Find the month with lowest avg price
+                  const lowestMonth = genreItems.reduce((prev, curr) =>
+                    (Number(curr.avg_price) || Infinity) < (Number(prev.avg_price) || Infinity) ? curr : prev
+                  )
+                  // Find the month with highest discount
+                  const highestDiscount = genreItems.reduce((prev, curr) =>
+                    (Number(curr.avg_discount_rate) || 0) > (Number(prev.avg_discount_rate) || 0) ? curr : prev
+                  )
+
+                  return (
+                    <div className="mt-4 p-4 rounded-xl bg-purple-50/40 border border-purple-100/60">
+                      <div className="text-[13px] font-semibold text-[#3D352F] mb-3">
+                        「{selectedGenre}」の詳細
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="p-3 rounded-lg bg-white border border-purple-100/60">
+                          <div className="text-[10px] text-gray-500">最安月</div>
+                          <div className="text-[14px] font-bold text-[#3D352F] mt-1">
+                            {lowestMonth.order_month.split('-')[1]}月
+                          </div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            平均 {formatCurrency(Number(lowestMonth.avg_price) || 0)}
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-white border border-purple-100/60">
+                          <div className="text-[10px] text-gray-500">最大値引き月</div>
+                          <div className="text-[14px] font-bold text-red-600 mt-1">
+                            {highestDiscount.order_month.split('-')[1]}月
+                          </div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            平均 {formatPercent(Number(highestDiscount.avg_discount_rate) || 0)}OFF
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-white border border-purple-100/60">
+                          <div className="text-[10px] text-gray-500">年間合計</div>
+                          <div className="text-[14px] font-bold text-[#3D352F] mt-1">
+                            {formatCurrency(genreItems.reduce((s, g) => s + (Number(g.revenue) || 0), 0))}
+                          </div>
+                          <div className="text-[11px] text-gray-500 mt-0.5">
+                            {formatNumber(genreItems.reduce((s, g) => s + (Number(g.quantity) || 0), 0))}点
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mini bar chart visualization */}
+                      <div className="space-y-1.5">
+                        <div className="text-[10px] text-gray-400 font-medium">月別平均価格（バー=定価比率）</div>
+                        {genreItems.map(g => {
+                          const avgPrice = Number(g.avg_price) || 0
+                          const listPrice = Number(g.avg_list_price) || 0
+                          const ratio = listPrice > 0 ? Math.min(avgPrice / listPrice, 1) : 1
+                          const fullRate = Number(g.full_price_rate) || 0
+                          return (
+                            <div key={g.order_month} className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-500 w-8 tabular-nums">{g.order_month.split('-')[1]}月</span>
+                              <div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden relative">
+                                <div
+                                  className="h-full bg-gradient-to-r from-purple-400 to-purple-500 rounded transition-all duration-500"
+                                  style={{ width: `${ratio * 100}%` }}
+                                />
+                                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white mix-blend-difference">
+                                  {formatCurrency(avgPrice)}
+                                </span>
+                              </div>
+                              <span className="text-[9px] tabular-nums w-14 text-right">
+                                <span className={fullRate >= 0.7 ? 'text-emerald-600' : fullRate >= 0.4 ? 'text-amber-600' : 'text-red-600'}>
+                                  定価{formatPercent(fullRate)}
+                                </span>
+                              </span>
+                              <span className="text-[9px] text-gray-400 tabular-nums w-10 text-right">{Number(g.quantity) || 0}点</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )
+        })()}
       </div>
     </>
   )
