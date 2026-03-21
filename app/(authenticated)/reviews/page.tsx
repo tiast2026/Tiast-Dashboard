@@ -148,10 +148,19 @@ function ReviewsContent() {
       try {
         const json = JSON.parse(text)
         if (json.success) {
-          setImportResult(`${json.imported || 0}件インポート完了`)
+          const parts: string[] = []
+          if (json.imported > 0) {
+            parts.push(`${json.imported}件インポート完了`)
+            if (json.official_reviews) parts.push(`(公式: ${json.official_reviews}件)`)
+          } else {
+            parts.push(json.message || '新規レビューなし')
+          }
+          if (json.skipped_duplicates) parts.push(`重複スキップ: ${json.skipped_duplicates}件`)
+          if (json.files_processed) parts.push(`ファイル: ${json.files_processed.join(', ')}`)
+          setImportResult(parts.join(' / '))
           fetchReviews()
         } else {
-          setImportResult(json.error || 'エラー')
+          setImportResult(json.error || json.message || 'エラー')
         }
       } catch {
         setImportResult(`エラー: ${text.slice(0, 100)}`)
