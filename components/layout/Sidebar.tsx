@@ -4,38 +4,101 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
-  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload,
+  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, ChevronRight, Trophy, MessageSquare, Upload,
   CircleDollarSign, Package, Store, Layers, UserPlus, Clock, ShoppingCart, Crown, Sun,
 } from 'lucide-react'
 
-interface BrandSection {
-  brand: string
+interface SubGroup {
   label: string
-  color: string
   items: { label: string; href: string; icon: React.ComponentType<{ className?: string }> }[]
 }
 
-const brandSections: BrandSection[] = [
+interface BrandConfig {
+  brand: string
+  label: string
+  color: string
+  groups: SubGroup[]
+}
+
+const brandConfigs: BrandConfig[] = [
   {
     brand: 'NOAHL',
     label: 'NOAHL',
     color: '#C4A882',
-    items: [
-      { label: '売上分析', href: '/dashboard', icon: TrendingUp },
-      { label: '商品分析', href: '/products', icon: Tag },
-      { label: '顧客分析', href: '/customers', icon: Users },
-      { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
+    groups: [
+      {
+        label: '売上・収益',
+        items: [
+          { label: '売上分析', href: '/dashboard', icon: TrendingUp },
+          { label: 'チャネル収益性', href: '/channel-profitability', icon: Store },
+          { label: 'ABC分析', href: '/abc-analysis', icon: Layers },
+        ],
+      },
+      {
+        label: '商品・在庫',
+        items: [
+          { label: '商品分析', href: '/products', icon: Tag },
+          { label: '価格分析', href: '/pricing', icon: CircleDollarSign },
+          { label: '在庫回転率', href: '/inventory', icon: Package },
+          { label: '季節性予測', href: '/seasonality', icon: Sun },
+        ],
+      },
+      {
+        label: '顧客',
+        items: [
+          { label: '顧客分析', href: '/customers', icon: Users },
+          { label: '新規vsリピート', href: '/repeat-purchase', icon: UserPlus },
+          { label: 'LTV分析', href: '/ltv', icon: Crown },
+          { label: 'バスケット分析', href: '/basket-analysis', icon: ShoppingCart },
+        ],
+      },
+      {
+        label: 'マーケティング',
+        items: [
+          { label: '曜日×時間帯', href: '/time-analysis', icon: Clock },
+          { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
+        ],
+      },
     ],
   },
   {
     brand: 'BLACKQUEEN',
     label: 'BLACKQUEEN',
     color: '#9CA3AF',
-    items: [
-      { label: '売上分析', href: '/dashboard', icon: TrendingUp },
-      { label: '商品分析', href: '/products', icon: Tag },
-      { label: '顧客分析', href: '/customers', icon: Users },
-      { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
+    groups: [
+      {
+        label: '売上・収益',
+        items: [
+          { label: '売上分析', href: '/dashboard', icon: TrendingUp },
+          { label: 'チャネル収益性', href: '/channel-profitability', icon: Store },
+          { label: 'ABC分析', href: '/abc-analysis', icon: Layers },
+        ],
+      },
+      {
+        label: '商品・在庫',
+        items: [
+          { label: '商品分析', href: '/products', icon: Tag },
+          { label: '価格分析', href: '/pricing', icon: CircleDollarSign },
+          { label: '在庫回転率', href: '/inventory', icon: Package },
+          { label: '季節性予測', href: '/seasonality', icon: Sun },
+        ],
+      },
+      {
+        label: '顧客',
+        items: [
+          { label: '顧客分析', href: '/customers', icon: Users },
+          { label: '新規vsリピート', href: '/repeat-purchase', icon: UserPlus },
+          { label: 'LTV分析', href: '/ltv', icon: Crown },
+          { label: 'バスケット分析', href: '/basket-analysis', icon: ShoppingCart },
+        ],
+      },
+      {
+        label: 'マーケティング',
+        items: [
+          { label: '曜日×時間帯', href: '/time-analysis', icon: Clock },
+          { label: 'レビュー管理', href: '/reviews', icon: MessageSquare },
+        ],
+      },
     ],
   },
 ]
@@ -45,22 +108,34 @@ export default function Sidebar() {
   const searchParams = useSearchParams()
   const currentBrand = searchParams.get('brand')
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+  // Brand expand state
+  const [brandExpanded, setBrandExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {}
-    for (const s of brandSections) {
-      init[s.brand] = true
+    for (const b of brandConfigs) init[b.brand] = true
+    return init
+  })
+
+  // Sub-group expand state: "NOAHL:売上・収益" => true/false
+  const [groupExpanded, setGroupExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {}
+    for (const b of brandConfigs) {
+      for (const g of b.groups) {
+        init[`${b.brand}:${g.label}`] = true
+      }
     }
     return init
   })
 
-  const toggle = (brand: string) => {
-    setExpanded(prev => ({ ...prev, [brand]: !prev[brand] }))
+  const toggleBrand = (brand: string) => {
+    setBrandExpanded(prev => ({ ...prev, [brand]: !prev[brand] }))
+  }
+
+  const toggleGroup = (key: string) => {
+    setGroupExpanded(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   const isActive = (href: string, brand?: string) => {
-    if (brand) {
-      return pathname === href && currentBrand === brand
-    }
+    if (brand) return pathname === href && currentBrand === brand
     return pathname === href && !currentBrand
   }
 
@@ -83,7 +158,7 @@ export default function Sidebar() {
       <div className="mx-4 h-px bg-white/10" />
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto scrollbar-thin">
         {/* 全体ダッシュボード */}
         <Link
           href="/dashboard"
@@ -101,15 +176,15 @@ export default function Sidebar() {
         </Link>
 
         {/* Brand sections */}
-        {brandSections.map((section) => {
-          const isExpanded = expanded[section.brand]
-          const isBrandActive = currentBrand === section.brand
+        {brandConfigs.map((config) => {
+          const isBrandOpen = brandExpanded[config.brand]
+          const isBrandActive = currentBrand === config.brand
 
           return (
-            <div key={section.brand} className="mt-2">
+            <div key={config.brand} className="mt-2">
               {/* Brand header */}
               <button
-                onClick={() => toggle(section.brand)}
+                onClick={() => toggleBrand(config.brand)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all duration-200 ${
                   isBrandActive
                     ? 'text-white'
@@ -118,80 +193,77 @@ export default function Sidebar() {
               >
                 <div
                   className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: section.color }}
+                  style={{ backgroundColor: config.color }}
                 />
-                <span className="font-medium">{section.label}</span>
+                <span className="font-medium">{config.label}</span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 ml-auto transition-transform duration-200 ${
-                    isExpanded ? 'rotate-180' : ''
+                    isBrandOpen ? 'rotate-180' : ''
                   }`}
                 />
               </button>
 
-              {/* Sub-items */}
+              {/* Brand content */}
               <div
-                className={`overflow-hidden transition-all duration-200 ${
-                  isExpanded ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+                className={`overflow-hidden transition-all duration-300 ${
+                  isBrandOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
-                {section.items.map((item) => {
-                  const active = isActive(item.href, section.brand)
-                  const Icon = item.icon
+                {config.groups.map((group) => {
+                  const groupKey = `${config.brand}:${group.label}`
+                  const isGroupOpen = groupExpanded[groupKey]
+                  const hasActiveChild = group.items.some(item => isActive(item.href, config.brand))
+
                   return (
-                    <Link
-                      key={`${section.brand}-${item.href}`}
-                      href={`${item.href}?brand=${section.brand}`}
-                      className={`flex items-center gap-3 pl-8 pr-3 py-2 rounded-lg text-[12px] transition-all duration-200 ${
-                        active
-                          ? 'bg-white/12 text-white font-medium'
-                          : 'text-[#8A7D72] hover:bg-white/6 hover:text-[#D4C8BC]'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
-                      {active && (
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.color }} />
-                      )}
-                    </Link>
+                    <div key={groupKey}>
+                      {/* Sub-group header */}
+                      <button
+                        onClick={() => toggleGroup(groupKey)}
+                        className={`w-full flex items-center gap-2 pl-7 pr-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 ${
+                          hasActiveChild ? 'text-[#C4A882]' : 'text-[#6B5F54] hover:text-[#8A7D72]'
+                        }`}
+                      >
+                        <ChevronRight
+                          className={`w-2.5 h-2.5 transition-transform duration-200 ${
+                            isGroupOpen ? 'rotate-90' : ''
+                          }`}
+                        />
+                        <span>{group.label}</span>
+                      </button>
+
+                      {/* Sub-group items */}
+                      <div
+                        className={`overflow-hidden transition-all duration-200 ${
+                          isGroupOpen ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        {group.items.map((item) => {
+                          const active = isActive(item.href, config.brand)
+                          const Icon = item.icon
+                          return (
+                            <Link
+                              key={`${config.brand}-${item.href}`}
+                              href={`${item.href}?brand=${config.brand}`}
+                              className={`flex items-center gap-2.5 pl-10 pr-3 py-1.5 rounded-lg text-[11px] transition-all duration-200 ${
+                                active
+                                  ? 'bg-white/12 text-white font-medium'
+                                  : 'text-[#8A7D72] hover:bg-white/6 hover:text-[#D4C8BC]'
+                              }`}
+                            >
+                              <Icon className="w-3.5 h-3.5" />
+                              <span>{item.label}</span>
+                              {active && (
+                                <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+                              )}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
                   )
                 })}
               </div>
             </div>
-          )
-        })}
-
-        {/* Separator */}
-        <div className="my-3 mx-2 h-px bg-white/8" />
-
-        {/* 分析メニュー */}
-        {[
-          { label: '価格分析', href: '/pricing', icon: CircleDollarSign, color: '#C4A882' },
-          { label: '在庫回転率', href: '/inventory', icon: Package, color: '#6366F1' },
-          { label: 'チャネル収益性', href: '/channel-profitability', icon: Store, color: '#0EA5E9' },
-          { label: 'ABC分析', href: '/abc-analysis', icon: Layers, color: '#8B5CF6' },
-          { label: '新規vsリピート', href: '/repeat-purchase', icon: UserPlus, color: '#EC4899' },
-          { label: '曜日×時間帯', href: '/time-analysis', icon: Clock, color: '#F59E0B' },
-          { label: 'バスケット分析', href: '/basket-analysis', icon: ShoppingCart, color: '#10B981' },
-          { label: 'LTV分析', href: '/ltv', icon: Crown, color: '#F97316' },
-          { label: '季節性予測', href: '/seasonality', icon: Sun, color: '#EF4444' },
-        ].map(item => {
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] transition-all duration-200 ${
-                isActive(item.href)
-                  ? 'bg-white/12 text-white font-medium shadow-sm'
-                  : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
-              }`}
-            >
-              <Icon className="w-[16px] h-[16px]" style={{ color: item.color }} />
-              <span>{item.label}</span>
-              {isActive(item.href) && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
-              )}
-            </Link>
           )
         })}
 
@@ -256,7 +328,7 @@ export default function Sidebar() {
           </div>
           <div className="leading-tight">
             <p className="text-[10px] text-[#A99D93]">TIAST Inc.</p>
-            <p className="text-[8px] text-[#5A524B]">v1.0 Phase 1</p>
+            <p className="text-[8px] text-[#5A524B]">v2.0</p>
           </div>
         </div>
       </div>
