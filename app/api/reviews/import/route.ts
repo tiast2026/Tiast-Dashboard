@@ -16,7 +16,7 @@ const TABLE = 'rakuten_reviews'
 const SHOP_TABLE = 'rakuten_shop_reviews'
 
 function sqlStr(v: string): string {
-  return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+  return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`
 }
 
 function extractRakutenItemId(reviewUrl: string): string | null {
