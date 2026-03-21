@@ -31,7 +31,7 @@ import type { SalesSummaryResponse, MonthlyTrendItem, BrandCompositionItem, Cate
 import type { CustomerSummary } from '@/types/customer'
 import type { InventoryAlerts } from '@/types/inventory'
 import DataSourceBadge from '@/components/ui/data-source-badge'
-import { Users, UserPlus, Repeat, TrendingUp, ShoppingCart, Percent, CreditCard, Monitor, Smartphone, ArrowDown } from 'lucide-react'
+import { Users, UserPlus, Repeat, TrendingUp, ShoppingCart, Percent, CreditCard, Monitor, Smartphone, ArrowDown, AlertTriangle, CheckCircle2, Info, TrendingDown } from 'lucide-react'
 
 interface RakutenDailyItem {
   date: string
@@ -643,7 +643,6 @@ function DashboardPageContent() {
           <TabsContent value="rakuten" className="space-y-6">
             <DataSourceBadge sources={[
               { key: 'rakuten', label: '楽天', hasData: rakutenData.availability.rakuten },
-              { key: 'official', label: '公式', hasData: rakutenData.availability.official },
             ]} />
 
             {rakutenLoading ? (
@@ -661,30 +660,32 @@ function DashboardPageContent() {
               <>
                 {/* 転換率ファネル */}
                 {rakutenData.funnel && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">転換ファネル（月合計）</CardTitle>
+                  <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-gray-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight">転換ファネル（月合計）</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-stretch justify-center gap-3">
                         {[
-                          { label: 'アクセス数', value: rakutenData.funnel.access_count, color: 'bg-blue-100 text-blue-800' },
-                          { label: 'ユニークユーザー', value: rakutenData.funnel.unique_users, color: 'bg-indigo-100 text-indigo-800' },
-                          { label: '購入者数', value: rakutenData.funnel.total_buyers, color: 'bg-purple-100 text-purple-800' },
-                          { label: '注文件数', value: rakutenData.funnel.order_count, color: 'bg-pink-100 text-pink-800' },
+                          { label: 'アクセス数', value: rakutenData.funnel.access_count, gradient: 'from-sky-50 to-sky-100/60', border: 'border-sky-200/50', text: 'text-sky-900', sub: 'text-sky-600' },
+                          { label: 'ユニークユーザー', value: rakutenData.funnel.unique_users, gradient: 'from-indigo-50 to-indigo-100/60', border: 'border-indigo-200/50', text: 'text-indigo-900', sub: 'text-indigo-600' },
+                          { label: '購入者数', value: rakutenData.funnel.total_buyers, gradient: 'from-violet-50 to-violet-100/60', border: 'border-violet-200/50', text: 'text-violet-900', sub: 'text-violet-600' },
+                          { label: '注文件数', value: rakutenData.funnel.order_count, gradient: 'from-rose-50 to-rose-100/60', border: 'border-rose-200/50', text: 'text-rose-900', sub: 'text-rose-600' },
                         ].map((step, i, arr) => (
                           <React.Fragment key={step.label}>
-                            <div className={`flex-1 max-w-[200px] rounded-xl p-4 text-center ${step.color}`}>
-                              <div className="text-[11px] font-medium opacity-70">{step.label}</div>
-                              <div className="text-xl font-bold tabular-nums mt-1">{formatNumber(step.value)}</div>
+                            <div className={`flex-1 max-w-[220px] rounded-2xl p-5 text-center bg-gradient-to-br ${step.gradient} border ${step.border} transition-transform hover:scale-[1.02]`}>
+                              <div className={`text-[11px] font-medium ${step.sub} uppercase tracking-wider`}>{step.label}</div>
+                              <div className={`text-2xl font-bold tabular-nums mt-2 ${step.text}`}>{formatNumber(step.value)}</div>
                               {i > 0 && arr[i - 1].value > 0 && (
-                                <div className="text-[10px] mt-1 opacity-60">
+                                <div className={`text-[11px] mt-2 font-medium ${step.sub}`}>
                                   {formatPercent(step.value / arr[i - 1].value)}
                                 </div>
                               )}
                             </div>
                             {i < arr.length - 1 && (
-                              <ArrowDown className="w-4 h-4 text-gray-300 rotate-[-90deg] shrink-0" />
+                              <div className="flex items-center">
+                                <ArrowDown className="w-4 h-4 text-gray-300 rotate-[-90deg] shrink-0" />
+                              </div>
                             )}
                           </React.Fragment>
                         ))}
@@ -693,12 +694,103 @@ function DashboardPageContent() {
                   </Card>
                 )}
 
+                {/* コンサルインサイト */}
+                {(() => {
+                  const insights: { type: 'success' | 'warning' | 'danger' | 'info'; title: string; detail: string }[] = []
+                  // 転換率評価
+                  if (rakutenData.funnel && rakutenData.funnel.unique_users > 0) {
+                    const cvr = rakutenData.funnel.total_buyers / rakutenData.funnel.unique_users
+                    if (cvr >= 0.05) {
+                      insights.push({ type: 'success', title: '転換率が好調', detail: `CVR ${(cvr * 100).toFixed(2)}% は楽天市場の平均（2〜3%）を大幅に上回っています。現在の施策を継続してください。` })
+                    } else if (cvr >= 0.02) {
+                      insights.push({ type: 'info', title: '転換率は標準レベル', detail: `CVR ${(cvr * 100).toFixed(2)}% は楽天市場の平均的な水準です。商品ページの改善やレビュー促進で改善余地があります。` })
+                    } else {
+                      insights.push({ type: 'danger', title: '転換率が低い', detail: `CVR ${(cvr * 100).toFixed(2)}% は改善が必要です。商品画像・説明文の見直し、価格設定、レビュー数の改善を検討してください。` })
+                    }
+                  }
+                  // DEAL依存度
+                  if (rakutenData.coupon && (Number(rakutenData.coupon.total_sales) || 0) > 0) {
+                    const dealRatio = (Number(rakutenData.coupon.deal_sales) || 0) / (Number(rakutenData.coupon.total_sales) || 1)
+                    if (dealRatio > 0.5) {
+                      insights.push({ type: 'warning', title: 'DEAL依存度が高い', detail: `売上の${(dealRatio * 100).toFixed(0)}%がスーパーDEAL経由です。利益率を圧迫している可能性があります。通常売上の強化が課題です。` })
+                    } else if (dealRatio > 0.3) {
+                      insights.push({ type: 'info', title: 'DEAL活用は適切', detail: `DEAL構成比${(dealRatio * 100).toFixed(0)}%は集客ツールとして適切なバランスです。` })
+                    }
+                  }
+                  // モバイル比率
+                  if (rakutenData.device.length > 0) {
+                    const totalSales = rakutenData.device.reduce((s, x) => s + (Number(x.sales_amount) || 0), 0)
+                    const mobileSales = rakutenData.device.filter(d => !d.device?.includes('PC') && !d.device?.includes('パソコン')).reduce((s, x) => s + (Number(x.sales_amount) || 0), 0)
+                    const mobileRatio = totalSales > 0 ? mobileSales / totalSales : 0
+                    if (mobileRatio > 0.7) {
+                      insights.push({ type: 'info', title: 'モバイル中心の売上構造', detail: `モバイル比率${(mobileRatio * 100).toFixed(0)}%。スマホ向けページの最適化と表示速度改善が売上に直結します。` })
+                    } else if (mobileRatio < 0.4) {
+                      insights.push({ type: 'warning', title: 'モバイル売上が低い', detail: `モバイル比率${(mobileRatio * 100).toFixed(0)}%は低めです。楽天全体ではモバイル70%超が一般的。スマホ向けの商品ページを改善しましょう。` })
+                    }
+                  }
+                  // リピート率
+                  if (rakutenData.newRepeat.length > 0) {
+                    const latest = rakutenData.newRepeat[rakutenData.newRepeat.length - 1]
+                    const repeatRate = Number(latest.repeat_rate) || 0
+                    if (repeatRate >= 0.3) {
+                      insights.push({ type: 'success', title: 'リピート率が優秀', detail: `直近月のリピート率${(repeatRate * 100).toFixed(1)}%。顧客ロイヤルティが高く、LTV向上が期待できます。` })
+                    } else if (repeatRate < 0.15) {
+                      insights.push({ type: 'danger', title: 'リピート率に課題', detail: `リピート率${(repeatRate * 100).toFixed(1)}%は低水準です。フォローメール・同梱物・リピート特典の導入を検討してください。` })
+                    }
+                  }
+                  // 客単価
+                  if (rakutenData.funnel && rakutenData.funnel.total_buyers > 0) {
+                    const totalDailySales = rakutenData.daily.reduce((s, d) => s + (Number(d.sales_amount) || 0), 0)
+                    const aov = totalDailySales / rakutenData.funnel.total_buyers
+                    if (aov > 0) {
+                      insights.push({ type: 'info', title: `客単価 ${formatCurrency(aov)}`, detail: aov >= 5000 ? 'セット売りやまとめ買い促進で更なる向上が見込めます。' : 'クロスセル・アップセルの仕組みを導入し、客単価向上を図りましょう。' })
+                    }
+                  }
+
+                  if (insights.length === 0) return null
+                  const iconMap = { success: CheckCircle2, warning: AlertTriangle, danger: TrendingDown, info: Info }
+                  const colorMap = {
+                    success: 'bg-emerald-50 border-emerald-200/60 text-emerald-800',
+                    warning: 'bg-amber-50 border-amber-200/60 text-amber-800',
+                    danger: 'bg-red-50 border-red-200/60 text-red-800',
+                    info: 'bg-blue-50 border-blue-200/60 text-blue-800',
+                  }
+                  const iconColorMap = { success: 'text-emerald-600', warning: 'text-amber-600', danger: 'text-red-600', info: 'text-blue-600' }
+
+                  return (
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-slate-50/30">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-[#BF0000]" />
+                          自動分析インサイト
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {insights.map((insight) => {
+                            const Icon = iconMap[insight.type]
+                            return (
+                              <div key={insight.title} className={`flex gap-3 p-4 rounded-xl border ${colorMap[insight.type]}`}>
+                                <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${iconColorMap[insight.type]}`} />
+                                <div className="min-w-0">
+                                  <div className="text-[13px] font-semibold">{insight.title}</div>
+                                  <div className="text-[12px] mt-1 opacity-80 leading-relaxed">{insight.detail}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
+
                 {/* デバイス別 + クーポン/DEAL分析 */}
                 <div className="grid grid-cols-2 gap-6">
                   {/* デバイス別内訳 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">デバイス別内訳</CardTitle>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight">デバイス別内訳</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {rakutenData.device.length > 0 ? (
@@ -708,22 +800,22 @@ function DashboardPageContent() {
                             const share = totalSales > 0 ? (Number(d.sales_amount) || 0) / totalSales : 0
                             const isPC = d.device?.includes('PC') || d.device?.includes('パソコン')
                             return (
-                              <div key={d.device} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                                <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
-                                  {isPC ? <Monitor className="w-4 h-4 text-gray-600" /> : <Smartphone className="w-4 h-4 text-gray-600" />}
+                              <div key={d.device} className="flex items-center gap-3 p-4 bg-gradient-to-r from-gray-50/80 to-white rounded-xl border border-gray-100/60 hover:shadow-sm transition-shadow">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${isPC ? 'bg-blue-50 border border-blue-100' : 'bg-emerald-50 border border-emerald-100'}`}>
+                                  {isPC ? <Monitor className="w-5 h-5 text-blue-600" /> : <Smartphone className="w-5 h-5 text-emerald-600" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[12px] font-medium text-[#3D352F]">{d.device}</span>
-                                    <span className="text-[12px] font-semibold text-[#3D352F] tabular-nums">{formatCurrency(Number(d.sales_amount) || 0)}</span>
+                                    <span className="text-[13px] font-semibold text-[#3D352F]">{d.device}</span>
+                                    <span className="text-[14px] font-bold text-[#3D352F] tabular-nums">{formatCurrency(Number(d.sales_amount) || 0)}</span>
                                   </div>
-                                  <div className="flex items-center gap-4 mt-1">
-                                    <span className="text-[10px] text-gray-500">構成比 {formatPercent(share)}</span>
-                                    <span className="text-[10px] text-gray-500">転換率 {formatPercent(Number(d.conversion_rate) || 0)}</span>
-                                    <span className="text-[10px] text-gray-500">客単価 {formatCurrency(Number(d.avg_order_value) || 0)}</span>
+                                  <div className="flex items-center gap-4 mt-1.5">
+                                    <span className="text-[11px] text-gray-500">構成比 <span className="font-medium text-[#5A524B]">{formatPercent(share)}</span></span>
+                                    <span className="text-[11px] text-gray-500">転換率 <span className="font-medium text-[#5A524B]">{formatPercent(Number(d.conversion_rate) || 0)}</span></span>
+                                    <span className="text-[11px] text-gray-500">客単価 <span className="font-medium text-[#5A524B]">{formatCurrency(Number(d.avg_order_value) || 0)}</span></span>
                                   </div>
-                                  <div className="w-full h-1.5 bg-gray-200 rounded-full mt-1.5">
-                                    <div className="h-full bg-[#BF0000] rounded-full" style={{ width: `${share * 100}%` }} />
+                                  <div className="w-full h-2 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-[#BF0000] to-[#E84040] rounded-full transition-all duration-500" style={{ width: `${share * 100}%` }} />
                                   </div>
                                 </div>
                               </div>
@@ -737,67 +829,59 @@ function DashboardPageContent() {
                   </Card>
 
                   {/* クーポン・DEAL・ポイント分析 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">クーポン・DEAL・ポイント</CardTitle>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight">クーポン・DEAL・ポイント</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {rakutenData.coupon ? (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {/* DEAL vs 通常 */}
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-red-50 rounded-lg border border-red-100">
-                              <div className="text-[10px] font-medium text-red-600">スーパーDEAL</div>
-                              <div className="text-lg font-bold text-red-800 tabular-nums mt-0.5">{formatCurrency(Number(rakutenData.coupon.deal_sales) || 0)}</div>
-                              <div className="text-[10px] text-red-500 mt-0.5">
+                            <div className="p-4 bg-gradient-to-br from-red-50 to-rose-50 rounded-xl border border-red-100/60">
+                              <div className="text-[11px] font-semibold text-red-600 uppercase tracking-wider">スーパーDEAL</div>
+                              <div className="text-xl font-bold text-red-800 tabular-nums mt-1">{formatCurrency(Number(rakutenData.coupon.deal_sales) || 0)}</div>
+                              <div className="text-[11px] text-red-500 mt-1.5">
                                 {formatNumber(Number(rakutenData.coupon.deal_orders) || 0)}件 / 転換率 {formatPercent(Number(rakutenData.coupon.deal_conversion_rate) || 0)}
                               </div>
                             </div>
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                              <div className="text-[10px] font-medium text-gray-600">通常売上</div>
-                              <div className="text-lg font-bold text-gray-800 tabular-nums mt-0.5">{formatCurrency(Number(rakutenData.coupon.normal_sales) || 0)}</div>
-                              <div className="text-[10px] text-gray-500 mt-0.5">
+                            <div className="p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-100/60">
+                              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">通常売上</div>
+                              <div className="text-xl font-bold text-gray-800 tabular-nums mt-1">{formatCurrency(Number(rakutenData.coupon.normal_sales) || 0)}</div>
+                              <div className="text-[11px] text-gray-500 mt-1.5">
                                 {formatNumber(Number(rakutenData.coupon.normal_orders) || 0)}件 / 転換率 {formatPercent(Number(rakutenData.coupon.normal_conversion_rate) || 0)}
                               </div>
                             </div>
                           </div>
                           {/* DEAL構成比バー */}
                           {(Number(rakutenData.coupon.total_sales) || 0) > 0 && (
-                            <div>
-                              <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                                <span>DEAL構成比</span>
-                                <span className="tabular-nums">{formatPercent((Number(rakutenData.coupon.deal_sales) || 0) / (Number(rakutenData.coupon.total_sales) || 1))}</span>
+                            <div className="px-1">
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
+                                <span className="font-medium">DEAL構成比</span>
+                                <span className="tabular-nums font-semibold text-[#3D352F]">{formatPercent((Number(rakutenData.coupon.deal_sales) || 0) / (Number(rakutenData.coupon.total_sales) || 1))}</span>
                               </div>
-                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-[#BF0000] rounded-full"
+                                  className="h-full bg-gradient-to-r from-[#BF0000] to-[#E84040] rounded-full transition-all duration-500"
                                   style={{ width: `${((Number(rakutenData.coupon.deal_sales) || 0) / (Number(rakutenData.coupon.total_sales) || 1)) * 100}%` }}
                                 />
                               </div>
                             </div>
                           )}
                           {/* クーポン・ポイント内訳 */}
-                          <div className="border-t border-gray-100 pt-3 space-y-2">
-                            <div className="flex items-center justify-between text-[12px]">
-                              <span className="text-gray-500">店舗クーポン</span>
-                              <span className="font-medium text-[#3D352F] tabular-nums">{formatCurrency(Number(rakutenData.coupon.coupon_store) || 0)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[12px]">
-                              <span className="text-gray-500">楽天クーポン</span>
-                              <span className="font-medium text-[#3D352F] tabular-nums">{formatCurrency(Number(rakutenData.coupon.coupon_rakuten) || 0)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[12px]">
-                              <span className="text-gray-500">送料無料クーポン</span>
-                              <span className="font-medium text-[#3D352F] tabular-nums">{formatCurrency(Number(rakutenData.coupon.free_shipping) || 0)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[12px]">
-                              <span className="text-gray-500">ポイント売上</span>
-                              <span className="font-medium text-[#3D352F] tabular-nums">{formatCurrency(Number(rakutenData.coupon.points_sales) || 0)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-[12px]">
-                              <span className="text-gray-500">ポイント原資</span>
-                              <span className="font-medium text-red-600 tabular-nums">{formatCurrency(Number(rakutenData.coupon.points_cost) || 0)}</span>
-                            </div>
+                          <div className="border-t border-gray-100/80 pt-4 space-y-2.5">
+                            {[
+                              { label: '店舗クーポン', value: rakutenData.coupon.coupon_store, danger: false },
+                              { label: '楽天クーポン', value: rakutenData.coupon.coupon_rakuten, danger: false },
+                              { label: '送料無料クーポン', value: rakutenData.coupon.free_shipping, danger: false },
+                              { label: 'ポイント売上', value: rakutenData.coupon.points_sales, danger: false },
+                              { label: 'ポイント原資', value: rakutenData.coupon.points_cost, danger: true },
+                            ].map((item) => (
+                              <div key={item.label} className="flex items-center justify-between text-[12px] py-0.5">
+                                <span className="text-gray-500">{item.label}</span>
+                                <span className={`font-semibold tabular-nums ${item.danger ? 'text-red-600' : 'text-[#3D352F]'}`}>{formatCurrency(Number(item.value) || 0)}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ) : (
@@ -809,9 +893,9 @@ function DashboardPageContent() {
 
                 {/* 新規・リピート推移（月次） */}
                 {rakutenData.newRepeat.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">新規・リピート購入者数推移（楽天・月次）</CardTitle>
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight">新規・リピート購入者数推移（楽天・月次）</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="overflow-x-auto border border-black/[0.06] rounded-xl overflow-hidden">
@@ -853,9 +937,9 @@ function DashboardPageContent() {
                 )}
 
                 {/* 日次売上・アクセス推移テーブル */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">日次データ一覧</CardTitle>
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold text-[#3D352F] tracking-tight">日次データ一覧</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto border border-black/[0.06] rounded-xl overflow-hidden">
