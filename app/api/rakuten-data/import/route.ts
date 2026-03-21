@@ -301,6 +301,15 @@ interface ImportFileResult {
   period: string
   rowCount: number
   inserted: number
+  error?: string
+  debug?: {
+    totalLines: number
+    line1: string
+    line2: string
+    line3: string
+    delimiter: string
+    contentLength: number
+  }
 }
 
 async function runImport(): Promise<{
@@ -326,10 +335,41 @@ async function runImport(): Promise<{
   const filesToMove: { id: string; name: string; parentFolderId: string }[] = []
 
   for (const { entry, content } of driveFiles) {
+    // デバッグ情報を収集
+    const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
+    const debugInfo = {
+      totalLines: contentLines.length,
+      line1: (contentLines[0] || '').substring(0, 200),
+      line2: (contentLines[1] || '').substring(0, 200),
+      line3: (contentLines[2] || '').substring(0, 200),
+      delimiter: (contentLines[2] || '').includes('\t') ? 'tab' : 'comma',
+      contentLength: content.length,
+    }
+    console.log(`[楽天データ] ${entry.name}: ${debugInfo.totalLines}行, 区切り=${debugInfo.delimiter}, サイズ=${debugInfo.contentLength}`)
+    console.log(`[楽天データ]   line1: ${debugInfo.line1}`)
+    console.log(`[楽天データ]   line2: ${debugInfo.line2}`)
+    console.log(`[楽天データ]   line3: ${debugInfo.line3}`)
+
     try {
       const parsed = parseRakutenCSV(content, entry.name)
       const label = getDataTypeLabel(parsed.dataType)
-      console.log(`[楽天データ] ${entry.name}: ${label} ${parsed.rowCount}行`)
+      console.log(`[楽天データ] ${entry.name}: ${label} ${parsed.rowCount}行パース完了`)
+
+      if (parsed.rowCount === 0) {
+        // 行数0の場合はデバッグ情報付きで記録、ファイルは移動しない
+        console.warn(`[楽天データ] ${entry.name}: パース結果0行（期間: ${parsed.periodStart} ～ ${parsed.periodEnd}）`)
+        results.push({
+          fileName: entry.name,
+          shopName: entry.shopName,
+          dataType: parsed.dataType,
+          dataTypeLabel: label,
+          period: `${parsed.periodStart} ～ ${parsed.periodEnd}`,
+          rowCount: 0,
+          inserted: 0,
+          debug: debugInfo,
+        })
+        continue
+      }
 
       await ensureTable(bq, parsed.dataType)
 
@@ -363,6 +403,7 @@ async function runImport(): Promise<{
       })
       filesToMove.push({ id: entry.id, name: entry.name, parentFolderId: entry.parentFolderId })
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e)
       console.error(`[楽天データ] ${entry.name} エラー:`, e)
       results.push({
         fileName: entry.name,
@@ -372,6 +413,8 @@ async function runImport(): Promise<{
         period: '',
         rowCount: 0,
         inserted: 0,
+        error: errorMessage,
+        debug: debugInfo,
       })
     }
   }
