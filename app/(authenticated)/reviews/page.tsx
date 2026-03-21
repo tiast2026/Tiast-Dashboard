@@ -90,25 +90,39 @@ function ReviewsContent() {
   const handleRematch = async () => {
     setRematchLoading(true)
     setRematchResult(null)
-    try {
-      const res = await fetch('/api/reviews/mapping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'rematch' }),
-      })
-      const text = await res.text()
+    let round = 0
+    let hasMore = true
+
+    while (hasMore) {
+      round++
       try {
-        const json = JSON.parse(text)
-        setRematchResult(json.message || json.error || '完了')
-      } catch {
-        setRematchResult(`エラー: ${text.slice(0, 100)}`)
+        const res = await fetch('/api/reviews/mapping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'rematch' }),
+        })
+        const text = await res.text()
+        try {
+          const json = JSON.parse(text)
+          const msg = json.message || json.error || '完了'
+          hasMore = msg.includes('もう一度実行')
+          if (hasMore) {
+            setRematchResult(`${msg}（自動実行中... ${round}回目完了）`)
+          } else {
+            setRematchResult(msg)
+          }
+        } catch {
+          setRematchResult(`エラー: ${text.slice(0, 100)}`)
+          hasMore = false
+        }
+      } catch (e) {
+        setRematchResult(`エラー: ${e}`)
+        hasMore = false
       }
-      fetchReviews()
-    } catch (e) {
-      setRematchResult(`エラー: ${e}`)
-    } finally {
-      setRematchLoading(false)
     }
+
+    fetchReviews()
+    setRematchLoading(false)
   }
 
   const handleImport = async () => {
