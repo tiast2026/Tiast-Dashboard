@@ -5,6 +5,7 @@ import {
   deleteDriveFiles,
 } from '@/lib/google-drive'
 import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
+import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
 
 // Allow up to 60s for this function (Vercel Pro)
 export const maxDuration = 60
@@ -187,7 +188,33 @@ async function runImport(dryRun = false, reprocess = false) {
     return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
 
-  // 3.5 Auto-populate mapping sheet from reviews that have both rakuten_item_id and manage_number
+  // 3.5 Scrape product codes for reviews that have no matched_product_code
+  const unmatchedUrls = enrichedReviews
+    .filter(r => !r.matched_product_code && r.rakuten_item_id)
+    .map(r => r.review_url)
+
+  if (unmatchedUrls.length > 0) {
+    console.log(`[レビューインポート] ${unmatchedUrls.length}件の未マッチレビューをスクレイピング中...`)
+    const scrapedMap = await batchScrapeProductCodes(unmatchedUrls, mappingMap)
+
+    // Apply scraped results to enriched reviews
+    for (const r of enrichedReviews) {
+      if (!r.matched_product_code && r.rakuten_item_id && scrapedMap.has(r.rakuten_item_id)) {
+        r.matched_product_code = scrapedMap.get(r.rakuten_item_id)!
+      }
+    }
+
+    // Save new scraped mappings to sheet
+    const scrapedMappings = Array.from(scrapedMap.entries())
+      .filter(([id]) => !mappingMap.has(id))
+      .map(([id, code]) => ({ rakuten_item_id: id, product_code: code }))
+    if (scrapedMappings.length > 0) {
+      const added = await appendReviewMappings(scrapedMappings)
+      console.log(`[レビューインポート] スクレイピングマッピング自動追加: ${added}件`)
+    }
+  }
+
+  // 3.6 Auto-populate mapping sheet from reviews that have both rakuten_item_id and manage_number
   const newMappings: Array<{ rakuten_item_id: string; product_code: string }> = []
   for (const r of enrichedReviews) {
     if (r.rakuten_item_id && r.manage_number && !mappingMap.has(r.rakuten_item_id)) {
@@ -195,7 +222,6 @@ async function runImport(dryRun = false, reprocess = false) {
     }
   }
   if (newMappings.length > 0) {
-    // De-duplicate within this batch
     const seen = new Set<string>()
     const unique = newMappings.filter(m => {
       if (seen.has(m.rakuten_item_id)) return false
