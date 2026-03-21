@@ -26,7 +26,7 @@ function escapeSQL(v: string): string {
  */
 function extractProductKeyword(name: string): string {
   // Remove common size patterns: F(M)フリー, Mサイズ, etc.
-  let cleaned = name
+  const cleaned = name
     .replace(/\s+[A-Z]+\([A-Z]+\)\S*/g, '') // F(M)フリー
     .replace(/\s+[SMLXF]+サイズ/g, '')
     .replace(/\s+フリーサイズ/g, '')
