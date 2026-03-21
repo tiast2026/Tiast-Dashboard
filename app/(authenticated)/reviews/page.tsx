@@ -142,13 +142,13 @@ function ReviewsContent() {
       const res = await fetch('/api/reviews/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dry_run: false, reprocess }),
+        body: JSON.stringify({ dryRun: false, reprocess }),
       })
       const text = await res.text()
       try {
         const json = JSON.parse(text)
         if (json.success) {
-          setImportResult(`${json.inserted || 0}件インポート完了`)
+          setImportResult(`${json.imported || 0}件インポート完了`)
           fetchReviews()
         } else {
           setImportResult(json.error || 'エラー')
