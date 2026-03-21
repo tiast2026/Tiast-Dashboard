@@ -431,9 +431,14 @@ async function fetchReviewCSVsFromFolder(
         unmatchedHeaders,
         reviewSource: isOfficialFile ? '公式' : '楽天',
       })
-      console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
+      console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件 (${isOfficialFile ? '公式' : '楽天'})`)
       allReviews.push(...rows)
-      fileIds.push({ id: file.id, name: file.name })
+      // Only mark file for deletion if it had parsed rows (don't delete unparseable files)
+      if (rows.length > 0) {
+        fileIds.push({ id: file.id, name: file.name })
+      } else {
+        console.warn(`[レビュー][${shopName}] ${file.name}: 0件パース - ファイルは削除しません`)
+      }
     } catch (e) {
       csvDebug.push({ fileName: file.name, error: e instanceof Error ? e.message : String(e) })
       console.warn(`[レビュー][${shopName}] ${file.name} 読み込みエラー:`, e)
