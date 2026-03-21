@@ -61,6 +61,7 @@ function ReviewsContent() {
   const [typeFilter, setTypeFilter] = useState('全て')
   const [ratingFilter, setRatingFilter] = useState('全て')
   const [matchStatus, setMatchStatus] = useState('全て')
+  const [sourceFilter, setSourceFilter] = useState('全て')
   const [rematchLoading, setRematchLoading] = useState(false)
   const [rematchResult, setRematchResult] = useState<string | null>(null)
   const [importLoading, setImportLoading] = useState(false)
@@ -79,6 +80,7 @@ function ReviewsContent() {
       if (typeFilter !== '全て') params.set('type', typeFilter)
       if (ratingFilter !== '全て') params.set('rating', ratingFilter)
       if (matchStatus !== '全て') params.set('match_status', matchStatus)
+      if (sourceFilter !== '全て') params.set('source', sourceFilter)
 
       const res = await fetch(`/api/reviews?${params}`)
       const json = await res.json()
@@ -90,7 +92,7 @@ function ReviewsContent() {
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, typeFilter, ratingFilter, matchStatus, brand])
+  }, [page, pageSize, search, typeFilter, ratingFilter, matchStatus, sourceFilter, brand])
 
   useEffect(() => { fetchReviews() }, [fetchReviews])
 
@@ -230,6 +232,14 @@ function ReviewsContent() {
               <SelectItem value="全て">タイプ: 全て</SelectItem>
               <SelectItem value="商品レビュー">商品レビュー</SelectItem>
               <SelectItem value="ショップレビュー">ショップレビュー</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sourceFilter} onValueChange={v => { setSourceFilter(v); setPage(0) }}>
+            <SelectTrigger className="w-36 bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="全て">ソース: 全て</SelectItem>
+              <SelectItem value="楽天">楽天</SelectItem>
+              <SelectItem value="公式">公式</SelectItem>
             </SelectContent>
           </Select>
           <Select value={ratingFilter} onValueChange={v => { setRatingFilter(v); setPage(0) }}>
