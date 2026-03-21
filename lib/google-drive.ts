@@ -431,7 +431,7 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 async function fetchReviewCSVsFromFolder(
   folderId: string,
   shopName: string,
-): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[]; brandMismatchWarnings?: BrandMismatchWarning[] }> {
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string; parentFolderId: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[]; brandMismatchWarnings?: BrandMismatchWarning[] }> {
   const client = getDriveClient()
 
   const queryParts: string[] = [
@@ -479,7 +479,7 @@ async function fetchReviewCSVsFromFolder(
   console.log(`[レビュー][${shopName}] ${files.length}件のreviews CSVファイルを発見`)
 
   const allReviews: ReviewRow[] = []
-  const fileIds: { id: string; name: string }[] = []
+  const fileIds: { id: string; name: string; parentFolderId: string }[] = []
   const csvDebug: Record<string, unknown>[] = []
   const brandMismatchWarnings: BrandMismatchWarning[] = []
 
@@ -534,7 +534,7 @@ async function fetchReviewCSVsFromFolder(
       })
       console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
       allReviews.push(...rows)
-      fileIds.push({ id: file.id, name: file.name })
+      fileIds.push({ id: file.id, name: file.name, parentFolderId: folderId })
     } catch (e) {
       csvDebug.push({ fileName: file.name, error: e instanceof Error ? e.message : String(e) })
       console.warn(`[レビュー][${shopName}] ${file.name} 読み込みエラー:`, e)
@@ -554,13 +554,13 @@ async function fetchReviewCSVsFromFolder(
  */
 export async function fetchAllShopReviewCSVs(): Promise<{
   reviews: ReviewRow[]
-  fileIds: { id: string; name: string }[]
+  fileIds: { id: string; name: string; parentFolderId: string }[]
   debug?: Record<string, unknown>[]
   csvDebug?: Record<string, unknown>[]
   brandMismatchWarnings?: BrandMismatchWarning[]
 }> {
   const allReviews: ReviewRow[] = []
-  const allFileIds: { id: string; name: string }[] = []
+  const allFileIds: { id: string; name: string; parentFolderId: string }[] = []
   const debugInfo: Record<string, unknown>[] = []
   const allCsvDebug: Record<string, unknown>[] = []
   const allBrandMismatchWarnings: BrandMismatchWarning[] = []
@@ -613,4 +613,74 @@ export async function deleteDriveFiles(fileIds: string[]): Promise<{ deleted: nu
   }
 
   return { deleted, errors }
+}
+
+/**
+ * 指定フォルダ内の「imported」サブフォルダを取得、なければ作成する。
+ */
+async function getOrCreateImportedFolder(parentFolderId: string): Promise<string> {
+  const client = getDriveClient()
+  const subfolderName = 'imported'
+
+  // 既存の「imported」フォルダを検索
+  const res = await client.files.list({
+    q: `name='${subfolderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+    fields: 'files(id)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  })
+
+  const existing = res.data.files?.[0]
+  if (existing?.id) return existing.id
+
+  // なければ作成
+  const createRes = await client.files.create({
+    requestBody: {
+      name: subfolderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    },
+    fields: 'id',
+    supportsAllDrives: true,
+  })
+
+  console.log(`[Drive] 「imported」フォルダを作成: ${parentFolderId}`)
+  return createRes.data.id!
+}
+
+/**
+ * ファイルを「imported」サブフォルダに移動する。
+ * parentFolderIdごとにグルーピングして移動先を取得する。
+ */
+export async function moveDriveFilesToImported(
+  files: { id: string; name: string; parentFolderId: string }[],
+): Promise<{ moved: number; errors: string[] }> {
+  const client = getDriveClient()
+  let moved = 0
+  const errors: string[] = []
+
+  // 親フォルダごとにimportedフォルダIDをキャッシュ
+  const importedFolderCache = new Map<string, string>()
+
+  for (const file of files) {
+    try {
+      let importedFolderId = importedFolderCache.get(file.parentFolderId)
+      if (!importedFolderId) {
+        importedFolderId = await getOrCreateImportedFolder(file.parentFolderId)
+        importedFolderCache.set(file.parentFolderId, importedFolderId)
+      }
+
+      await client.files.update({
+        fileId: file.id,
+        addParents: importedFolderId,
+        removeParents: file.parentFolderId,
+        supportsAllDrives: true,
+      })
+      moved++
+    } catch (e) {
+      errors.push(`${file.name}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return { moved, errors }
 }
