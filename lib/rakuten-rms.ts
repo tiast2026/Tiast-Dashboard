@@ -22,6 +22,7 @@ export interface RmsItem {
   manageNumber: string    // 商品管理番号 (= 品番, 例: nlwp473-2512)
   itemName: string        // 商品名
   hideItem: boolean       // 倉庫フラグ
+  itemNumber?: string     // 楽天商品番号 (例: 10002380)
 }
 
 function getShopConfigs(): RmsShopConfig[] {
@@ -185,4 +186,54 @@ export function buildNameToCodeMap(items: RmsItem[]): Map<string, string> {
     }
   }
   return map
+}
+
+/**
+ * 全ショップの楽天商品番号 → 品番マッピングを取得
+ * items/search の結果から itemNumber を取得し、manageNumber と紐付ける
+ */
+export async function fetchItemNumberMappings(): Promise<Array<{ itemNumber: string; manageNumber: string }>> {
+  const shops = getShopConfigs()
+  const mappings: Array<{ itemNumber: string; manageNumber: string }> = []
+
+  for (const shop of shops) {
+    console.log(`[RMS] ${shop.shopName} の商品番号マッピング取得開始...`)
+    const HITS = 30
+    let offset = 0
+
+    while (true) {
+      const url = `${RMS_BASE_URL}/items/search?hits=${HITS}&offset=${offset}`
+      const data = await callRmsApi('GET', url, shop)
+      if (!data) break
+
+      const results = data.results as Array<{
+        item?: { manageNumber?: string }
+        itemNumber?: number | string
+      }> | undefined
+      if (!results || results.length === 0) break
+
+      for (const r of results) {
+        const manageNumber = r.item?.manageNumber
+        // itemNumber can be at top level or inside item
+        const itemNumber = r.itemNumber
+          || (r.item as Record<string, unknown> | undefined)?.itemNumber
+        if (manageNumber && itemNumber) {
+          mappings.push({
+            itemNumber: String(itemNumber),
+            manageNumber,
+          })
+        }
+      }
+
+      offset += HITS
+      const numFound = (data.numFound as number) || 0
+      if (offset >= numFound) break
+
+      await new Promise(r => setTimeout(r, 1000))
+    }
+
+    console.log(`[RMS] ${shop.shopName}: ${mappings.length}件のマッピング取得`)
+  }
+
+  return mappings
 }
