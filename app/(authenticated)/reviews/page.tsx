@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Star, RefreshCw, Download, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
 import { getBrandDisplayName } from '@/lib/constants'
 
 interface Review {
@@ -21,6 +22,7 @@ interface Review {
   order_number: string
   unhandled_flag: number
   matched_product_code: string | null
+  image_url: string | null
 }
 
 interface Summary {
@@ -266,18 +268,26 @@ function ReviewsContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/80">
+                  <TableHead className="w-[50px] text-xs"></TableHead>
                   <TableHead className="w-[80px] text-xs">評価</TableHead>
                   <TableHead className="w-[90px] text-xs">タイプ</TableHead>
                   <TableHead className="w-[90px] text-xs">投稿日</TableHead>
                   <TableHead className="text-xs">レビュー内容</TableHead>
                   <TableHead className="text-xs">商品名</TableHead>
                   <TableHead className="w-[120px] text-xs">品番</TableHead>
-                  <TableHead className="w-[60px] text-xs"></TableHead>
+                  <TableHead className="w-[40px] text-xs"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reviews.map((review, i) => (
                   <TableRow key={i} className="hover:bg-gray-50/50">
+                    <TableCell className="py-2 px-2">
+                      {review.image_url ? (
+                        <ProductImage src={review.image_url} alt="" size={36} className="rounded" />
+                      ) : (
+                        <div className="w-9 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300 text-[10px]">-</div>
+                      )}
+                    </TableCell>
                     <TableCell className="py-2.5">
                       {renderStars(review.rating)}
                     </TableCell>

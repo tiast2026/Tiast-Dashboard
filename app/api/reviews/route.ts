@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runQuery, isBigQueryConfigured, tableName } from '@/lib/bigquery'
+import { fetchSheetData } from '@/lib/google-sheets'
 
 interface ReviewRecord {
   review_type: string
@@ -139,7 +140,20 @@ export async function GET(request: NextRequest) {
       summary = row || null
     }
 
-    return NextResponse.json({ data: reviews, summary, total })
+    // Enrich with product images from master sheet
+    const masterData = await fetchSheetData()
+    const imageMap = new Map<string, string>()
+    for (const p of masterData) {
+      if (p.product_code && p.image_url) {
+        imageMap.set(p.product_code, p.image_url)
+      }
+    }
+    const enriched = reviews.map(r => ({
+      ...r,
+      image_url: r.matched_product_code ? imageMap.get(r.matched_product_code) || null : null,
+    }))
+
+    return NextResponse.json({ data: enriched, summary, total })
   } catch (error) {
     console.error('[レビュー取得] エラー:', error)
     return NextResponse.json({ data: [], summary: null, total: 0, error: String(error) }, { status: 500 })
