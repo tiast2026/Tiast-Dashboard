@@ -3,6 +3,7 @@ import { getBigQueryClient, isBigQueryConfigured } from '@/lib/bigquery'
 import {
   fetchAllShopReviewCSVs,
   deleteDriveFiles,
+  type BrandMismatchWarning,
 } from '@/lib/google-drive'
 import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
@@ -148,7 +149,7 @@ async function runImport(dryRun = false, reprocess = false) {
 
   // 1. Fetch all "reviews*" CSVs from both shop folders
   console.log(`[レビューインポート] NOAHL + BLACKQUEEN のDriveフォルダからreviews CSVを取得中...`)
-  const { reviews, fileIds, debug, csvDebug } = await fetchAllShopReviewCSVs()
+  const { reviews, fileIds, debug, csvDebug, brandMismatchWarnings } = await fetchAllShopReviewCSVs()
 
   if (reviews.length === 0) {
     return {
@@ -161,6 +162,7 @@ async function runImport(dryRun = false, reprocess = false) {
       files_found: fileIds.length,
       debug,
       csvDebug,
+      brandMismatchWarnings,
     }
   }
 
@@ -375,6 +377,7 @@ async function runImport(dryRun = false, reprocess = false) {
     files_processed: fileIds.map(f => f.name),
     files_deleted: delResult.deleted,
     delete_errors: delResult.errors.length > 0 ? delResult.errors : undefined,
+    brandMismatchWarnings,
   }
 }
 

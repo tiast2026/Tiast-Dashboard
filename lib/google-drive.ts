@@ -97,6 +97,58 @@ export interface ReviewRow {
   review_source: '楽天' | '公式'
 }
 
+export interface BrandMismatchWarning {
+  fileName: string
+  folderBrand: string
+  detectedBrand: string
+  mismatchCount: number
+  totalRows: number
+  sampleManageNumbers: string[]
+}
+
+/**
+ * 品番の先頭文字からブランドを判定する。
+ * n → NOAHL, b → BLACKQUEEN（SQLのCASE文と同じロジック）
+ */
+function detectBrandFromManageNumber(manageNumber: string): string | null {
+  if (!manageNumber) return null
+  const first = manageNumber.charAt(0).toLowerCase()
+  if (first === 'n') return 'NOAHL'
+  if (first === 'b') return 'BLACKQUEEN'
+  return null
+}
+
+/**
+ * CSVの品番からブランドを推定し、フォルダのブランドと一致するか検証する。
+ */
+function validateBrandMatch(
+  rows: ReviewRow[],
+  folderBrand: string,
+  fileName: string,
+): BrandMismatchWarning | null {
+  const mismatched: string[] = []
+  let detectedOtherBrand: string | null = null
+
+  for (const row of rows) {
+    const detected = detectBrandFromManageNumber(row.manage_number)
+    if (detected && detected !== folderBrand) {
+      mismatched.push(row.manage_number)
+      if (!detectedOtherBrand) detectedOtherBrand = detected
+    }
+  }
+
+  if (mismatched.length === 0 || !detectedOtherBrand) return null
+
+  return {
+    fileName,
+    folderBrand,
+    detectedBrand: detectedOtherBrand,
+    mismatchCount: mismatched.length,
+    totalRows: rows.length,
+    sampleManageNumbers: Array.from(new Set(mismatched)).slice(0, 5),
+  }
+}
+
 // CSV header → internal key mapping (supports both Rakuten and official store CSVs)
 const REVIEW_HEADER_MAP: Record<string, keyof ReviewRow> = {
   // Rakuten CSV headers
@@ -379,7 +431,7 @@ export async function listDriveCSVFiles(folderId?: string): Promise<{
 async function fetchReviewCSVsFromFolder(
   folderId: string,
   shopName: string,
-): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[] }> {
+): Promise<{ reviews: ReviewRow[]; fileIds: { id: string; name: string }[]; debug?: Record<string, unknown>; csvDebug?: Record<string, unknown>[]; brandMismatchWarnings?: BrandMismatchWarning[] }> {
   const client = getDriveClient()
 
   const queryParts: string[] = [
@@ -429,6 +481,7 @@ async function fetchReviewCSVsFromFolder(
   const allReviews: ReviewRow[] = []
   const fileIds: { id: string; name: string }[] = []
   const csvDebug: Record<string, unknown>[] = []
+  const brandMismatchWarnings: BrandMismatchWarning[] = []
 
   for (const file of files) {
     if (!file.id || !file.name) continue
@@ -458,6 +511,17 @@ async function fetchReviewCSVsFromFolder(
       const contentLines = content.split(/\r?\n/).filter((l: string) => l.trim())
       const headerLine = contentLines[0] || ''
       const rows = parseReviewCSV(content, shopName, file.name)
+
+      // ブランド誤フォルダ検証: 品番プレフィックスでブランドを判定
+      const mismatch = validateBrandMatch(rows, shopName, file.name)
+      if (mismatch) {
+        brandMismatchWarnings.push(mismatch)
+        console.warn(
+          `[レビュー][${shopName}] ⚠️ ブランド不一致: ${file.name} は${mismatch.detectedBrand}の品番を含んでいます` +
+          `（${mismatch.mismatchCount}/${mismatch.totalRows}件、例: ${mismatch.sampleManageNumbers.join(', ')}）`
+        )
+      }
+
       csvDebug.push({
         fileName: file.name,
         mimeType: file.mimeType,
@@ -466,6 +530,7 @@ async function fetchReviewCSVsFromFolder(
         headerLine: headerLine.substring(0, 500),
         secondLine: (contentLines[1] || '').substring(0, 500),
         parsedRows: rows.length,
+        brandMismatch: mismatch ? { detectedBrand: mismatch.detectedBrand, mismatchCount: mismatch.mismatchCount } : null,
       })
       console.log(`[レビュー][${shopName}] ${file.name}: ${rows.length}件`)
       allReviews.push(...rows)
@@ -476,7 +541,12 @@ async function fetchReviewCSVsFromFolder(
     }
   }
 
-  return { reviews: allReviews, fileIds, csvDebug: csvDebug.length > 0 ? csvDebug : undefined }
+  return {
+    reviews: allReviews,
+    fileIds,
+    csvDebug: csvDebug.length > 0 ? csvDebug : undefined,
+    brandMismatchWarnings: brandMismatchWarnings.length > 0 ? brandMismatchWarnings : undefined,
+  }
 }
 
 /**
@@ -487,18 +557,25 @@ export async function fetchAllShopReviewCSVs(): Promise<{
   fileIds: { id: string; name: string }[]
   debug?: Record<string, unknown>[]
   csvDebug?: Record<string, unknown>[]
+  brandMismatchWarnings?: BrandMismatchWarning[]
 }> {
   const allReviews: ReviewRow[] = []
   const allFileIds: { id: string; name: string }[] = []
   const debugInfo: Record<string, unknown>[] = []
   const allCsvDebug: Record<string, unknown>[] = []
+  const allBrandMismatchWarnings: BrandMismatchWarning[] = []
 
   for (const shop of REVIEW_CSV_FOLDERS) {
-    const { reviews, fileIds, debug, csvDebug } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
+    const { reviews, fileIds, debug, csvDebug, brandMismatchWarnings } = await fetchReviewCSVsFromFolder(shop.folderId, shop.shopName)
     allReviews.push(...reviews)
     allFileIds.push(...fileIds)
     if (debug) debugInfo.push(debug)
     if (csvDebug) allCsvDebug.push(...csvDebug)
+    if (brandMismatchWarnings) allBrandMismatchWarnings.push(...brandMismatchWarnings)
+  }
+
+  if (allBrandMismatchWarnings.length > 0) {
+    console.warn(`[レビュー] ⚠️ ${allBrandMismatchWarnings.length}件のCSVファイルでブランド不一致を検出`)
   }
 
   console.log(`[レビュー] 全店舗合計: ${allReviews.length}件（${allFileIds.length}ファイル）`)
@@ -507,6 +584,7 @@ export async function fetchAllShopReviewCSVs(): Promise<{
     fileIds: allFileIds,
     debug: debugInfo.length > 0 ? debugInfo : undefined,
     csvDebug: allCsvDebug.length > 0 ? allCsvDebug : undefined,
+    brandMismatchWarnings: allBrandMismatchWarnings.length > 0 ? allBrandMismatchWarnings : undefined,
   }
 }
 
