@@ -37,19 +37,25 @@ const REVIEW_COLUMNS = `
   title, review_body, flag, order_number, unhandled_flag, matched_product_code, review_source
 `
 
-/** Combined view of both product and shop review tables */
+/** Combined view of rakuten product / rakuten shop / official review tables */
 function allReviewsTable(): string {
   return `(
     SELECT review_type, product_name, review_url, rating, posted_at,
            title, review_body, flag, order_number, unhandled_flag,
-           matched_product_code, IFNULL(review_source, '楽天') AS review_source, shop_name
+           matched_product_code, '楽天' AS review_source, shop_name
     FROM ${tableName('rakuten_reviews')}
     UNION ALL
     SELECT review_type, product_name, review_url, rating, posted_at,
            title, review_body, flag, order_number, unhandled_flag,
            CAST(NULL AS STRING) AS matched_product_code,
-           IFNULL(review_source, '楽天') AS review_source, shop_name
+           '楽天' AS review_source, shop_name
     FROM ${tableName('rakuten_shop_reviews')}
+    UNION ALL
+    SELECT review_type, product_name, review_url, rating, posted_at,
+           title, review_body, CAST(0 AS INT64) AS flag, CAST('' AS STRING) AS order_number,
+           CAST(0 AS INT64) AS unhandled_flag,
+           matched_product_code, '公式' AS review_source, shop_name
+    FROM ${tableName('official_reviews')}
   ) AS all_reviews`
 }
 
