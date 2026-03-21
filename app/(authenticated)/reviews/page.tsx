@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Star, RefreshCw, Download, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
 import ProductImage from '@/components/ui/product-image'
+import ProductDetailDialog from '@/components/products/ProductDetailDialog'
 import { getBrandDisplayName } from '@/lib/constants'
 
 interface Review {
@@ -63,6 +64,7 @@ function ReviewsContent() {
   const [rematchResult, setRematchResult] = useState<string | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<string | null>(null)
+  const [dialogProductCode, setDialogProductCode] = useState<string | null>(null)
 
   const fetchReviews = useCallback(async () => {
     setLoading(true)
@@ -268,23 +270,15 @@ function ReviewsContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/80">
-                  <TableHead className="w-[40px] text-xs px-2"></TableHead>
                   <TableHead className="w-[150px] text-xs px-2">評価</TableHead>
                   <TableHead className="text-xs px-2">レビュー内容</TableHead>
-                  <TableHead className="w-[180px] text-xs px-2">商品</TableHead>
+                  <TableHead className="w-[220px] text-xs px-2">商品</TableHead>
                   <TableHead className="w-[30px] text-xs px-1"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reviews.map((review, i) => (
                   <TableRow key={i} className="hover:bg-gray-50/50">
-                    <TableCell className="py-2 px-2">
-                      {review.image_url ? (
-                        <ProductImage src={review.image_url} alt="" size={36} className="rounded" />
-                      ) : (
-                        <div className="w-9 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300 text-[10px]">-</div>
-                      )}
-                    </TableCell>
                     <TableCell className="py-2 px-2 align-top">
                       <div className="flex items-center gap-1">
                         {renderStars(review.rating)}
@@ -308,17 +302,37 @@ function ReviewsContent() {
                       </div>
                     </TableCell>
                     <TableCell className="py-2 px-2 align-top">
-                      <div className="text-[11px] text-gray-500 line-clamp-1" title={review.product_name}>
-                        {review.product_name}
-                      </div>
                       {review.matched_product_code ? (
-                        <span className="text-[10px] px-1 py-0.5 bg-green-50 text-green-700 rounded font-medium">
-                          {review.matched_product_code}
-                        </span>
+                        <button
+                          onClick={() => setDialogProductCode(review.matched_product_code)}
+                          className="flex items-center gap-2 text-left hover:bg-gray-50 rounded p-1 -m-1 transition group w-full"
+                        >
+                          {review.image_url ? (
+                            <ProductImage src={review.image_url} alt="" size={36} className="rounded flex-shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 bg-gray-100 rounded flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-[11px] text-gray-500 line-clamp-1 group-hover:text-gray-700" title={review.product_name}>
+                              {review.product_name}
+                            </div>
+                            <span className="text-[10px] px-1 py-0.5 bg-green-50 text-green-700 rounded font-medium">
+                              {review.matched_product_code}
+                            </span>
+                          </div>
+                        </button>
                       ) : (
-                        <span className="text-[10px] px-1 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
-                          未マッチ
-                        </span>
+                        <div className="flex items-center gap-2 p-1 -m-1">
+                          <div className="w-9 h-9 bg-gray-100 rounded flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-[11px] text-gray-500 line-clamp-1" title={review.product_name}>
+                              {review.product_name}
+                            </div>
+                            <span className="text-[10px] px-1 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
+                              未マッチ
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="py-2 px-1">
@@ -368,6 +382,15 @@ function ReviewsContent() {
           </div>
         )}
       </div>
+
+      {dialogProductCode && (
+        <ProductDetailDialog
+          open={!!dialogProductCode}
+          onClose={() => setDialogProductCode(null)}
+          mode="product"
+          productCode={dialogProductCode}
+        />
+      )}
     </>
   )
 }
