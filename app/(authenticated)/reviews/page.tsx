@@ -270,37 +270,15 @@ function ReviewsContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/80">
+                  <TableHead className="w-[220px] text-xs px-2">商品</TableHead>
                   <TableHead className="w-[150px] text-xs px-2">評価</TableHead>
                   <TableHead className="text-xs px-2">レビュー内容</TableHead>
-                  <TableHead className="w-[220px] text-xs px-2">商品</TableHead>
                   <TableHead className="w-[30px] text-xs px-1"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {reviews.map((review, i) => (
                   <TableRow key={i} className="hover:bg-gray-50/50">
-                    <TableCell className="py-2 px-2 align-top">
-                      <div className="flex items-center gap-1">
-                        {renderStars(review.rating)}
-                        <span className="text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap bg-red-50 text-red-600">楽天</span>
-                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${
-                          review.review_type === '商品レビュー'
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'bg-purple-50 text-purple-600'
-                        }`}>
-                          {review.review_type === '商品レビュー' ? '商品' : 'ショップ'}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-gray-400 mt-0.5">{review.posted_at}</div>
-                    </TableCell>
-                    <TableCell className="py-2 px-2 align-top">
-                      {review.title && (
-                        <div className="text-sm font-medium text-gray-800 line-clamp-1">{review.title}</div>
-                      )}
-                      <div className="text-xs text-gray-400 line-clamp-2">
-                        {review.review_body || '（本文なし）'}
-                      </div>
-                    </TableCell>
                     <TableCell className="py-2 px-2 align-top">
                       {review.matched_product_code ? (
                         <button
@@ -334,6 +312,28 @@ function ReviewsContent() {
                           </div>
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell className="py-2 px-2 align-top">
+                      <div className="flex items-center gap-1">
+                        {renderStars(review.rating)}
+                        <span className="text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap bg-red-50 text-red-600">楽天</span>
+                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${
+                          review.review_type === '商品レビュー'
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'bg-purple-50 text-purple-600'
+                        }`}>
+                          {review.review_type === '商品レビュー' ? '商品' : 'ショップ'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">{review.posted_at}</div>
+                    </TableCell>
+                    <TableCell className="py-2 px-2 align-top">
+                      {review.title && (
+                        <div className="text-sm font-medium text-gray-800 line-clamp-1">{review.title}</div>
+                      )}
+                      <div className="text-xs text-gray-400 line-clamp-2">
+                        {review.review_body || '（本文なし）'}
+                      </div>
                     </TableCell>
                     <TableCell className="py-2 px-1">
                       {review.review_url && (
