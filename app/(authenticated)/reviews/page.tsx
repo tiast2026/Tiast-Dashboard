@@ -268,14 +268,11 @@ function ReviewsContent() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/80">
-                  <TableHead className="w-[50px] text-xs"></TableHead>
-                  <TableHead className="w-[80px] text-xs">評価</TableHead>
-                  <TableHead className="w-[90px] text-xs">タイプ</TableHead>
-                  <TableHead className="w-[90px] text-xs">投稿日</TableHead>
-                  <TableHead className="text-xs">レビュー内容</TableHead>
-                  <TableHead className="text-xs">商品名</TableHead>
-                  <TableHead className="w-[120px] text-xs">品番</TableHead>
-                  <TableHead className="w-[40px] text-xs"></TableHead>
+                  <TableHead className="w-[40px] text-xs px-2"></TableHead>
+                  <TableHead className="w-[100px] text-xs px-2">評価</TableHead>
+                  <TableHead className="text-xs px-2">レビュー内容</TableHead>
+                  <TableHead className="w-[180px] text-xs px-2">商品</TableHead>
+                  <TableHead className="w-[30px] text-xs px-1"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -288,44 +285,42 @@ function ReviewsContent() {
                         <div className="w-9 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300 text-[10px]">-</div>
                       )}
                     </TableCell>
-                    <TableCell className="py-2.5">
-                      {renderStars(review.rating)}
+                    <TableCell className="py-2 px-2 align-top">
+                      <div className="flex items-center gap-1.5">
+                        {renderStars(review.rating)}
+                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
+                          review.review_type === '商品レビュー'
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'bg-purple-50 text-purple-600'
+                        }`}>
+                          {review.review_type === '商品レビュー' ? '商品' : 'ショップ'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">{review.posted_at}</div>
                     </TableCell>
-                    <TableCell className="py-2.5">
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
-                        review.review_type === '商品レビュー'
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'bg-purple-50 text-purple-600'
-                      }`}>
-                        {review.review_type === '商品レビュー' ? '商品' : 'ショップ'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                      {review.posted_at}
-                    </TableCell>
-                    <TableCell className="py-2.5 max-w-[400px]">
+                    <TableCell className="py-2 px-2 align-top">
                       {review.title && (
-                        <div className="text-sm font-medium text-gray-800 truncate">{review.title}</div>
+                        <div className="text-sm font-medium text-gray-800 line-clamp-1">{review.title}</div>
                       )}
-                      <div className="text-xs text-gray-400 line-clamp-1">
+                      <div className="text-xs text-gray-400 line-clamp-2">
                         {review.review_body || '（本文なし）'}
                       </div>
                     </TableCell>
-                    <TableCell className="py-2.5 text-xs text-gray-500 max-w-[250px] truncate" title={review.product_name}>
-                      {review.product_name}
-                    </TableCell>
-                    <TableCell className="py-2.5">
+                    <TableCell className="py-2 px-2 align-top">
+                      <div className="text-[11px] text-gray-500 line-clamp-1" title={review.product_name}>
+                        {review.product_name}
+                      </div>
                       {review.matched_product_code ? (
-                        <span className="text-[11px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded font-medium">
+                        <span className="text-[10px] px-1 py-0.5 bg-green-50 text-green-700 rounded font-medium">
                           {review.matched_product_code}
                         </span>
                       ) : (
-                        <span className="text-[11px] px-1.5 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
+                        <span className="text-[10px] px-1 py-0.5 bg-orange-50 text-orange-500 rounded font-medium">
                           未マッチ
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="py-2.5">
+                    <TableCell className="py-2 px-1">
                       {review.review_url && (
                         <a
                           href={review.review_url}
