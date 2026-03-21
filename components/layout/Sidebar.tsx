@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
-  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload, CircleDollarSign,
+  BarChart3, Tag, Users, Database, TrendingUp, ChevronDown, Trophy, MessageSquare, Upload,
+  CircleDollarSign, Package, Store, Layers, UserPlus, Clock, ShoppingCart, Crown, Sun,
 } from 'lucide-react'
 
 interface BrandSection {
@@ -162,21 +163,40 @@ export default function Sidebar() {
         {/* Separator */}
         <div className="my-3 mx-2 h-px bg-white/8" />
 
-        {/* 価格分析 */}
-        <Link
-          href="/pricing"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-all duration-200 ${
-            isActive('/pricing')
-              ? 'bg-white/12 text-white font-medium shadow-sm'
-              : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
-          }`}
-        >
-          <CircleDollarSign className="w-[18px] h-[18px]" style={{ color: '#C4A882' }} />
-          <span>価格分析</span>
-          {isActive('/pricing') && (
-            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#C4A882]" />
-          )}
-        </Link>
+        {/* 分析メニュー */}
+        {[
+          { label: '価格分析', href: '/pricing', icon: CircleDollarSign, color: '#C4A882' },
+          { label: '在庫回転率', href: '/inventory', icon: Package, color: '#6366F1' },
+          { label: 'チャネル収益性', href: '/channel-profitability', icon: Store, color: '#0EA5E9' },
+          { label: 'ABC分析', href: '/abc-analysis', icon: Layers, color: '#8B5CF6' },
+          { label: '新規vsリピート', href: '/repeat-purchase', icon: UserPlus, color: '#EC4899' },
+          { label: '曜日×時間帯', href: '/time-analysis', icon: Clock, color: '#F59E0B' },
+          { label: 'バスケット分析', href: '/basket-analysis', icon: ShoppingCart, color: '#10B981' },
+          { label: 'LTV分析', href: '/ltv', icon: Crown, color: '#F97316' },
+          { label: '季節性予測', href: '/seasonality', icon: Sun, color: '#EF4444' },
+        ].map(item => {
+          const Icon = item.icon
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[12px] transition-all duration-200 ${
+                isActive(item.href)
+                  ? 'bg-white/12 text-white font-medium shadow-sm'
+                  : 'text-[#A99D93] hover:bg-white/6 hover:text-[#D4C8BC]'
+              }`}
+            >
+              <Icon className="w-[16px] h-[16px]" style={{ color: item.color }} />
+              <span>{item.label}</span>
+              {isActive(item.href) && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: item.color }} />
+              )}
+            </Link>
+          )
+        })}
+
+        {/* Separator */}
+        <div className="my-3 mx-2 h-px bg-white/8" />
 
         {/* 楽天ランキング */}
         <Link
