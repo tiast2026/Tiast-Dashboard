@@ -705,7 +705,7 @@ export default function RankingPage() {
 
                           {/* Product Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate" title={product.item_name}>
+                            <div className="font-medium text-sm line-clamp-2" title={product.item_name}>
                               {product.item_name}
                             </div>
                             <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -730,7 +730,7 @@ export default function RankingPage() {
                           </div>
 
                           {/* Stats */}
-                          <div className="hidden lg:flex gap-5 flex-shrink-0 text-center">
+                          <div className="hidden xl:flex gap-5 flex-shrink-0 text-center">
                             <div>
                               <div className="text-[10px] text-gray-400">現在順位</div>
                               <div className="text-lg font-semibold text-gray-700">{product.latest_rank}位</div>
@@ -747,7 +747,7 @@ export default function RankingPage() {
 
                           {/* Sparkline + Expand */}
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="hidden xl:block w-28">
+                            <div className="hidden 2xl:block w-28">
                               <RankSparkline history={product.history} />
                             </div>
                             <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />

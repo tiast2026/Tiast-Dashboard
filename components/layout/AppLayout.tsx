@@ -9,7 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Suspense>
         <Sidebar />
       </Suspense>
-      <main className="flex-1 ml-60">{children}</main>
+      <main className="flex-1 ml-60 min-w-0 overflow-x-hidden">{children}</main>
     </div>
   )
 }
