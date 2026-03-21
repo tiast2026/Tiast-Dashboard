@@ -89,38 +89,31 @@ function parseCSVLine(line: string): string[] {
  */
 function splitCSVRows(content: string): string[] {
   const rows: string[] = []
-  let current = ''
+  let rowStart = 0
   let inQuotes = false
 
   for (let i = 0; i < content.length; i++) {
     const ch = content[i]
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < content.length && content[i + 1] === '"') {
-          current += '""'
-          i++
-        } else {
-          inQuotes = false
-          current += ch
-        }
+    if (ch === '"') {
+      if (inQuotes && i + 1 < content.length && content[i + 1] === '"') {
+        i++ // skip escaped quote ""
       } else {
-        current += ch
+        inQuotes = !inQuotes
       }
-    } else {
-      if (ch === '"') {
-        inQuotes = true
-        current += ch
-      } else if (ch === '\n') {
-        const trimmed = current.replace(/\r$/, '')
-        if (trimmed.trim()) rows.push(trimmed)
-        current = ''
-      } else {
-        current += ch
-      }
+    } else if (ch === '\n' && !inQuotes) {
+      let end = i
+      if (end > rowStart && content[end - 1] === '\r') end--
+      const row = content.slice(rowStart, end)
+      if (row.trim()) rows.push(row)
+      rowStart = i + 1
     }
   }
-  const trimmed = current.replace(/\r$/, '')
-  if (trimmed.trim()) rows.push(trimmed)
+  if (rowStart < content.length) {
+    let end = content.length
+    if (end > rowStart && content[end - 1] === '\r') end--
+    const row = content.slice(rowStart, end)
+    if (row.trim()) rows.push(row)
+  }
   return rows
 }
 
@@ -135,12 +128,17 @@ function normalizeDate(raw: string): string {
 }
 
 function parseReviewCSV(content: string, shopName: string = ''): ReviewRow[] {
-  const lines = splitCSVRows(content)
-  if (lines.length < 2) return []
-
-  // Detect delimiter (tab or comma)
-  const headerLine = lines[0]
+  // Detect delimiter from first line
+  const firstNewline = content.indexOf('\n')
+  const headerLine = (firstNewline >= 0 ? content.slice(0, firstNewline) : content).replace(/\r$/, '')
   const delimiter = headerLine.includes('\t') ? '\t' : ','
+
+  // TSV: simple line split (no quoted newlines in TSV)
+  // CSV: use quote-aware split to handle newlines inside quoted fields
+  const lines = delimiter === '\t'
+    ? content.split(/\r?\n/).filter(l => l.trim())
+    : splitCSVRows(content)
+  if (lines.length < 2) return []
 
   // Parse header
   const rawHeaders = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''))
