@@ -38,9 +38,11 @@ export interface DriveFileEntry {
  */
 export async function fetchRakutenDataCSVsFromDrive(): Promise<{
   files: { entry: DriveFileEntry; content: string }[]
+  errors: { fileName: string; shopName: string; error: string }[]
 }> {
   const client = getDriveClient()
   const results: { entry: DriveFileEntry; content: string }[] = []
+  const errors: { fileName: string; shopName: string; error: string }[] = []
 
   for (const shop of REVIEW_CSV_FOLDERS) {
     const res = await client.files.list({
@@ -52,6 +54,11 @@ export async function fetchRakutenDataCSVsFromDrive(): Promise<{
     })
 
     const files = res.data.files || []
+    console.log(`[楽天データ][${shop.shopName}] フォルダ内ファイル数: ${files.length}`)
+    for (const file of files) {
+      console.log(`[楽天データ][${shop.shopName}]   - ${file.name} (${file.mimeType}) → 楽天CSV: ${file.name ? isRakutenDataCSV(file.name) : false}`)
+    }
+
     for (const file of files) {
       if (!file.id || !file.name) continue
       if (!isRakutenDataCSV(file.name)) continue
@@ -80,12 +87,14 @@ export async function fetchRakutenDataCSVsFromDrive(): Promise<{
           content,
         })
       } catch (e) {
-        console.warn(`[楽天データ][${shop.shopName}] ${file.name} 読み込みエラー:`, e)
+        const errorMsg = e instanceof Error ? e.message : String(e)
+        console.error(`[楽天データ][${shop.shopName}] ${file.name} 読み込みエラー:`, e)
+        errors.push({ fileName: file.name, shopName: shop.shopName, error: errorMsg })
       }
     }
   }
 
-  return { files: results }
+  return { files: results, errors }
 }
 
 export interface ReviewRow {

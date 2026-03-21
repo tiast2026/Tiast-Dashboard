@@ -323,10 +323,26 @@ async function runImport(): Promise<{
     return { success: false, files: [], totalInserted: 0, filesMoved: 0, error: 'BigQuery未設定' }
   }
 
-  const { files: driveFiles } = await fetchRakutenDataCSVsFromDrive()
+  const { files: driveFiles, errors: driveErrors } = await fetchRakutenDataCSVsFromDrive()
 
-  if (driveFiles.length === 0) {
+  // ダウンロードエラーがあったファイルも結果に含める
+  const downloadErrorResults: ImportFileResult[] = driveErrors.map(e => ({
+    fileName: e.fileName,
+    shopName: e.shopName,
+    dataType: 'unknown',
+    dataTypeLabel: 'ダウンロードエラー',
+    period: '',
+    rowCount: 0,
+    inserted: 0,
+    error: e.error,
+  }))
+
+  if (driveFiles.length === 0 && driveErrors.length === 0) {
     return { success: true, files: [], totalInserted: 0, filesMoved: 0, error: '楽天データCSVファイルが見つかりません' }
+  }
+
+  if (driveFiles.length === 0 && driveErrors.length > 0) {
+    return { success: false, files: downloadErrorResults, totalInserted: 0, filesMoved: 0, error: 'ファイルのダウンロードに失敗しました' }
   }
 
   console.log(`[楽天データ] ${driveFiles.length}ファイル検出`)
@@ -430,10 +446,12 @@ async function runImport(): Promise<{
     }
   }
 
-  const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0)
-  console.log(`[楽天データ] 完了: ${totalInserted}件インポート, ${filesMoved}ファイル移動`)
+  // ダウンロードエラーも結果に追加
+  const allResults = [...results, ...downloadErrorResults]
+  const totalInserted = allResults.reduce((sum, r) => sum + r.inserted, 0)
+  console.log(`[楽天データ] 完了: ${totalInserted}件インポート, ${filesMoved}ファイル移動, ${driveErrors.length}ダウンロードエラー`)
 
-  return { success: true, files: results, totalInserted, filesMoved }
+  return { success: true, files: allResults, totalInserted, filesMoved }
 }
 
 // ---------- ハンドラ ----------
