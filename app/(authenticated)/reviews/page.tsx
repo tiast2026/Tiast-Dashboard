@@ -269,7 +269,7 @@ function ReviewsContent() {
               <TableHeader>
                 <TableRow className="bg-gray-50/80">
                   <TableHead className="w-[40px] text-xs px-2"></TableHead>
-                  <TableHead className="w-[100px] text-xs px-2">評価</TableHead>
+                  <TableHead className="w-[120px] text-xs px-2">評価</TableHead>
                   <TableHead className="text-xs px-2">レビュー内容</TableHead>
                   <TableHead className="w-[180px] text-xs px-2">商品</TableHead>
                   <TableHead className="w-[30px] text-xs px-1"></TableHead>
@@ -288,7 +288,7 @@ function ReviewsContent() {
                     <TableCell className="py-2 px-2 align-top">
                       <div className="flex items-center gap-1.5">
                         {renderStars(review.rating)}
-                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium ${
+                        <span className={`text-[10px] px-1 py-0.5 rounded font-medium whitespace-nowrap ${
                           review.review_type === '商品レビュー'
                             ? 'bg-blue-50 text-blue-600'
                             : 'bg-purple-50 text-purple-600'
