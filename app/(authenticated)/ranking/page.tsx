@@ -509,7 +509,7 @@ export default function RankingPage() {
   return (
     <>
       <Header title="楽天ランキング履歴" subtitle="レディースファッション｜デイリー集計" />
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6">
         {/* Controls */}
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={genre} onValueChange={setGenre}>
@@ -690,7 +690,7 @@ export default function RankingPage() {
                         <button
                           type="button"
                           onClick={() => toggleExpand(key, product.matched_product_code, product.item_code, product.item_url)}
-                          className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50/50 transition-colors rounded-lg"
+                          className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50/50 transition-colors rounded-lg overflow-hidden"
                         >
                           {/* Rank */}
                           <div className="w-16 text-center flex-shrink-0">
