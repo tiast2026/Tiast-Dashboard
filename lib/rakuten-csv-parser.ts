@@ -52,11 +52,13 @@ export function getDataTypeLabel(type: RakutenDataType): string {
 // ---------- ファイル名からデータ種類を判定 ----------
 
 export function detectDataTypeFromFilename(filename: string): RakutenDataType | null {
-  if (filename.includes('店舗データ')) return 'store_data'
-  if (filename.includes('SKU別売上')) return 'sku_sales'
-  if (filename.includes('新規') && filename.includes('店舗別')) return 'new_repeat_store'
-  if (filename.includes('新規') && filename.includes('商品別')) return 'new_repeat_product'
-  if (filename.includes('新規') && filename.includes('商品ジャンル別')) return 'new_repeat_genre'
+  // macOSからアップロードされたファイル名はNFD（濁点分離）の場合があるためNFCに正規化
+  const fn = filename.normalize('NFC')
+  if (fn.includes('店舗データ')) return 'store_data'
+  if (fn.includes('SKU別売上')) return 'sku_sales'
+  if (fn.includes('新規') && fn.includes('店舗別')) return 'new_repeat_store'
+  if (fn.includes('新規') && fn.includes('商品別')) return 'new_repeat_product'
+  if (fn.includes('新規') && fn.includes('商品ジャンル別')) return 'new_repeat_genre'
   return null
 }
 
