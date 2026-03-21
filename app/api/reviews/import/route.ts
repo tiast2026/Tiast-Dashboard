@@ -7,8 +7,8 @@ import {
 import { getReviewMappingMap, appendReviewMappings } from '@/lib/google-sheets'
 import { batchScrapeProductCodes } from '@/lib/rakuten-review-scraper'
 
-// Allow up to 60s for this function (Vercel Pro)
-export const maxDuration = 60
+// Allow up to 300s for this function (Vercel Pro)
+export const maxDuration = 300
 
 const PROJECT = 'tiast-data-platform'
 const DATASET = 'analytics_mart'
@@ -188,10 +188,12 @@ async function runImport(dryRun = false, reprocess = false) {
     return { ...r, rakuten_item_id: rakutenItemId, matched_product_code: matched }
   })
 
-  // 3.5 Scrape product codes for reviews that have no matched_product_code
+  // 3.5 Scrape product codes for reviews that have no matched_product_code (limit to avoid timeout)
+  const MAX_SCRAPE = 30
   const unmatchedUrls = enrichedReviews
     .filter(r => !r.matched_product_code && r.rakuten_item_id && r.review_type === '商品レビュー')
     .map(r => r.review_url)
+    .slice(0, MAX_SCRAPE)
 
   if (unmatchedUrls.length > 0) {
     console.log(`[レビューインポート] ${unmatchedUrls.length}件の未マッチレビューをスクレイピング中...`)
