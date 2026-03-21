@@ -590,7 +590,7 @@ function ReviewSection({ reviews, summary, loading }: {
   summary: ReviewSummary | null
   loading: boolean
 }) {
-  const [filter, setFilter] = useState<'all' | '商品レビュー' | 'ショップレビュー'>('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | '楽天' | '公式'>('all')
 
   if (loading) {
     return (
@@ -606,7 +606,7 @@ function ReviewSection({ reviews, summary, loading }: {
 
   if (reviews.length === 0) return null
 
-  const filtered = filter === 'all' ? reviews : reviews.filter(r => r.review_type === filter)
+  const filtered = sourceFilter === 'all' ? reviews : reviews.filter(r => (r.review_source || '楽天') === sourceFilter)
 
   return (
     <div className="bg-gray-50 rounded-lg p-4">
@@ -623,18 +623,18 @@ function ReviewSection({ reviews, summary, loading }: {
           )}
         </div>
         <div className="flex gap-1">
-          {(['all', '商品レビュー', 'ショップレビュー'] as const).map((type) => {
-            const label = type === 'all' ? '全て' : type === '商品レビュー' ? '商品' : 'ショップ'
-            const count = type === 'all'
+          {(['all', '楽天', '公式'] as const).map((source) => {
+            const label = source === 'all' ? '全て' : source
+            const count = source === 'all'
               ? reviews.length
-              : reviews.filter(r => r.review_type === type).length
-            if (count === 0 && type !== 'all') return null
+              : reviews.filter(r => (r.review_source || '楽天') === source).length
+            if (count === 0 && source !== 'all') return null
             return (
               <button
-                key={type}
-                onClick={() => setFilter(type)}
+                key={source}
+                onClick={() => setSourceFilter(source)}
                 className={`px-2 py-0.5 rounded text-xs transition-colors ${
-                  filter === type
+                  sourceFilter === source
                     ? 'bg-orange-100 text-orange-700'
                     : 'text-gray-400 hover:text-gray-600'
                 }`}
