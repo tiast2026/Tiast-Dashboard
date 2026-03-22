@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatPercent } from '@/lib/format'
+import FilterBar from '@/components/filters/FilterBar'
+import { formatCurrency, formatPercent, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Sun, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
 
@@ -93,10 +94,51 @@ function SeasonalityContent() {
     <>
       <Header title="季節性予測" subtitle="カテゴリ別の季節パターン・来月予測" />
       <div className="p-8 space-y-6">
+        <FilterBar month={getCurrentMonth()} onMonthChange={() => {}} brand={brand || '全て'} onBrandChange={() => {}} hideBrand={!!urlBrand} hideMonth />
+
         {loading ? (
           <Skeleton className="h-96 rounded-lg" />
         ) : monthlyTrend.length > 0 ? (
           <>
+            {/* Summary KPIs */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">分析期間</div>
+                  <div className="text-xl font-bold text-[#3D352F] tabular-nums mt-2">{monthlyTrend.length}ヶ月</div>
+                  <div className="text-[11px] text-gray-400 mt-1">{monthlyTrend[0]?.order_month} 〜 {monthlyTrend[monthlyTrend.length - 1]?.order_month}</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">期間合計売上</div>
+                  <div className="text-xl font-bold text-[#3D352F] tabular-nums mt-2">{formatCurrency(monthlyTrend.reduce((s, m) => s + (Number(m.revenue) || 0), 0))}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">月平均 {formatCurrency(monthlyTrend.reduce((s, m) => s + (Number(m.revenue) || 0), 0) / monthlyTrend.length)}</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">最高売上月</div>
+                  {(() => {
+                    const best = monthlyTrend.reduce((prev, curr) => (Number(curr.revenue) || 0) > (Number(prev.revenue) || 0) ? curr : prev)
+                    return (
+                      <>
+                        <div className="text-xl font-bold text-emerald-600 tabular-nums mt-2">{formatCurrency(Number(best.revenue) || 0)}</div>
+                        <div className="text-[11px] text-gray-400 mt-1">{best.order_month}</div>
+                      </>
+                    )
+                  })()}
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">カテゴリ数</div>
+                  <div className="text-xl font-bold text-[#3D352F] tabular-nums mt-2">{topCategories.length}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">上位カテゴリ分析</div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Forecast card */}
             {forecast && (
               <Card className="border-0 shadow-sm bg-gradient-to-r from-amber-50/30 to-orange-50/30">

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import AlertCard from '@/components/cards/AlertCard'
 import DataTable, { Column } from '@/components/tables/DataTable'
@@ -93,15 +94,23 @@ const ALERT_TYPE_OPTIONS = [
   { value: 'season_exceeded', label: 'シーズン超過' },
 ] as const
 
-export default function InventoryPage() {
+function InventoryContent() {
+  const searchParams = useSearchParams()
+  const urlBrand = searchParams.get('brand')
+
   // Filter state
   const [search, setSearch] = useState('')
-  const [brand, setBrand] = useState('全て')
+  const [brand, setBrand] = useState(urlBrand || '全て')
   const [category, setCategory] = useState('全て')
   const [season, setSeason] = useState('全て')
   const [status, setStatus] = useState('全て')
   const [lifecycle, setLifecycle] = useState('全て')
   const [alertType, setAlertType] = useState('all')
+
+  // Sync brand from URL
+  useEffect(() => {
+    if (urlBrand) setBrand(urlBrand)
+  }, [urlBrand])
 
   // Sort and pagination
   const [sortBy, setSortBy] = useState('stock_retail_value')
@@ -948,4 +957,8 @@ function InfoCell({ label, value, highlight, warn }: {
       </div>
     </div>
   )
+}
+
+export default function InventoryPage() {
+  return <Suspense><InventoryContent /></Suspense>
 }

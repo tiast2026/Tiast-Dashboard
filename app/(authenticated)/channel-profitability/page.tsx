@@ -68,29 +68,50 @@ function ChannelContent() {
           <div className="grid grid-cols-3 gap-4">{Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>
         ) : channels.length > 0 ? (
           <>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-5 gap-4">
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計売上</div>
-                  <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatCurrency(totalRevenue)}</div>
+                  <div className="text-2xl font-bold text-[#3D352F] tabular-nums mt-2">{formatCurrency(totalRevenue)}</div>
                   <div className="text-[11px] text-gray-400 mt-1">{channels.length}チャネル</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計粗利</div>
-                  <div className="text-3xl font-bold text-emerald-600 tabular-nums mt-2">{formatCurrency(totalProfit)}</div>
+                  <div className="text-2xl font-bold text-emerald-600 tabular-nums mt-2">{formatCurrency(totalProfit)}</div>
                   <div className="text-[11px] text-gray-400 mt-1">粗利率 {totalRevenue > 0 ? formatPercent(totalProfit / totalRevenue) : '-'}</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
-                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">最高粗利率チャネル</div>
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計注文数</div>
+                  <div className="text-2xl font-bold text-[#3D352F] tabular-nums mt-2">{formatNumber(channels.reduce((s, c) => s + (Number(c.order_count) || 0), 0))}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">全チャネル合計</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">平均注文額</div>
+                  {(() => {
+                    const totalOrders = channels.reduce((s, c) => s + (Number(c.order_count) || 0), 0)
+                    return (
+                      <>
+                        <div className="text-2xl font-bold text-blue-600 tabular-nums mt-2">{totalOrders > 0 ? formatCurrency(totalRevenue / totalOrders) : '-'}</div>
+                        <div className="text-[11px] text-gray-400 mt-1">AOV</div>
+                      </>
+                    )
+                  })()}
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">最高粗利率</div>
                   {(() => {
                     const best = channels.reduce((prev, curr) => (Number(curr.gross_margin) || 0) > (Number(prev.gross_margin) || 0) ? curr : prev)
                     return (
                       <>
-                        <div className="text-3xl font-bold text-[#3D352F] mt-2">{best.channel}</div>
+                        <div className="text-2xl font-bold text-[#3D352F] mt-2">{best.channel}</div>
                         <div className="text-[11px] text-emerald-600 mt-1 font-medium">{formatPercent(Number(best.gross_margin) || 0)}</div>
                       </>
                     )
