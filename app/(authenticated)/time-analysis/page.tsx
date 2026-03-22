@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, getCurrentMonth } from '@/lib/format'
+import { formatCurrency, formatNumber, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Clock, Calendar } from 'lucide-react'
 
@@ -81,6 +81,46 @@ function TimeContent() {
           <Skeleton className="h-96 rounded-lg" />
         ) : heatmap.length > 0 ? (
           <>
+            {/* KPI Summary */}
+            {(() => {
+              const totalOrders = dailySummary.reduce((s, d) => s + (Number(d.order_count) || 0), 0)
+              const totalRev = dailySummary.reduce((s, d) => s + (Number(d.revenue) || 0), 0)
+              const peakDay = dailySummary.length > 0 ? dailySummary.reduce((prev, curr) => (Number(curr.order_count) || 0) > (Number(prev.order_count) || 0) ? curr : prev) : null
+              const peakH = peakHours.length > 0 ? peakHours.reduce((prev, curr) => (Number(curr.order_count) || 0) > (Number(prev.order_count) || 0) ? curr : prev) : null
+              return (
+                <div className="grid grid-cols-4 gap-4">
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計注文数</div>
+                      <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatNumber(totalOrders)}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">当月合計</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計売上</div>
+                      <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatCurrency(totalRev)}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">AOV {totalOrders > 0 ? formatCurrency(totalRev / totalOrders) : '-'}</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">ピーク曜日</div>
+                      <div className="text-3xl font-bold text-green-600 mt-2">{peakDay ? DAY_NAMES[peakDay.day_of_week] + '曜日' : '-'}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{peakDay ? `${formatNumber(Number(peakDay.order_count) || 0)}件` : ''}</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">ピーク時間帯</div>
+                      <div className="text-3xl font-bold text-orange-600 mt-2">{peakH ? `${peakH.hour}時台` : '-'}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{peakH ? `${formatNumber(Number(peakH.order_count) || 0)}件` : ''}</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )
+            })()}
+
             {/* Heatmap */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">

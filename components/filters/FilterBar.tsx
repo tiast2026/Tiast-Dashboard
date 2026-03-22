@@ -10,6 +10,7 @@ interface FilterBarProps {
   months?: string[] // available months for dropdown
   children?: React.ReactNode // additional filter elements
   hideBrand?: boolean // hide brand selector when on brand-specific page
+  hideMonth?: boolean // hide month selector
 }
 
 function generateMonths(count: number = 24): string[] {
@@ -27,20 +28,22 @@ function formatMonthLabel(m: string): string {
   return `${year}年${parseInt(month)}月`
 }
 
-export default function FilterBar({ month, onMonthChange, brand, onBrandChange, months, children, hideBrand }: FilterBarProps) {
+export default function FilterBar({ month, onMonthChange, brand, onBrandChange, months, children, hideBrand, hideMonth }: FilterBarProps) {
   const monthOptions = months || generateMonths()
   return (
     <div className="flex items-center gap-3 flex-wrap">
-      <Select value={month} onValueChange={onMonthChange}>
-        <SelectTrigger className="w-40 bg-white">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {monthOptions.map((m) => (
-            <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {!hideMonth && (
+        <Select value={month} onValueChange={onMonthChange}>
+          <SelectTrigger className="w-40 bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map((m) => (
+              <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       {!hideBrand && (
         <Select value={brand} onValueChange={onBrandChange}>
           <SelectTrigger className="w-40 bg-white">

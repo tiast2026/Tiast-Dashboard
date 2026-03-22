@@ -60,6 +60,46 @@ function BasketContent() {
           <div className="grid grid-cols-2 gap-6"><Skeleton className="h-64 rounded-lg" /><Skeleton className="h-64 rounded-lg" /></div>
         ) : (
           <>
+            {/* KPI Summary */}
+            {(() => {
+              const avgBasketSize = totalOrders > 0
+                ? basketSize.reduce((s, b) => s + (Number(b.items_in_order) || 0) * (Number(b.order_count) || 0), 0) / totalOrders
+                : 0
+              const multiItem = basketSize.filter(b => Number(b.items_in_order) >= 2)
+              const multiOrders = multiItem.reduce((s, b) => s + (Number(b.order_count) || 0), 0)
+              const multiRate = totalOrders > 0 ? multiOrders / totalOrders : 0
+              return (
+                <div className="grid grid-cols-4 gap-4">
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">合計注文数</div>
+                      <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatNumber(totalOrders)}</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">平均バスケットサイズ</div>
+                      <div className="text-3xl font-bold text-indigo-600 tabular-nums mt-2">{avgBasketSize.toFixed(1)}点</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">複数購入率</div>
+                      <div className="text-3xl font-bold text-emerald-600 tabular-nums mt-2">{formatPercent(multiRate)}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">{formatNumber(multiOrders)}件</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-0 shadow-sm">
+                    <CardContent className="p-5">
+                      <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">併売ペア数</div>
+                      <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatNumber(pairs.length)}</div>
+                      <div className="text-[11px] text-gray-400 mt-1">検出された組合せ</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )
+            })()}
+
             <div className="grid grid-cols-2 gap-6">
               {/* Basket size */}
               <Card className="border-0 shadow-sm">

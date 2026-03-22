@@ -5,7 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
+import FilterBar from '@/components/filters/FilterBar'
+import { formatCurrency, formatNumber, formatPercent, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Crown, Users, TrendingUp } from 'lucide-react'
 
@@ -16,8 +17,9 @@ interface Cohort { cohort_month: string; months_since: number; customers: number
 function LTVContent() {
   const searchParams = useSearchParams()
   const urlBrand = searchParams.get('brand')
+  const [month, setMonth] = useState(getCurrentMonth())
   const brand = urlBrand || ''
-  const cacheKey = `ltv-v1:${brand}`
+  const cacheKey = `ltv-v1:${brand}:${month}`
 
   const cached = getCached<{ distribution: Distribution[]; topCustomers: TopCustomer[]; cohort: Cohort[] }>(cacheKey)
   const [distribution, setDistribution] = useState<Distribution[]>(cached?.distribution ?? [])
@@ -32,8 +34,11 @@ function LTVContent() {
     if (isFresh(cacheKey)) return
     if (!getCached(cacheKey)) setLoading(true)
     try {
-      const bParam = brand ? `?brand=${brand}` : ''
-      const res = await fetch(`/api/ltv${bParam}`)
+      const params = new URLSearchParams()
+      if (brand) params.set('brand', brand)
+      if (month) params.set('month', month)
+      const qs = params.toString()
+      const res = await fetch(`/api/ltv${qs ? `?${qs}` : ''}`)
       const data = res.ok ? await res.json() : null
       if (mountedRef.current && data) {
         setDistribution(Array.isArray(data.distribution) ? data.distribution : [])
@@ -42,7 +47,7 @@ function LTVContent() {
         setCache(cacheKey, data)
       }
     } catch { /* ignore */ } finally { if (mountedRef.current) setLoading(false) }
-  }, [brand, cacheKey])
+  }, [brand, month, cacheKey])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -66,27 +71,44 @@ function LTVContent() {
     <>
       <Header title="LTV分析" subtitle="顧客生涯価値・コホートリテンション" />
       <div className="p-8 space-y-6">
+        <FilterBar month={month} onMonthChange={setMonth} brand={brand || '全て'} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+
         {loading ? (
           <div className="grid grid-cols-3 gap-4">{Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>
         ) : distribution.length > 0 ? (
           <>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">全顧客数</div>
                   <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatNumber(totalCustomers)}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">分析対象</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">累計売上</div>
                   <div className="text-3xl font-bold text-[#3D352F] tabular-nums mt-2">{formatCurrency(totalRevenue)}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">全期間合計</div>
                 </CardContent>
               </Card>
               <Card className="border-0 shadow-sm">
                 <CardContent className="p-5">
                   <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">平均LTV</div>
                   <div className="text-3xl font-bold text-purple-600 tabular-nums mt-2">{formatCurrency(overallAvgLtv)}</div>
+                  <div className="text-[11px] text-gray-400 mt-1">1人あたり生涯価値</div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-5">
+                  <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">平均注文回数</div>
+                  <div className="text-3xl font-bold text-amber-600 tabular-nums mt-2">
+                    {(() => {
+                      const totalOrders = distribution.reduce((s, d) => s + (Number(d.avg_orders) || 0) * (Number(d.customer_count) || 0), 0)
+                      return totalCustomers > 0 ? (totalOrders / totalCustomers).toFixed(1) : '-'
+                    })()}回
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-1">1人あたり</div>
                 </CardContent>
               </Card>
             </div>
