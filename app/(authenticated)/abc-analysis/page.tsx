@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatNumber, formatPercent, getCurrentMonth } from '@/lib/format'
@@ -64,6 +65,7 @@ function ABCContent() {
       <Header title="ABC分析" subtitle="パレート分析 - 売上上位商品の集中度" />
       <div className="p-8 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {loading ? (
           <div className="grid grid-cols-4 gap-4">{Array.from({length: 4}).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
+import GroupTabs from '@/components/layout/GroupTabs'
 import AlertCard from '@/components/cards/AlertCard'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import LifecycleBadge from '@/components/products/LifecycleBadge'
@@ -195,6 +196,7 @@ function InventoryContent() {
       setInventoryList(data)
     } catch (e) {
       console.error('Failed to fetch inventory list:', e)
+      setInventoryList({ data: [], total: 0, page: 1, per_page: perPage, total_pages: 0 })
     } finally {
       setListLoading(false)
     }
@@ -404,6 +406,7 @@ function InventoryContent() {
     <>
       <Header title="在庫管理" subtitle="商品マスタ連携" />
       <div className="p-6 space-y-6">
+        <GroupTabs />
         {/* Search & Filter Bar */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
@@ -584,7 +587,7 @@ function InventoryContent() {
                 onRowClick={handleRowClick}
               />
             ) : (
-              <div className="text-center py-8 text-gray-500">データの読み込みに失敗しました</div>
+              <div className="text-center py-8 text-gray-500">在庫データがありません</div>
             )}
           </CardContent>
         </Card>

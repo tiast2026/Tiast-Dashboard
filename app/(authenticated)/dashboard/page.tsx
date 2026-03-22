@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { getBrandDisplayName, BRAND_COLORS, CHANNEL_GROUP_COLORS } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import KPICard from '@/components/cards/KPICard'
 import {
   LazyDailySalesChart as DailySalesChart,
@@ -397,6 +398,7 @@ function DashboardPageContent() {
       <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 売上分析` : 'ダッシュボード'} />
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {/* ===== 常時表示: 売上 KPI ===== */}
         <div>

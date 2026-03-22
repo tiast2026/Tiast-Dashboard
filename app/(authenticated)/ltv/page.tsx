@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { formatCurrency, formatNumber, formatPercent, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Crown, Users, TrendingUp } from 'lucide-react'
@@ -72,6 +73,7 @@ function LTVContent() {
       <Header title="LTV分析" subtitle="顧客生涯価値・コホートリテンション" />
       <div className="p-8 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand || '全て'} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {loading ? (
           <div className="grid grid-cols-3 gap-4">{Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>

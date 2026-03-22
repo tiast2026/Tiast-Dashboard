@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
@@ -203,6 +204,7 @@ function ReviewsContent() {
         </button>
       </Header>
       <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
+        <GroupTabs />
         {/* Summary row */}
         {summary && (
           <div className="grid grid-cols-6 gap-3">

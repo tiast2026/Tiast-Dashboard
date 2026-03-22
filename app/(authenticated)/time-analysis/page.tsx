@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatNumber, getCurrentMonth } from '@/lib/format'
@@ -76,6 +77,7 @@ function TimeContent() {
       <Header title="曜日×時間帯分析" subtitle="注文の曜日・時間帯パターン" />
       <div className="p-8 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {loading ? (
           <Skeleton className="h-96 rounded-lg" />

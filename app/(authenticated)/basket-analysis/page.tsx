@@ -4,14 +4,18 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatCurrency, formatNumber, formatPercent, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { ShoppingCart, ArrowRight, BarChart3 } from 'lucide-react'
+import ProductImage from '@/components/ui/product-image'
 
 interface Pair { product_a: string; product_a_name: string; product_b: string; product_b_name: string; pair_count: number; support: number; confidence_a_to_b: number; confidence_b_to_a: number }
 interface BasketSize { items_in_order: number; order_count: number; avg_revenue: number }
+interface ProductInfo { brand?: string; category?: string; season?: string; selling_price?: number; image_url?: string; product_name?: string }
 
 function BasketContent() {
   const searchParams = useSearchParams()
@@ -46,15 +50,40 @@ function BasketContent() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  const [selectedProduct, setSelectedProduct] = useState<{ code: string; name: string } | null>(null)
+  const [productDetail, setProductDetail] = useState<ProductInfo | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  const showProductDetail = async (code: string, name: string) => {
+    setSelectedProduct({ code, name })
+    setDetailLoading(true)
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(code)}`)
+      const data = res.ok ? await res.json() : null
+      setProductDetail(data)
+    } catch { setProductDetail(null) } finally { setDetailLoading(false) }
+  }
+
   const maxPairCount = Math.max(...pairs.map(p => Number(p.pair_count) || 0), 1)
   const totalOrders = basketSize.reduce((s, b) => s + (Number(b.order_count) || 0), 0)
   const maxBasketOrders = Math.max(...basketSize.map(b => Number(b.order_count) || 0), 1)
+
+  const ProductLink = ({ code, name }: { code: string; name: string }) => (
+    <button
+      onClick={() => showProductDetail(code, name)}
+      className="text-left font-medium text-[#3D352F] hover:text-[#C4A882] hover:underline cursor-pointer truncate transition-colors"
+      title={name || code}
+    >
+      {name || code}
+    </button>
+  )
 
   return (
     <>
       <Header title="バスケット分析" subtitle="併売パターン・セット購入の発見" />
       <div className="p-8 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-6"><Skeleton className="h-64 rounded-lg" /><Skeleton className="h-64 rounded-lg" /></div>
@@ -152,9 +181,9 @@ function BasketContent() {
                   {pairs.slice(0, 5).map((p, i) => (
                     <div key={i} className="p-3 rounded-xl border border-gray-100/60 bg-gradient-to-r from-gray-50/50 to-white">
                       <div className="flex items-center gap-2 text-[12px]">
-                        <span className="font-bold text-[#3D352F] flex-1 truncate">{p.product_a_name || p.product_a}</span>
+                        <div className="flex-1 min-w-0"><ProductLink code={p.product_a} name={p.product_a_name || p.product_a} /></div>
                         <ArrowRight className="w-3 h-3 text-gray-400 shrink-0" />
-                        <span className="font-bold text-[#3D352F] flex-1 truncate text-right">{p.product_b_name || p.product_b}</span>
+                        <div className="flex-1 min-w-0 text-right"><ProductLink code={p.product_b} name={p.product_b_name || p.product_b} /></div>
                       </div>
                       <div className="flex items-center justify-between mt-2 text-[10px] text-gray-500">
                         <span>同時購入 <span className="font-bold text-[#3D352F]">{Number(p.pair_count) || 0}回</span></span>
@@ -192,8 +221,8 @@ function BasketContent() {
                         {pairs.map((p, i) => (
                           <tr key={i} className={`border-b border-black/[0.04] ${i % 2 === 1 ? 'bg-[#FDFCFB]' : ''}`}>
                             <td className="px-2 py-2 text-center text-[11px] text-gray-400">{i + 1}</td>
-                            <td className="px-3 py-2 text-[11px] text-[#3D352F] font-medium truncate max-w-[180px]">{p.product_a_name || p.product_a}</td>
-                            <td className="px-3 py-2 text-[11px] text-[#3D352F] font-medium truncate max-w-[180px]">{p.product_b_name || p.product_b}</td>
+                            <td className="px-3 py-2 text-[11px] max-w-[200px]"><ProductLink code={p.product_a} name={p.product_a_name || p.product_a} /></td>
+                            <td className="px-3 py-2 text-[11px] max-w-[200px]"><ProductLink code={p.product_b} name={p.product_b_name || p.product_b} /></td>
                             <td className="px-3 py-2 text-right tabular-nums text-[11px] font-bold text-[#3D352F]">{Number(p.pair_count) || 0}</td>
                             <td className="px-3 py-2 text-right tabular-nums text-[11px] text-[#5A524B]">{formatPercent(Number(p.support) || 0)}</td>
                             <td className="px-3 py-2 text-right tabular-nums text-[11px] text-emerald-600 font-medium">{formatPercent(Number(p.confidence_a_to_b) || 0)}</td>
@@ -214,6 +243,64 @@ function BasketContent() {
           </>
         )}
       </div>
+
+      {/* Product Detail Dialog */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => { if (!open) { setSelectedProduct(null); setProductDetail(null) } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[15px] font-bold text-[#3D352F]">商品詳細</DialogTitle>
+          </DialogHeader>
+          {detailLoading ? (
+            <div className="space-y-3 py-4">
+              <Skeleton className="h-32 rounded-lg" />
+              <Skeleton className="h-6 w-3/4" />
+            </div>
+          ) : selectedProduct && (
+            <div className="space-y-4">
+              {productDetail && productDetail.image_url && (
+                <div className="flex justify-center">
+                  <ProductImage src={productDetail.image_url} alt={selectedProduct.name} className="w-32 h-32 rounded-lg object-cover" />
+                </div>
+              )}
+              <div>
+                <div className="text-[14px] font-bold text-[#3D352F] leading-relaxed">{selectedProduct.name}</div>
+                <div className="text-[11px] text-gray-400 mt-1">{selectedProduct.code}</div>
+              </div>
+              {productDetail && (
+                <div className="grid grid-cols-2 gap-3">
+                  {productDetail.brand && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-[10px] text-gray-500">ブランド</div>
+                      <div className="text-[13px] font-medium text-[#3D352F]">{productDetail.brand}</div>
+                    </div>
+                  )}
+                  {productDetail.category && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-[10px] text-gray-500">カテゴリ</div>
+                      <div className="text-[13px] font-medium text-[#3D352F]">{productDetail.category}</div>
+                    </div>
+                  )}
+                  {productDetail.selling_price != null && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-[10px] text-gray-500">販売価格</div>
+                      <div className="text-[13px] font-bold text-[#3D352F]">{formatCurrency(Number(productDetail.selling_price) || 0)}</div>
+                    </div>
+                  )}
+                  {productDetail.season && (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="text-[10px] text-gray-500">シーズン</div>
+                      <div className="text-[13px] font-medium text-[#3D352F]">{productDetail.season}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!productDetail && (
+                <div className="text-center text-gray-400 text-sm py-4">商品マスタに登録されていません</div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

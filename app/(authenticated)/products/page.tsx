@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
+import GroupTabs from '@/components/layout/GroupTabs'
 import DataTable, { Column } from '@/components/tables/DataTable'
 import { TableRow, TableCell } from '@/components/ui/table'
 import AlertCard from '@/components/cards/AlertCard'
@@ -573,6 +574,7 @@ function ProductsPageContent() {
     <>
       <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 商品分析` : '商品分析'} />
       <div className="p-6 pb-0 space-y-4 flex flex-col h-[calc(100vh-4rem)]">
+        <GroupTabs />
         {/* Inventory Alerts */}
         {alerts && (
           <div className="grid grid-cols-3 gap-4">

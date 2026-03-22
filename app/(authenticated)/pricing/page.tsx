@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -258,6 +259,7 @@ function PricingPageContent() {
           onBrandChange={() => {}}
           hideBrand={!!urlBrand}
         />
+        <GroupTabs />
 
         {/* KPI Cards */}
         {loading ? (

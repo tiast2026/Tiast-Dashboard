@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { getBrandDisplayName } from '@/lib/constants'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import KPICard from '@/components/cards/KPICard'
 import { LazyStackedBarChart as StackedBarChart, LazyBarChart as BarChart } from '@/components/charts/LazyCharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -199,6 +200,7 @@ function CustomersPageContent() {
       <Header title={urlBrand ? `${getBrandDisplayName(urlBrand)} 顧客分析` : '顧客分析'} />
       <div className="p-6 space-y-6">
         <FilterBar month={month} onMonthChange={setMonth} brand={brand} onBrandChange={() => {}} hideBrand={!!urlBrand} />
+        <GroupTabs />
 
         {/* KPI Cards */}
         {loading ? (

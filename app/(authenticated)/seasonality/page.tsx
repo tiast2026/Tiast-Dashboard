@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import FilterBar from '@/components/filters/FilterBar'
+import GroupTabs from '@/components/layout/GroupTabs'
 import { formatCurrency, formatPercent, getCurrentMonth } from '@/lib/format'
 import { getCached, setCache, isFresh } from '@/lib/client-cache'
 import { Sun, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
@@ -95,6 +96,7 @@ function SeasonalityContent() {
       <Header title="季節性予測" subtitle="カテゴリ別の季節パターン・来月予測" />
       <div className="p-8 space-y-6">
         <FilterBar month={getCurrentMonth()} onMonthChange={() => {}} brand={brand || '全て'} onBrandChange={() => {}} hideBrand={!!urlBrand} hideMonth />
+        <GroupTabs />
 
         {loading ? (
           <Skeleton className="h-96 rounded-lg" />
